@@ -33,6 +33,8 @@ import type {
   PropagationStatusDto,
   RegisterInput,
   RoleDto,
+  SecurityFindingDto,
+  SecurityScoreDto,
   SocialAccountDto,
   SocialProviderDto,
   SocialRedirectResponse,
@@ -405,5 +407,21 @@ export class HttpApiClient implements ApiClient {
 
   restoreFileVersion(fileId: string, versionId: string): Promise<DriveFileDto> {
     return this.request(`/storage/files/${fileId}/versions/${versionId}/restore`, { method: 'POST' });
+  }
+
+  getSecurityScore(): Promise<SecurityScoreDto> {
+    return this.request('/security');
+  }
+
+  scanSecurity(): Promise<SecurityScoreDto> {
+    return this.request('/security/scan', { method: 'POST' });
+  }
+
+  dismissSecurityFinding(id: string): Promise<SecurityFindingDto> {
+    return this.request(`/security/findings/${id}/dismiss`, { method: 'POST' });
+  }
+
+  reopenSecurityFinding(id: string): Promise<SecurityFindingDto> {
+    return this.request(`/security/findings/${id}/reopen`, { method: 'POST' });
   }
 }

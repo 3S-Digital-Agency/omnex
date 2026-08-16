@@ -112,6 +112,7 @@ export interface SocialProviderDto {
   name: string;
   label: string;
   configured: boolean;
+  recommended?: boolean;
 }
 
 export interface SocialAccountDto {
@@ -365,4 +366,35 @@ export interface DriveFileUpdateInput {
   name?: string;
   contents?: string;
   mime_type?: string;
+}
+
+export type SecuritySeverity = 'high' | 'medium' | 'low';
+export type SecurityFindingStatus = 'open' | 'resolved' | 'dismissed';
+
+export interface SecurityFindingDto {
+  id: string;
+  rule: string;
+  severity: SecuritySeverity;
+  status: SecurityFindingStatus;
+  resource_type?: string | null;
+  resource_id?: string | null;
+  metadata?: Record<string, unknown> | null;
+  resolved_at?: string | null;
+  dismissed_at?: string | null;
+  created_at?: string;
+}
+
+export interface SecurityScoreSummary {
+  open: number;
+  resolved: number;
+  dismissed: number;
+  high: number;
+  medium: number;
+  low: number;
+}
+
+export interface SecurityScoreDto {
+  score: number;
+  summary: SecurityScoreSummary;
+  findings: SecurityFindingDto[];
 }

@@ -9,6 +9,7 @@ use App\Support\SocialAuth\Providers\FacebookSocialProvider;
 use App\Support\SocialAuth\Providers\GoogleSocialProvider;
 use App\Support\SocialAuth\Providers\MicrosoftSocialProvider;
 use App\Support\SocialAuth\Providers\SandboxSocialProvider;
+use App\Support\SocialAuth\Providers\SdpSocialProvider;
 use InvalidArgumentException;
 
 final class SocialAuthRegistry
@@ -24,6 +25,7 @@ final class SocialAuthRegistry
         $this->register(new AppleSocialProvider);
         $this->register(new FacebookSocialProvider);
         $this->register(new AmazonSocialProvider);
+        $this->register(new SdpSocialProvider);
     }
 
     public function register(SocialAuthProviderInterface $provider): void

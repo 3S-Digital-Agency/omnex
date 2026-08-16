@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DriveFolder extends Model
 {
-    use HasFactory, HasUuids, HasTenant;
+    use HasFactory, HasTenant, HasUuids;
 
     protected $fillable = [
         'organization_id',

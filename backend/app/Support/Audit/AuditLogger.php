@@ -4,6 +4,7 @@ namespace App\Support\Audit;
 
 use App\Models\AuditLog;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Http\Request;
 
 final class AuditLogger
 {
@@ -15,7 +16,7 @@ final class AuditLogger
         ?array $after = null,
         string $result = 'success',
     ): AuditLog {
-        /** @var \Illuminate\Http\Request|null $request */
+        /** @var Request|null $request */
         $request = app('request');
 
         return AuditLog::create([

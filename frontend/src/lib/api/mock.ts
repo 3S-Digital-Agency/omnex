@@ -37,6 +37,8 @@ import type {
   PropagationStatusDto,
   RegisterInput,
   RoleDto,
+  SecurityFindingDto,
+  SecurityScoreDto,
   SocialAccountDto,
   SocialProviderDto,
   SocialRedirectResponse,
@@ -90,6 +92,8 @@ const ALL_PERMISSIONS = [
   'dns.manage',
   'storage.read',
   'storage.manage',
+  'security.read',
+  'security.manage',
 ];
 
 const roles: RoleDto[] = [
@@ -99,21 +103,21 @@ const roles: RoleDto[] = [
     name: 'Admin',
     key: 'admin',
     description: 'Manage members and settings.',
-    permissions: ['organizations.read', 'organizations.invite', 'members.manage', 'audit.read', 'notifications.read', 'domains.read', 'domains.manage', 'dns.read', 'dns.manage', 'storage.read', 'storage.manage'],
+    permissions: ['organizations.read', 'organizations.invite', 'members.manage', 'audit.read', 'notifications.read', 'domains.read', 'domains.manage', 'dns.read', 'dns.manage', 'storage.read', 'storage.manage', 'security.read', 'security.manage'],
   },
   {
     id: 'role-developer',
     name: 'Developer',
     key: 'developer',
     description: 'Read access to the organization and audit log.',
-    permissions: ['organizations.read', 'audit.read', 'notifications.read', 'domains.read', 'dns.read', 'storage.read'],
+    permissions: ['organizations.read', 'audit.read', 'notifications.read', 'domains.read', 'dns.read', 'storage.read', 'security.read'],
   },
   {
     id: 'role-viewer',
     name: 'Viewer',
     key: 'viewer',
     description: 'Read-only access.',
-    permissions: ['organizations.read', 'notifications.read', 'domains.read', 'dns.read', 'storage.read'],
+    permissions: ['organizations.read', 'notifications.read', 'domains.read', 'dns.read', 'storage.read', 'security.read'],
   },
 ];
 
@@ -342,6 +346,103 @@ function driveVersionsOf(fileId: string): MockDriveVersion[] {
   return driveVersions.filter((v) => v.file_id === fileId).sort((a, b) => b.version - a.version);
 }
 
+const dismissedSecurityFindingIds = new Set<string>();
+
+const SECURITY_PENALTIES: Record<string, number> = { high: 25, medium: 15, low: 10 };
+
+function securityFindingId(rule: string, resourceId: string | null): string {
+  return `sec-${rule}-${resourceId ?? 'org'}`;
+}
+
+function securityFinding(
+  rule: string,
+  severity: 'high' | 'medium' | 'low',
+  resourceType: string | null,
+  resourceId: string | null,
+  metadata: Record<string, unknown>,
+): SecurityFindingDto {
+  const id = securityFindingId(rule, resourceId);
+  return {
+    id,
+    rule,
+    severity,
+    status: dismissedSecurityFindingIds.has(id) ? 'dismissed' : 'open',
+    resource_type: resourceType,
+    resource_id: resourceId,
+    metadata,
+    created_at: nowIso(),
+  };
+}
+
+function computeSecurityFindings(): SecurityFindingDto[] {
+  const activeMembers = memberships.filter((m) => m.status === 'active');
+  const memberUsers = activeMembers
+    .map((m) => users.find((u) => u.id === m.userId))
+    .filter((u): u is MockUser => !!u);
+
+  const findings: SecurityFindingDto[] = [];
+
+  for (const u of memberUsers) {
+    if (!u.mfa_enabled) {
+      findings.push(securityFinding('mfa', 'high', 'user', u.id, { name: u.name, email: u.email }));
+    }
+    if (!u.email_verified_at) {
+      findings.push(securityFinding('email', 'low', 'user', u.id, { name: u.name, email: u.email }));
+    }
+  }
+
+  if (activeMembers.length <= 1) {
+    findings.push(securityFinding('single_member', 'medium', null, null, { member_count: activeMembers.length }));
+  }
+
+  const now = Date.now();
+  const warningMs = 30 * 86400000;
+  for (const domain of domains) {
+    if (!domain.expires_at) continue;
+    const exp = new Date(domain.expires_at).getTime();
+    if (exp > now && exp <= now + warningMs) {
+      const days = Math.max(0, Math.ceil((exp - now) / 86400000));
+      findings.push(
+        securityFinding('domain_expiring', 'medium', 'domain', domain.id, {
+          domain: domain.name,
+          expires_at: domain.expires_at,
+          days,
+        }),
+      );
+    }
+  }
+
+  for (const domain of domains) {
+    if (!domain.zone_id) continue;
+    if (!dnssecState(domain.zone_id).enabled) {
+      findings.push(
+        securityFinding('dnssec_disabled', 'low', 'dns_zone', domain.zone_id, { domain: domain.name }),
+      );
+    }
+  }
+
+  return findings;
+}
+
+function computeSecurityReport(): SecurityScoreDto {
+  const findings = computeSecurityFindings();
+  const open = findings.filter((f) => f.status === 'open');
+  const score = Math.max(0, 100 - open.reduce((sum, f) => sum + (SECURITY_PENALTIES[f.severity] ?? 0), 0));
+
+  return {
+    score,
+    summary: {
+      open: open.length,
+      resolved: 0,
+      dismissed: dismissedSecurityFindingIds.size,
+      high: open.filter((f) => f.severity === 'high').length,
+      medium: open.filter((f) => f.severity === 'medium').length,
+      low: open.filter((f) => f.severity === 'low').length,
+    },
+    findings: open,
+  };
+}
+
 const DNS_TEMPLATES: Record<string, DnsRecordInput[]> = {
   website: [
     { type: 'A', name: '@', content: '192.0.2.10', ttl: 3600 },
@@ -490,6 +591,7 @@ function parseZoneFile(zoneFile: string): DnsRecordInput[] {
 }
 
 const SOCIAL_PROVIDERS: SocialProviderDto[] = [
+  { name: 'sdp', label: 'Serveurs du Peuple', configured: true, recommended: true },
   { name: 'google', label: 'Google', configured: true },
   { name: 'microsoft', label: 'Microsoft', configured: true },
   { name: 'apple', label: 'Apple', configured: true },
@@ -1444,5 +1546,31 @@ export class MockApiClient implements ApiClient {
     file.size = source.size;
     file.updated_at = nowIso();
     return Promise.resolve({ ...file });
+  }
+
+  async getSecurityScore(): Promise<SecurityScoreDto> {
+    requireUser();
+    return Promise.resolve(computeSecurityReport());
+  }
+
+  async scanSecurity(): Promise<SecurityScoreDto> {
+    requireUser();
+    return Promise.resolve(computeSecurityReport());
+  }
+
+  async dismissSecurityFinding(id: string): Promise<SecurityFindingDto> {
+    requireUser();
+    const finding = computeSecurityFindings().find((f) => f.id === id);
+    if (!finding) throw new ApiError(404, 'Not found', 'Finding not found.');
+    dismissedSecurityFindingIds.add(id);
+    return Promise.resolve({ ...finding, status: 'dismissed', dismissed_at: nowIso() });
+  }
+
+  async reopenSecurityFinding(id: string): Promise<SecurityFindingDto> {
+    requireUser();
+    const finding = computeSecurityFindings().find((f) => f.id === id);
+    if (!finding) throw new ApiError(404, 'Not found', 'Finding not found.');
+    dismissedSecurityFindingIds.delete(id);
+    return Promise.resolve({ ...finding, status: 'open', dismissed_at: null });
   }
 }

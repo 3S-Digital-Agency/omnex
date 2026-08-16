@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
-  title: NEXUS Cloud OS API
+  title: OMNEX Cloud OS API
   version: 1.0.0
   description: |
-    NEXUS Cloud OS API — authentication (incl. TOTP MFA), organizations,
+    OMNEX Cloud OS API — authentication (incl. TOTP MFA), organizations,
     members, invitations, RBAC roles, audit, notifications, and the
     Domain + DNS engines (Phase 3) with provider abstraction.
     Base path: /api/v1
@@ -511,7 +511,7 @@ paths:
   /domains/transfer:
     post:
       tags: [domains]
-      summary: Transfer an existing domain into NEXUS
+      summary: Transfer an existing domain into OMNEX
       requestBody:
         required: true
         content:

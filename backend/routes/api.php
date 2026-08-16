@@ -10,6 +10,7 @@ use App\Http\Controllers\MemberController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\SocialAuthController;
 use App\Http\Controllers\StorageController;
 use Illuminate\Support\Facades\Route;
@@ -59,6 +60,12 @@ Route::prefix('v1')->group(function () {
         Route::delete('/organizations/{organization}/invitations/{invitation}', [InvitationController::class, 'cancel']);
 
         Route::get('/roles', [RoleController::class, 'index']);
+
+        // Security Center (Phase 7).
+        Route::get('/security', [SecurityController::class, 'index']);
+        Route::post('/security/scan', [SecurityController::class, 'scan']);
+        Route::post('/security/findings/{finding}/dismiss', [SecurityController::class, 'dismiss']);
+        Route::post('/security/findings/{finding}/reopen', [SecurityController::class, 'reopen']);
 
         Route::get('/audit', [AuditController::class, 'index']);
         Route::get('/activity', [ActivityController::class, 'index']);

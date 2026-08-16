@@ -13,7 +13,7 @@ import { EmptyState, Spinner } from '../../components/ui/Spinner';
 import { cn } from '../../lib/utils';
 
 export function DashboardPage() {
-  const { activeOrganization, user, hasPermission } = useAuth();
+  const { activeOrganization, hasPermission } = useAuth();
   const { t } = useI18n();
   const orgId = activeOrganization?.id;
 
@@ -38,8 +38,13 @@ export function DashboardPage() {
     enabled: !!orgId,
   });
   const activity = useActivityFeed(!!orgId && hasPermission('audit.read'));
+  const security = useQuery({
+    queryKey: ['security', orgId],
+    queryFn: () => api.getSecurityScore(),
+    enabled: !!orgId,
+  });
 
-  const score = securityScore(user?.mfa_enabled ?? false, members.data?.length ?? 1, !!user?.email_verified_at);
+  const score = security.data?.score ?? 0;
 
   const stats = [
     { label: t('dashboard.members'), value: members.data?.length ?? '—', icon: Users },
@@ -156,10 +161,3 @@ export function DashboardPage() {
   );
 }
 
-function securityScore(mfaEnabled: boolean, memberCount: number, emailVerified: boolean): number {
-  let penalty = 0;
-  if (!mfaEnabled) penalty += 25;
-  if (memberCount <= 1) penalty += 15;
-  if (!emailVerified) penalty += 10;
-  return Math.max(0, 100 - penalty);
-}

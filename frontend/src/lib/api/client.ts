@@ -30,6 +30,8 @@ import type {
   PropagationStatusDto,
   RegisterInput,
   RoleDto,
+  SecurityFindingDto,
+  SecurityScoreDto,
   SocialAccountDto,
   SocialProviderDto,
   SocialRedirectResponse,
@@ -131,4 +133,9 @@ export interface ApiClient {
   deleteFile(fileId: string): Promise<void>;
   listFileVersions(fileId: string): Promise<DriveVersionDto[]>;
   restoreFileVersion(fileId: string, versionId: string): Promise<DriveFileDto>;
+
+  getSecurityScore(): Promise<SecurityScoreDto>;
+  scanSecurity(): Promise<SecurityScoreDto>;
+  dismissSecurityFinding(id: string): Promise<SecurityFindingDto>;
+  reopenSecurityFinding(id: string): Promise<SecurityFindingDto>;
 }

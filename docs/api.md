@@ -1,4 +1,4 @@
-# NEXUS — API Map
+# OMNEX — API Map
 
 > Phase 0 deliverable. API-first is a hard rule: every module exposes a clean,
 > versioned REST API, and the React app is generated against the OpenAPI spec.
@@ -20,7 +20,7 @@
 
 ```json
 {
-  "type": "https://nexus.dev/errors/validation",
+  "type": "https://omnex.dev/errors/validation",
   "title": "Validation failed",
   "status": 422,
   "detail": "One or more fields are invalid.",

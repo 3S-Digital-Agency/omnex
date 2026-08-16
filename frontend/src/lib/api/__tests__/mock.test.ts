@@ -180,6 +180,19 @@ describe('MockApiClient', () => {
     expect(records.some((r) => r.name === 'staging')).toBe(false);
   });
 
+  it('recommends Serveurs du Peuple as the sovereign social provider', async () => {
+    const api = new MockApiClient();
+    const providers = await api.socialProviders();
+
+    expect(providers[0].name).toBe('sdp');
+    expect(providers[0].label).toBe('Serveurs du Peuple');
+    expect(providers[0].recommended).toBe(true);
+    expect(providers[0].configured).toBe(true);
+
+    const redirect = await api.socialRedirect('sdp');
+    expect(redirect.url).toContain('provider=sdp');
+  });
+
   it('links and unlinks a social account', async () => {
     const api = new MockApiClient();
     await api.login({ email: 'demo@omnex.dev', password: 'password' });
@@ -241,5 +254,31 @@ describe('MockApiClient', () => {
 
     const persisted = await api.getDnsPropagation('dom-omnex-dev');
     expect(persisted.summary.total).toBe(status.summary.total);
+  });
+
+  it('scores, dismisses and reopens a security finding', async () => {
+    const api = new MockApiClient();
+    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+
+    const report = await api.getSecurityScore();
+    expect(report.score).toBeGreaterThanOrEqual(0);
+    expect(report.score).toBeLessThanOrEqual(100);
+    expect(report.findings.length).toBeGreaterThan(0);
+    expect(report.summary.open).toBe(report.findings.filter((f) => f.status === 'open').length);
+
+    const finding = report.findings[0];
+    const dismissed = await api.dismissSecurityFinding(finding.id);
+    expect(dismissed.status).toBe('dismissed');
+    expect((await api.getSecurityScore()).summary.open).toBe(report.summary.open - 1);
+
+    const reopened = await api.reopenSecurityFinding(finding.id);
+    expect(reopened.status).toBe('open');
+    expect((await api.getSecurityScore()).summary.open).toBe(report.summary.open);
+  });
+
+  it('rejects dismissing an unknown security finding', async () => {
+    const api = new MockApiClient();
+    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+    await expect(api.dismissSecurityFinding('sec-does-not-exist')).rejects.toMatchObject({ status: 404 });
   });
 });

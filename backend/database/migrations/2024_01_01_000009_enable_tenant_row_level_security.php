@@ -10,11 +10,11 @@ return new class extends Migration
         // Session-scoped helpers used by the policies. They read GUCs set by
         // ResolveTenant middleware (nexus.tenant_id / nexus.user_id).
         DB::statement(
-            "CREATE OR REPLACE FUNCTION nexus_current_tenant() RETURNS uuid LANGUAGE sql STABLE AS $$ "
+            'CREATE OR REPLACE FUNCTION nexus_current_tenant() RETURNS uuid LANGUAGE sql STABLE AS $$ '
             ."SELECT NULLIF(current_setting('nexus.tenant_id', true), '')::uuid $$"
         );
         DB::statement(
-            "CREATE OR REPLACE FUNCTION nexus_current_user() RETURNS uuid LANGUAGE sql STABLE AS $$ "
+            'CREATE OR REPLACE FUNCTION nexus_current_user() RETURNS uuid LANGUAGE sql STABLE AS $$ '
             ."SELECT NULLIF(current_setting('nexus.user_id', true), '')::uuid $$"
         );
 
@@ -28,12 +28,12 @@ return new class extends Migration
             DB::statement("ALTER TABLE {$table} ENABLE ROW LEVEL SECURITY");
             DB::statement(
                 "CREATE POLICY tenant_read ON {$table} FOR SELECT "
-                ."USING (organization_id = nexus_current_tenant())"
+                .'USING (organization_id = nexus_current_tenant())'
             );
             DB::statement(
                 "CREATE POLICY tenant_write ON {$table} FOR ALL "
-                ."USING (organization_id = nexus_current_tenant()) "
-                ."WITH CHECK (organization_id = nexus_current_tenant())"
+                .'USING (organization_id = nexus_current_tenant()) '
+                .'WITH CHECK (organization_id = nexus_current_tenant())'
             );
         }
 

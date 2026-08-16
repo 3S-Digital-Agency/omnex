@@ -16,12 +16,12 @@ return new class extends Migration
             DB::statement("ALTER TABLE {$table} ENABLE ROW LEVEL SECURITY");
             DB::statement(
                 "CREATE POLICY tenant_read ON {$table} FOR SELECT "
-                ."USING (organization_id = nexus_current_tenant())"
+                .'USING (organization_id = nexus_current_tenant())'
             );
             DB::statement(
                 "CREATE POLICY tenant_write ON {$table} FOR ALL "
-                ."USING (organization_id = nexus_current_tenant()) "
-                ."WITH CHECK (organization_id = nexus_current_tenant())"
+                .'USING (organization_id = nexus_current_tenant()) '
+                .'WITH CHECK (organization_id = nexus_current_tenant())'
             );
         }
     }

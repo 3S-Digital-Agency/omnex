@@ -1,7 +1,7 @@
-# NEXUS — Architecture Map
+# OMNEX — Architecture Map
 
 > Phase 0 deliverable. This document is the single source of truth for how
-> NEXUS is structured. It is reviewed and updated as the system evolves.
+> OMNEX is structured. It is reviewed and updated as the system evolves.
 
 ---
 
@@ -10,7 +10,7 @@
 1. **Laravel is the core, not the whole.** Business logic lives in the backend
    only. The React frontend renders state and sends intents — it never decides.
 2. **Modular monolith first.** At 10 users, microservices are a tax, not a
-   benefit. NEXUS starts as one deployable Laravel application with hard module
+   benefit. OMNEX starts as one deployable Laravel application with hard module
    boundaries, so it can be split later **without a rewrite**.
 3. **Ports & adapters for every external system.** Providers (registrars, DNS,
    storage, cloud, email, payments) are behind interfaces. A provider can be
@@ -26,7 +26,7 @@
 ## 2. High-level view
 
 ```
-                        NEXUS
+                        OMNEX
                           │
                   React / TypeScript (SPA + PWA)
                           │
@@ -50,7 +50,7 @@
 
 There is **no separate API gateway service** in the MVP. Laravel's router is the
 gateway (single entry point, auth, rate limiting, versioning). A dedicated
-gateway is only justified once NEXUS has multiple backend services — that
+gateway is only justified once OMNEX has multiple backend services — that
 decision is deferred and documented here so it is a conscious one.
 
 ---
@@ -58,8 +58,8 @@ decision is deferred and documented here so it is a conscious one.
 ## 3. Repository layout (monorepo)
 
 ```
-nexus/
-├── backend/                # Laravel 11+, PHP 8.3 — NEXUS CORE
+omnex/
+├── backend/                # Laravel 11+, PHP 8.3 — OMNEX CORE
 │   ├── app/
 │   │   ├── Modules/        # one directory per domain module
 │   │   │   ├── Iam/
@@ -218,7 +218,7 @@ Conventions:
 - No custom SMTP server (Email uses specialized providers).
 - No simulated domain availability in production (Domains integrate a real
   registrar once connected; tests use a fake provider, never "simulated" data).
-- **No Nextcloud, ownCloud or Seafile by default.** NEXUS owns its Storage
+- **No Nextcloud, ownCloud or Seafile by default.** OMNEX owns its Storage
   abstraction (`StorageProviderInterface`) and its own Cloud UI ("My Cloud").
   A third-party engine is integrated only if it demonstrates a concrete
   technical advantage, and it can never become the System of Record.

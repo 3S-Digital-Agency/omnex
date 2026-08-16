@@ -1,4 +1,4 @@
-# NEXUS — Security Model
+# OMNEX — Security Model
 
 > Phase 0 deliverable. Security and tenant isolation are structural invariants,
 > not features. Anything in here that is violated is a STOP condition.

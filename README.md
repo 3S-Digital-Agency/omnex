@@ -23,7 +23,8 @@ API.
 | 2 | Command Center — dashboard, activity, Ctrl+K, i18n (EN/FR) | ✅ Delivered |
 | 3 | Domain + DNS engine — registry, DNS, DNSSEC, propagation | ✅ Delivered |
 | 4 | OMNEX Drive — storage abstraction (S3-compatible) | ✅ Delivered |
-| 5+ | Sites, Billing, Security, Cloud, CI/CD, Mail, AI… | 🔜 Planned |
+| 7 | Security — findings engine, score, dismiss/reopen | ✅ Delivered |
+| 5+ | Sites, Billing, Cloud, CI/CD, Mail, AI… | 🔜 Planned |
 
 Phase 4 is delivered: `StorageProviderInterface` with a deterministic
 **sandbox** and a real **S3** provider (AWS SigV4 over Guzzle — AWS S3,
@@ -39,9 +40,10 @@ and the OMNEX Drive UI.
 - Accounts, organizations, invitations, roles/permissions (Owner / Admin /
   Developer / Viewer), org switching.
 - **MFA** — RFC 6238 TOTP implemented in-house + recovery codes.
-- **Social login (GAFAM)** — Google, Microsoft (OpenID), Apple (JWT ES256),
-  Facebook, Amazon, behind `SocialAuthProviderInterface`; sandbox works with
-  zero credentials, real providers activate via `.env`.
+- **Social login (GAFAM + sovereign)** — Google, Microsoft (OpenID), Apple
+  (JWT ES256), Facebook, Amazon and **Serveurs du Peuple** (Nextcloud OAuth2),
+  behind `SocialAuthProviderInterface`; sandbox works with zero credentials,
+  real providers activate via `.env`.
 - Every request resolves an active organization; all tenant queries are
   scoped automatically; **default-deny** authorization; immutable audit log.
 
@@ -54,7 +56,10 @@ and the OMNEX Drive UI.
 - Search / availability / register / renew / transfer behind
   `DomainProviderInterface` — **multi-provider**: sandbox, **Namecheap**
   (XML API), **OVHcloud** (signature auth + cart flow) and a generic
-  **Custom** JSON HTTP registrar, selectable per request.
+  **Custom** JSON HTTP registrar, selectable per request. **Custom** is a
+  gateway port for wiring any registrar/hosting you control (your own
+  HTTP/JSON proxy in front of a reseller or a self-hosted platform) — not a
+  plan to become a registrar.
 - Full DNS record CRUD (A, AAAA, CNAME, MX, TXT, NS, SRV, CAA) with
   validation, templates, BIND zone-file import/export, immutable history +
   reversible rollback.
@@ -69,6 +74,13 @@ and the OMNEX Drive UI.
   `storage.manage`).
 - Rule: **no Nextcloud/ownCloud/Seafile by default** — OMNEX owns its storage
   abstraction and its own cloud UI.
+
+### 🛡️ Security Center (Phase 7)
+- Findings engine behind the live score: MFA, unverified email, single-member
+  organization, expiring domains, DNSSEC off — each with severity, impact and
+  remediation, dismissible/reopenable (`security.read` / `security.manage`).
+- Score recomputed on demand (`scan`); dashboard score and Security Center are
+  both driven by the same API.
 
 ---
 
@@ -148,7 +160,7 @@ code**. Swap a registrar, DNS or storage backend without touching module code:
 | `DomainProviderInterface` | sandbox · Namecheap · OVHcloud · Custom |
 | `DnsProviderInterface` | sandbox (real provider via the same port) |
 | `StorageProviderInterface` | sandbox · S3-compatible (R2 / MinIO / OVH) |
-| `SocialAuthProviderInterface` | sandbox · Google · Microsoft · Apple · Facebook · Amazon |
+| `SocialAuthProviderInterface` | sandbox · Google · Microsoft · Apple · Facebook · Amazon · Serveurs du Peuple |
 | `DnsPropagationCheckerInterface` | sandbox (deterministic) |
 
 ---
@@ -174,9 +186,9 @@ cross-tenant attack test checklist.
 | Layer | Status |
 |---|---|
 | Frontend typecheck (`pnpm typecheck`) | ✅ green |
-| Frontend tests (`pnpm test`) | ✅ 24/24 |
+| Frontend tests (`pnpm test`) | ✅ 27/27 |
 | Frontend build (`pnpm build`) | ✅ green |
-| Backend (`php artisan test`) | ✅ 105/105 (361 assertions) |
+| Backend (`php artisan test`) | ✅ 117/117 (407 assertions) |
 
 The Laravel backend is validated against a local portable PHP + PostgreSQL
 setup (see `infra/dev-env.sh`); `php artisan test` runs the full Pest suite.

@@ -34,10 +34,12 @@ final class ZoneFileParser
             // Directives.
             if (preg_match('/^\$TTL\s+(\d+)$/i', $line, $m)) {
                 $defaultTtl = (int) $m[1];
+
                 continue;
             }
             if (preg_match('/^\$ORIGIN\s+(\S+)$/i', $line, $m)) {
                 $origin = rtrim($m[1], '.');
+
                 continue;
             }
 

@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Invitation extends Model
 {
-    use HasFactory, HasUuids, HasTenant;
+    use HasFactory, HasTenant, HasUuids;
 
     protected $fillable = [
         'organization_id',

@@ -6,28 +6,27 @@ use App\Support\Tenancy\HasTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class DriveVersion extends Model
+class SecurityFinding extends Model
 {
     use HasFactory, HasTenant, HasUuids;
 
     protected $fillable = [
         'organization_id',
-        'file_id',
-        'version',
-        'storage_key',
-        'size',
-        'checksum',
+        'rule',
+        'dedupe_key',
+        'severity',
+        'status',
+        'resource_type',
+        'resource_id',
+        'metadata',
+        'resolved_at',
+        'dismissed_at',
     ];
 
     protected $casts = [
-        'version' => 'integer',
-        'size' => 'integer',
+        'metadata' => 'array',
+        'resolved_at' => 'datetime',
+        'dismissed_at' => 'datetime',
     ];
-
-    public function file(): BelongsTo
-    {
-        return $this->belongsTo(DriveFile::class);
-    }
 }

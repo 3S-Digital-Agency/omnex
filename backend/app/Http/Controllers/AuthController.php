@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\InvitationResource;
 use App\Http\Resources\MembershipResource;
 use App\Http\Resources\OrganizationResource;
 use App\Http\Resources\UserResource;
@@ -132,7 +133,7 @@ class AuthController extends Controller
                 ? new OrganizationResource(app(TenantContext::class)->organization())
                 : null,
             'permissions' => $user->permissionKeys(),
-            'pending_invitations' => \App\Http\Resources\InvitationResource::collection($pendingInvitations),
+            'pending_invitations' => InvitationResource::collection($pendingInvitations),
         ]);
     }
 
@@ -247,7 +248,7 @@ class AuthController extends Controller
                 ? new OrganizationResource($active->organization)
                 : null,
             'permissions' => $user->permissionKeys(),
-            'pending_invitations' => \App\Http\Resources\InvitationResource::collection(
+            'pending_invitations' => InvitationResource::collection(
                 Invitation::withoutTenancy()
                     ->where('email', $user->email)
                     ->where('status', 'pending')

@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DnsHistory extends Model
 {
-    use HasFactory, HasUuids, HasTenant;
+    use HasFactory, HasTenant, HasUuids;
 
     // The migration uses the singular "dns_history" table name.
     protected $table = 'dns_history';

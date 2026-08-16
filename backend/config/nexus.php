@@ -84,4 +84,22 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Security Center
+    |--------------------------------------------------------------------------
+    |
+    | Severity penalties subtracted from the 100-point Security Score for
+    | every open finding.
+    |
+    */
+
+    'security' => [
+        'severity_penalties' => [
+            'high' => 25,
+            'medium' => 15,
+            'low' => 10,
+        ],
+    ],
+
 ];

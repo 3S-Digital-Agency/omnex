@@ -9,7 +9,5 @@ class DomainTransferred
 {
     use Dispatchable;
 
-    public function __construct(public readonly Domain $domain)
-    {
-    }
+    public function __construct(public readonly Domain $domain) {}
 }

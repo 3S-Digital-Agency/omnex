@@ -1,4 +1,4 @@
-# NEXUS — Database Map
+# OMNEX — Database Map
 
 > Phase 0 deliverable. PostgreSQL is the system of record for everything except
 > file objects (S3-compatible storage). Redis is cache + queue, never a source

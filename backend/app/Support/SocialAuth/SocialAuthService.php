@@ -2,6 +2,7 @@
 
 namespace App\Support\SocialAuth;
 
+use App\Contracts\SocialAuthProviderInterface;
 use App\Models\SocialAccount;
 use App\Models\User;
 use Illuminate\Support\Str;
@@ -17,7 +18,7 @@ final class SocialAuthService
 {
     public function __construct(private SocialAuthRegistry $registry) {}
 
-    public function provider(string $name): \App\Contracts\SocialAuthProviderInterface
+    public function provider(string $name): SocialAuthProviderInterface
     {
         $provider = $this->registry->get($name);
 

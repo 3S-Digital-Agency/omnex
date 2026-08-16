@@ -9,7 +9,5 @@ class DomainRenewed
 {
     use Dispatchable;
 
-    public function __construct(public readonly Domain $domain, public readonly int $years)
-    {
-    }
+    public function __construct(public readonly Domain $domain, public readonly int $years) {}
 }

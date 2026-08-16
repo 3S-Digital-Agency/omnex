@@ -9,7 +9,5 @@ class DomainExpiring
 {
     use Dispatchable;
 
-    public function __construct(public readonly Domain $domain, public readonly int $days)
-    {
-    }
+    public function __construct(public readonly Domain $domain, public readonly int $days) {}
 }

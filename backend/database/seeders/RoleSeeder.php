@@ -31,6 +31,8 @@ class RoleSeeder extends Seeder
                     'dns.manage',
                     'storage.read',
                     'storage.manage',
+                    'security.read',
+                    'security.manage',
                 ],
             ],
             'developer' => [
@@ -43,6 +45,7 @@ class RoleSeeder extends Seeder
                     'domains.read',
                     'dns.read',
                     'storage.read',
+                    'security.read',
                 ],
             ],
             'viewer' => [
@@ -54,6 +57,7 @@ class RoleSeeder extends Seeder
                     'domains.read',
                     'dns.read',
                     'storage.read',
+                    'security.read',
                 ],
             ],
         ];

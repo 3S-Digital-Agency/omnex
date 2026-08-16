@@ -1,4 +1,4 @@
-# NEXUS — Technical Roadmap
+# OMNEX — Technical Roadmap
 
 > Phase 0 deliverable. Ordered, one-domain-at-a-time. Each phase has a
 > Definition of Done; a phase is not started until the previous one passes the
@@ -37,7 +37,7 @@ is available. The frontend and the API contract can proceed regardless.
 
 ---
 
-## Phase 1 — NEXUS Foundation
+## Phase 1 — OMNEX Foundation
 
 **Goal:** a real, authenticated, multi-tenant skeleton with RBAC and audit.
 
@@ -65,7 +65,7 @@ authorization; audit covers all mutations.
 
 ---
 
-## Phase 2 — NEXUS Command Center
+## Phase 2 — OMNEX Command Center
 
 Dashboard with real-time overview, navigation, `Ctrl + K` command palette.
 Modules: Overview, Domains, Sites, Cloud, Storage, Security, Billing, Activity.
@@ -78,7 +78,7 @@ keyboard-first command palette.
 
 ## Phase 3 — Domain + DNS
 
-Domain Engine + NEXUS DNS behind `DomainProviderInterface` /
+Domain Engine + OMNEX DNS behind `DomainProviderInterface` /
 `DnsProviderInterface`. Search, register, renew, transfer, contacts, privacy,
 locking, nameservers; A/AAAA/CNAME/MX/TXT/NS/SRV/CAA, DNSSEC, templates,
 validation, import/export, history, rollback, propagation monitoring.
@@ -97,13 +97,13 @@ monitoring, and a real registrar provider.
 
 ---
 
-## Phase 4 — NEXUS Storage (Drive)
+## Phase 4 — OMNEX Storage (Drive)
 
 `StorageProviderInterface` with `S3Provider`, `R2Provider`, `OVHProvider`,
 `MinIOProvider`. Upload/download via signed URLs, folders, sharing,
 permissions, quotas, versioning, trash, search, previews, favorites, recent.
 
-**Rule:** no Nextcloud/ownCloud/Seafile by default. NEXUS owns its Storage
+**Rule:** no Nextcloud/ownCloud/Seafile by default. OMNEX owns its Storage
 abstraction and Cloud UI; a third-party engine is added only for a demonstrated
 technical advantage and can never become the System of Record.
 
@@ -112,7 +112,7 @@ cross-tenant namespace tests green; versioning + trash restore tested.
 
 ---
 
-## Phase 5 — NEXUS Sites
+## Phase 5 — OMNEX Sites
 
 Site provisioning, Git connect, build/deploy, staging/preview/production,
 environment variables (encrypted), logs, SSL, CDN, cache, rollback, backups.
@@ -122,7 +122,7 @@ deploy → automatic rollback; env vars never leak via API.
 
 ---
 
-## Phase 6 — NEXUS Billing
+## Phase 6 — OMNEX Billing
 
 Products, plans, subscriptions, invoices, taxes, coupons, credits, upgrades/
 downgrades/prorata, refunds, failed payments, renewals.
@@ -133,15 +133,22 @@ checkout; failure/dunning path produces `PaymentFailed` events.
 
 ---
 
-## Phase 7 — NEXUS Security
+## Phase 7 — OMNEX Security
 
 Security Center, MFA enforcement policy, session management, audit,
 vulnerability/SSL/domain monitoring, backup status, Security Score with
 severity/explanation/impact/remediation/action.
 
+**Status: partially delivered** — the findings engine behind the Security
+Score is live (`SecurityService`, `security_findings` table, `SecurityController`,
+RBAC `security.read`/`security.manage`, Security Center UI, dashboard score wired
+to the API). Rules: MFA off, unverified email, single-member org, expiring
+domains, DNSSEC off. Still planned: MFA enforcement policy, session
+management, SSL/vulnerability monitoring, backup status.
+
 ---
 
-## Phase 8 — NEXUS Cloud
+## Phase 8 — OMNEX Cloud
 
 `CloudProviderInterface`, **one provider first** (recommended: Hetzner or DO).
 VPS provisioning, lifecycle, metrics, SSH keys, firewall, snapshots, backups.
@@ -149,14 +156,14 @@ Add further providers only after one is production-solid.
 
 ---
 
-## Phase 9 — NEXUS Deploy (CI/CD)
+## Phase 9 — OMNEX Deploy (CI/CD)
 
 GitHub first (then GitLab/Bitbucket): build → test → security scan → staging →
 health check → production → monitoring; automatic rollback on failure.
 
 ---
 
-## Phase 10 — NEXUS Mail
+## Phase 10 — OMNEX Mail
 
 Domain mail config, mailboxes, aliases, forwarding, quotas, spam, SPF/DKIM/
 DMARC auto-config, provider abstraction. Specialized email provider, no custom
@@ -164,7 +171,7 @@ SMTP infrastructure.
 
 ---
 
-## Phase 11 — NEXUS AI
+## Phase 11 — OMNEX AI
 
 AI Core with **permission-scoped access** (AI by permission, not by default).
 AI website builder (produces real deployable code), Cloud Copilot (diagnose →
@@ -173,14 +180,14 @@ Copilot, usage tracking.
 
 ---
 
-## Phase 12 — NEXUS Automate
+## Phase 12 — OMNEX Automate
 
 Workflow engine: trigger → condition → action → result. Schedules, webhooks,
 event-driven automation; sensitive actions require confirmation.
 
 ---
 
-## Phase 13 — NEXUS Marketplace
+## Phase 13 — OMNEX Marketplace
 
 Apps, plugins, themes, integrations, AI agents, templates. Extensible
 architecture; marketplace is a distribution layer, not a rewrite.

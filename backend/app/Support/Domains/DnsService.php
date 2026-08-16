@@ -19,9 +19,7 @@ use Illuminate\Validation\ValidationException;
  */
 final class DnsService
 {
-    public function __construct(private DnsProviderRegistry $providers)
-    {
-    }
+    public function __construct(private DnsProviderRegistry $providers) {}
 
     private function provider(): DnsProviderInterface
     {

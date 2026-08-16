@@ -14,6 +14,5 @@ class DnssecChanged
         public readonly string $action,
         public readonly ?array $before = null,
         public readonly ?array $after = null,
-    ) {
-    }
+    ) {}
 }

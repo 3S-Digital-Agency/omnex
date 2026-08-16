@@ -13,6 +13,5 @@ class DomainUpdated
         public readonly Domain $domain,
         public readonly array $before,
         public readonly array $after,
-    ) {
-    }
+    ) {}
 }

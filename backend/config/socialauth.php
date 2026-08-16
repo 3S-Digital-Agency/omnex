@@ -51,4 +51,13 @@ return [
         'client_secret' => env('AMAZON_CLIENT_SECRET'),
         'redirect' => env('AMAZON_REDIRECT_URI'),
     ],
+
+    // Serveurs du Peuple — Nextcloud OAuth2 (Path A). The id is the Nextcloud
+    // username; email is not asserted verified by this provider.
+    'sdp' => [
+        'base_url' => env('SDP_BASE_URL', 'https://cloud.serveursdupeuple.net'),
+        'client_id' => env('SDP_CLIENT_ID'),
+        'client_secret' => env('SDP_CLIENT_SECRET'),
+        'redirect' => env('SDP_REDIRECT_URI'),
+    ],
 ];

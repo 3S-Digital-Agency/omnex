@@ -44,6 +44,19 @@ function ProviderIcon({ provider }: { provider: string }) {
           <path fill="#FF9900" d="M15.78 11.42c-.22-.28-1.45-.13-2-.07-.17.02-.19-.13-.04-.23.99-.7 2.61-.5 2.8-.26.19.23-.05 1.84-.97 2.61-.14.12-.28.06-.21-.1.2-.51.64-1.66.42-1.95z" />
         </svg>
       );
+    case 'sdp':
+      return (
+        <svg viewBox="0 0 39.96 35.42" className="h-4 w-4 shrink-0" aria-hidden="true">
+          <polyline
+            points="19.92,19.97 20.31,20.81 20.48,21.82 20.36,22.93 19.93,24.07 19.18,25.15 18.11,26.07 16.75,26.75 15.18,27.11 13.46,27.09 11.69,26.63 9.99,25.74 8.46,24.40 7.22,22.67 6.37,20.60 6.00,18.29 6.17,15.85 6.92,13.41 8.25,11.11 10.14,9.09 12.51,7.49 15.29,6.43 18.34,6.00 21.51,6.27 24.64,7.27 27.56,9.00 30.10,11.41 32.10,14.41 33.42,17.88 33.96,21.66 33.63,25.57 32.41,29.42"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      );
     default:
       return null;
   }
@@ -108,7 +121,12 @@ export function SocialLoginButtons() {
             className="flex w-full items-center justify-center gap-2 rounded-md border border-edge bg-raised px-4 py-2 text-sm font-medium text-zinc-200 transition-colors hover:bg-edge disabled:cursor-not-allowed disabled:opacity-50"
           >
             <ProviderIcon provider={provider.name} />
-            <span>{t('auth.socialSignInWith', { provider: provider.label })}</span>
+            <span>{provider.label}</span>
+            {provider.recommended ? (
+              <span className="rounded-full bg-emerald-900/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
+                {t('auth.recommended')}
+              </span>
+            ) : null}
           </button>
         ))}
       </div>

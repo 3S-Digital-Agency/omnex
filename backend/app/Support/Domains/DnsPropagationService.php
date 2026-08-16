@@ -15,9 +15,7 @@ use App\Models\DnsZone;
  */
 final class DnsPropagationService
 {
-    public function __construct(private DnsPropagationCheckerInterface $checker)
-    {
-    }
+    public function __construct(private DnsPropagationCheckerInterface $checker) {}
 
     /**
      * @return array{domain: string, nameservers: array<int, string>, checked_at: ?string, data: array<int, DnsPropagationCheck>, summary: array{synced: int, pending: int, outdated: int, error: int, total: int}}

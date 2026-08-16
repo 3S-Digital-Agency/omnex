@@ -19,6 +19,7 @@ use App\Support\Domains\DnsService;
 use App\Support\Domains\DomainProviderRegistry;
 use App\Support\Domains\DomainService;
 use App\Support\Domains\Providers\SandboxDnsPropagationChecker;
+use App\Support\Security\SecurityService;
 use App\Support\SocialAuth\SocialAuthRegistry;
 use App\Support\SocialAuth\SocialAuthService;
 use App\Support\Storage\StorageProviderRegistry;
@@ -43,6 +44,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(SocialAuthService::class);
         $this->app->singleton(StorageProviderRegistry::class, fn () => new StorageProviderRegistry);
         $this->app->singleton(StorageService::class);
+        $this->app->singleton(SecurityService::class);
     }
 
     public function boot(): void

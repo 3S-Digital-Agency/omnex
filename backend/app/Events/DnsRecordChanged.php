@@ -16,6 +16,5 @@ class DnsRecordChanged
         public readonly ?DnsRecord $record,
         public readonly ?array $before = null,
         public readonly ?array $after = null,
-    ) {
-    }
+    ) {}
 }

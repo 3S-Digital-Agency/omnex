@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Http\Resources\DnsHistoryResource;
 use App\Http\Resources\DnsRecordResource;
 use App\Http\Resources\PropagationCheckResource;
-use App\Models\Domain;
 use App\Models\DnsZone;
+use App\Models\Domain;
 use App\Support\Domains\DnsPropagationService;
 use App\Support\Domains\DnsService;
 use App\Support\Domains\DnsTemplates;
@@ -16,9 +16,7 @@ use Illuminate\Validation\ValidationException;
 
 class DnsController extends Controller
 {
-    public function __construct(private DnsService $dns, private DnsPropagationService $propagation)
-    {
-    }
+    public function __construct(private DnsService $dns, private DnsPropagationService $propagation) {}
 
     public function index(Request $request, string $domain): JsonResponse
     {
