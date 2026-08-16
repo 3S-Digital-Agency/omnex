@@ -66,7 +66,7 @@ export function Sidebar() {
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-edge bg-panel">
       <div className="flex items-center gap-3 border-b border-edge px-4 py-4">
-        <img src="/logo.png" alt={`${brand.name} logo`} className="h-16 w-16 rounded-lg object-cover" />
+        <img src="/logo.png" alt={`${brand.name} logo`} className="h-auto w-24 rounded-lg" />
         <div className="min-w-0">
           <div className="text-sm font-bold tracking-wide text-white">{brand.name}</div>
           <div className="text-[11px] text-zinc-500">{t('nav.cloudOs')}</div>

@@ -5,7 +5,6 @@ import { useAuth } from '../../app/AuthProvider';
 import { Button } from '../../components/ui/Button';
 import { Field } from '../../components/ui/Field';
 import { Input } from '../../components/ui/Input';
-import { brand } from '../../lib/brand';
 import { errorMessage } from '../../lib/errors';
 import { useI18n } from '../../lib/i18n';
 import { AuthLayout } from './AuthLayout';
@@ -35,7 +34,7 @@ export function LoginPage() {
   }
 
   return (
-    <AuthLayout title={t('auth.signIn')} subtitle={t('auth.welcomeBack', { name: brand.name })}>
+    <AuthLayout brandCard>
       <form onSubmit={onSubmit} className="space-y-4">
         <Field label={t('auth.email')} htmlFor="email">
           <Input

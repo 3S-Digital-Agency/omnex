@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OMNEX — Présentation</title>
+<style>
+  :root {
+    --bg: #0e0e11;
+    --panel: #17171b;
+    --edge: #2a2a33;
+    --text: #f4f4f5;
+    --muted: #9ca3af;
+    --dim: #63636b;
+    --accent: #ffffff;
+    --rainbow: linear-gradient(90deg, #f43f5e, #f97316, #eab308, #22c55e, #22d3ee, #3b82f6);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: var(--rainbow);
+    z-index: 60;
+    transition: width 0.35s ease;
+  }
+  .deck { position: relative; width: 100%; height: 100%; }
+  .slide {
+    position: absolute; inset: 0;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    padding: 7vh 9vw;
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+  .slide.active { display: flex; opacity: 1; transform: translateY(0); }
+  .kicker {
+    font-size: 0.78rem; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--dim); margin-bottom: 1.4rem; font-weight: 600;
+  }
+  h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 1.05; font-weight: 800; letter-spacing: -0.02em; }
+  h2 { font-size: clamp(1.7rem, 3.6vw, 2.8rem); line-height: 1.12; font-weight: 700; letter-spacing: -0.01em; }
+  .grad { background: var(--rainbow); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .sub { color: var(--muted); font-size: clamp(1rem, 1.8vw, 1.35rem); margin-top: 1.2rem; max-width: 46rem; line-height: 1.5; }
+  .lead { color: var(--muted); font-size: 1.1rem; line-height: 1.6; max-width: 52rem; margin-top: 1rem; }
+  .grid { display: grid; gap: 1rem; margin-top: 2.2rem; }
+  .grid-2 { grid-template-columns: 1fr 1fr; }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .card {
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 14px;
+    padding: 1.3rem 1.4rem;
+  }
+  .card h3 { font-size: 1.02rem; font-weight: 650; margin-bottom: 0.45rem; }
+  .card p { color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
+  .badge {
+    display: inline-block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em;
+    padding: 0.2rem 0.6rem; border-radius: 999px; border: 1px solid var(--edge);
+    color: var(--muted); vertical-align: middle; margin-left: 0.5rem;
+  }
+  .badge.live { color: #34d399; border-color: rgba(52, 211, 153, 0.35); background: rgba(52, 211, 153, 0.08); }
+  .row { display: flex; gap: 1rem; align-items: center; margin-top: 2rem; }
+  .pill {
+    display: inline-block; padding: 0.5rem 1rem; border: 1px solid var(--edge);
+    border-radius: 999px; color: var(--muted); font-size: 0.9rem; margin: 0.3rem 0.4rem 0.3rem 0;
+  }
+  .pill b { color: var(--text); font-weight: 600; }
+  ul.tick { list-style: none; margin-top: 1.4rem; }
+  ul.tick li {
+    position: relative; padding-left: 1.6rem; margin: 0.55rem 0;
+    color: var(--muted); font-size: 1.02rem;
+  }
+  ul.tick li::before {
+    content: "✓"; position: absolute; left: 0; top: 0;
+    background: var(--rainbow); -webkit-background-clip: text; background-clip: text;
+    color: transparent; font-weight: 800;
+  }
+  .logo { height: 92px; width: auto; }
+  .logo-lg { height: 132px; width: auto; margin-bottom: 1.2rem; }
+  .footer {
+    position: fixed; left: 0; right: 0; bottom: 0; height: 56px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 2rem; color: var(--dim); font-size: 0.8rem; z-index: 50;
+    background: linear-gradient(transparent, rgba(14,14,17,0.9));
+  }
+  .nav { display: flex; gap: 0.5rem; }
+  .nav button {
+    background: var(--panel); border: 1px solid var(--edge); color: var(--text);
+    border-radius: 8px; width: 34px; height: 34px; cursor: pointer; font-size: 1rem;
+  }
+  .nav button:hover { border-color: var(--muted); }
+  .hint { position: fixed; right: 2rem; top: 1.2rem; color: var(--dim); font-size: 0.75rem; z-index: 50; }
+  .timeline { margin-top: 2.4rem; }
+  .phase {
+    display: flex; gap: 1rem; align-items: baseline; padding: 0.7rem 0;
+    border-bottom: 1px solid var(--edge);
+  }
+  .phase .n { min-width: 88px; font-weight: 700; font-size: 0.9rem; }
+  .phase .t { font-weight: 600; }
+  .phase .d { color: var(--muted); font-size: 0.85rem; flex: 1; }
+  .phase.done { opacity: 1; }
+  .phase.done .n { background: var(--rainbow); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .phase.future { opacity: 0.7; }
+  @media (max-width: 720px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .slide { padding: 6vh 6vw; }
+  }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div class="hint">← → pour naviguer</div>
+
+<div class="deck">
+
+  <!-- 1 · Titre -->
+  <section class="slide active">
+    <div class="kicker">Présentation</div>
+    <img class="logo-lg" src="logo.png" alt="OMNEX logo" />
+    <h1 class="grad">Le système d'exploitation de votre infrastructure digitale</h1>
+    <p class="sub">Un seul plan de contrôle pour vos domaines, votre DNS, vos sites, votre cloud, votre stockage, votre e-mail, votre sécurité et votre facturation.</p>
+  </section>
+
+  <!-- 2 · Le problème -->
+  <section class="slide">
+    <div class="kicker">Le problème</div>
+    <h2>Une infrastructure éclatée<br />en dizaines d'outils</h2>
+    <div class="grid grid-3">
+      <div class="card"><h3>Fragmentation</h3><p>Domaines ici, DNS là, hébergement, cloud, stockage, e-mail… chaque brique a son propre outil, son propre compte, sa propre facturation.</p></div>
+      <div class="card"><h3>Aucune vue unique</h3><p>Impossible de répondre à « où est ma donnée, qui y accède, qu'est-ce qui expire, combien ça coûte » sans recoller des dizaines de tableaux de bord.</p></div>
+      <div class="card"><h3>Risque & dépendance</h3><p>Sécurité éparpillée, secrets dispersés, accès non révoqués, et un lock-in chez chaque fournisseur.</p></div>
+    </div>
+    <p class="lead">Résultat : une équipe qui <b>gère des outils</b> au lieu de <b>construire et d'exploiter</b>.</p>
+  </section>
+
+  <!-- 3 · La solution -->
+  <section class="slide">
+    <div class="kicker">La solution</div>
+    <h2>OMNEX, le <span class="grad">Cloud OS</span></h2>
+    <p class="sub">Une plateforme unique où chaque ressource — un domaine, un enregistrement DNS, un site, un serveur, un fichier, une facture — devient un <b>objet du système</b>, dans un seul modèle de données, derrière une seule interface.</p>
+    <ul class="tick">
+      <li>Une identité, une organisation, une sécurité : le multi-tenant est structurel, pas optionnel.</li>
+      <li>Des fournisseurs interchangeables derrière des abstractions — vous n'êtes jamais prisonnier d'un seul.</li>
+      <li>Une feuille de route incrémentale : chaque brique est livrée réelle, testée, une à la fois.</li>
+    </ul>
+  </section>
+
+  <!-- 4 · Architecture -->
+  <section class="slide">
+    <div class="kicker">Architecture</div>
+    <h2>Conçu pour durer,<br />pas pour la démo</h2>
+    <div class="grid grid-2">
+      <div class="card"><h3>Monolithe modulaire</h3><p>Un seul déploiement Laravel avec des frontières de modules dures — découpable en services plus tard, sans réécriture.</p></div>
+      <div class="card"><h3>Ports &amp; adaptateurs</h3><p>Registrar, DNS, stockage, cloud, e-mail, paiement : chaque système externe est derrière une interface. Ajouter un provider = une classe, pas un chantier.</p></div>
+      <div class="card"><h3>Événements, pas de couplage</h3><p>Les modules communiquent via un bus d'événements typés. L'audit, les notifications et l'automatisation sont des effets de bord, jamais des appels directs.</p></div>
+      <div class="card"><h3>API-first</h3><p>Toute capacité est exposée en API REST versionnée. L'interface React n'est qu'un consommateur parmi d'autres.</p></div>
+    </div>
+  </section>
+
+  <!-- 5 · Sécurité -->
+  <section class="slide">
+    <div class="kicker">Sécurité &amp; multi-tenant</div>
+    <h2>Isolé par conception,<br />pas par convention</h2>
+    <ul class="tick">
+      <li><b>Isolation structurelle</b> : scope global applicatif + Row-Level Security PostgreSQL, dès le jour un.</li>
+      <li><b>Default-deny</b> : aucun endpoint sans autorisation ; RBAC fin (Owner / Admin / Developer / Viewer).</li>
+      <li><b>Audit immuable</b> : chaque mutation critique est tracée avant/après.</li>
+      <li><b>MFA native</b> : TOTP RFC 6238 implémenté en interne, codes de récupération, connexion GAFAM (Google, Microsoft, Apple, Facebook, Amazon).</li>
+      <li><b>IA par permission, jamais par défaut</b> : l'IA n'accède qu'à ce que le rôle autorise.</li>
+    </ul>
+  </section>
+
+  <!-- 6 · Déjà livré -->
+  <section class="slide">
+    <div class="kicker">État actuel</div>
+    <h2>Déjà livré et testé</h2>
+    <div class="grid grid-2">
+      <div class="card"><h3>IAM &amp; Organisations <span class="badge live">LIVRÉ</span></h3><p>Comptes, organisations, invitations, rôles/permissions, MFA TOTP + codes de récupération, connexion GAFAM.</p></div>
+      <div class="card"><h3>Command Center <span class="badge live">LIVRÉ</span></h3><p>Tableau de bord temps réel, navigation, Ctrl+K, activité, sécurité, i18n français/anglais.</p></div>
+      <div class="card"><h3>Domaines &amp; DNS <span class="badge live">LIVRÉ</span></h3><p>Recherche/enregistrement/renouvellement/transfert, DNS validé avec historique et rollback, DNSSEC, suivi de propagation.</p></div>
+      <div class="card"><h3>OMNEX Drive <span class="badge live">LIVRÉ</span></h3><p>Stockage S3-compatible derrière une abstraction, dossiers, versions, corbeille, quotas, URL signées.</p></div>
+    </div>
+    <p class="lead">Le tout derrière des <b>providers sandbox déterministes</b> d'abord, puis de <b>vrais providers</b> (Namecheap/OVH, S3/R2/MinIO…) sans toucher au code métier.</p>
+  </section>
+
+  <!-- 7 · Domaines & DNS -->
+  <section class="slide">
+    <div class="kicker">Phase 3 · Domaine + DNS</div>
+    <h2>Le moteur de domaines</h2>
+    <ul class="tick">
+      <li>Recherche, disponibilité, enregistrement, renouvellement, transfert derrière <code>DomainProviderInterface</code>.</li>
+      <li>Zone DNS complète : A, AAAA, CNAME, MX, TXT, NS, SRV, CAA — validés, avec modèles, import/export BIND.</li>
+      <li>Historique immuable + <b>rollback réversible</b> de chaque changement.</li>
+      <li><b>DNSSEC</b> (DS records) et <b>suivi de propagation par serveur de noms</b>.</li>
+    </ul>
+  </section>
+
+  <!-- 8 · Drive -->
+  <section class="slide">
+    <div class="kicker">Phase 4 · Stockage</div>
+    <h2>OMNEX Drive</h2>
+    <p class="sub">Votre propre cloud, sur un stockage S3-compatible que <b>vous</b> choisissez.</p>
+    <ul class="tick">
+      <li>Abstraction <code>StorageProviderInterface</code> : sandbox + S3 (AWS, R2, MinIO, OVH) — signature AWS SigV4 native, zéro SDK imposé.</li>
+      <li>Dossiers, upload/download par URL signée, versions, corbeille avec restauration, quotas.</li>
+      <li>Règle fondatrice : <b>pas de Nextcloud/ownCloud/Seafile par défaut</b> — OMNEX possède son abstraction et son interface.</li>
+    </ul>
+  </section>
+
+  <!-- 9 · Feuille de route -->
+  <section class="slide">
+    <div class="kicker">Feuille de route</div>
+    <h2>La route vers le Cloud OS complet</h2>
+    <div class="timeline">
+      <div class="phase done"><span class="n">Phase 0–4</span><span class="t">Fondations, Command Center, Domaines/DNS, Drive</span></div>
+      <div class="phase future"><span class="n">Phase 5</span><span class="t">Sites</span><span class="d">Déploiement Git, staging/preview/production, SSL, rollback</span></div>
+      <div class="phase future"><span class="n">Phase 6</span><span class="t">Facturation</span><span class="d">Plans, abonnements, factures, Stripe (sandbox d'abord)</span></div>
+      <div class="phase future"><span class="n">Phase 7</span><span class="t">Sécurité</span><span class="d">Security Center, score, constats, remédiation</span></div>
+      <div class="phase future"><span class="n">Phase 8</span><span class="t">Cloud</span><span class="d">VPS, SSH, pare-feu, snapshots, métriques</span></div>
+      <div class="phase future"><span class="n">Phase 9</span><span class="t">CI/CD</span><span class="d">Build → test → scan → prod, rollback automatique</span></div>
+      <div class="phase future"><span class="n">Phase 10–15</span><span class="t">Mail, IA, Automatisation, Marketplace, Scale, Lancement</span></div>
+    </div>
+  </section>
+
+  <!-- 10 · Vision -->
+  <section class="slide">
+    <div class="kicker">La vision</div>
+    <h2>Ce que OMNEX devient</h2>
+    <div class="grid grid-3">
+      <div class="card"><h3>Un copilote IA</h3><p>Diagnostiquer, recommander, réviser, appliquer — jamais d'action destructive silencieuse.</p></div>
+      <div class="card"><h3>Un moteur d'automatisation</h3><p>Déclencheur → condition → action : tout votre parc s'orchestre seul.</p></div>
+      <div class="card"><h3>Une marketplace ouverte</h3><p>Apps, plugins, thèmes, intégrations, agents IA — la distribution, pas une réécriture.</p></div>
+    </div>
+    <p class="lead">La cible : un <b>système d'exploitation</b> où l'infrastructure devient programmable, observable et automatisable — <b>souveraineté des données</b>, <b>aucun lock-in fournisseur</b>.</p>
+  </section>
+
+  <!-- 11 · Différenciateurs -->
+  <section class="slide">
+    <div class="kicker">Pourquoi OMNEX</div>
+    <h2>Ce qui nous distingue</h2>
+    <ul class="tick">
+      <li><b>Provider-agnostique</b> : le fournisseur est une donnée, pas du code. Changez de registrar/DNS/cloud sans réécrire.</li>
+      <li><b>Nous possédons l'abstraction</b> : le stockage et l'interface cloud sont à nous, par principe.</li>
+      <li><b>Sécurité structurelle</b> : multi-tenant et audit dès la première ligne de code.</li>
+      <li><b>Construit une brique à la fois</b> : rien de factice — chaque module est réel et testé avant le suivant.</li>
+    </ul>
+  </section>
+
+  <!-- 12 · Conclusion -->
+  <section class="slide">
+    <div class="kicker">Prochaines étapes</div>
+    <h2>Embarquons.</h2>
+    <p class="sub">Brancher les vrais providers (registrar, DNS, stockage), livrer les Sites (Phase 5), puis la facturation, la sécurité et le cloud.</p>
+    <div class="row">
+      <span class="pill"><b>Laravel</b> + PostgreSQL + Redis</span>
+      <span class="pill"><b>React</b> + TypeScript + PWA</span>
+      <span class="pill"><b>S3-compatible</b></span>
+      <span class="pill"><b>FR/EN</b></span>
+    </div>
+  </section>
+
+</div>
+
+<div class="footer">
+  <span>OMNEX — Cloud Infrastructure, Simplified</span>
+  <div class="nav">
+    <button id="prev" aria-label="Précédent">←</button>
+    <span id="counter">1 / 12</span>
+    <button id="next" aria-label="Suivant">→</button>
+  </div>
+</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const progress = document.getElementById('progress');
+  const counter = document.getElementById('counter');
+  let current = 0;
+
+  function show(i) {
+    current = (i + slides.length) % slides.length;
+    slides.forEach((s, idx) => s.classList.toggle('active', idx === current));
+    progress.style.width = ((current + 1) / slides.length * 100) + '%';
+    counter.textContent = (current + 1) + ' / ' + slides.length;
+  }
+
+  document.getElementById('next').addEventListener('click', () => show(current + 1));
+  document.getElementById('prev').addEventListener('click', () => show(current - 1));
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); show(current + 1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); show(current - 1); }
+    if (e.key === 'Home') show(0);
+    if (e.key === 'End') show(slides.length - 1);
+  });
+  show(0);
+</script>
+</body>
+</html>
