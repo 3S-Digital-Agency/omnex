@@ -10,7 +10,7 @@ use Psr\Http\Message\ResponseInterface;
 /**
  * Real S3-compatible object storage (AWS S3, Cloudflare R2, MinIO, OVH
  * Object Storage) using AWS Signature Version 4 over Guzzle — no SDK
- * dependency. Activates only when NEXUS_STORAGE_S3_* credentials are set.
+ * dependency. Activates only when OMNEX_STORAGE_S3_* credentials are set.
  *
  * Objects are addressed path-style: {endpoint}/{bucket}/{key}, which every
  * S3-compatible backend supports.
@@ -102,11 +102,11 @@ final class S3StorageProvider implements StorageProviderInterface
     private function config(): array
     {
         return [
-            'endpoint' => rtrim((string) config('nexus.storage.s3.endpoint'), '/'),
-            'region' => (string) config('nexus.storage.s3.region', 'us-east-1'),
-            'bucket' => (string) config('nexus.storage.s3.bucket'),
-            'key' => (string) config('nexus.storage.s3.key'),
-            'secret' => (string) config('nexus.storage.s3.secret'),
+            'endpoint' => rtrim((string) config('omnex.storage.s3.endpoint'), '/'),
+            'region' => (string) config('omnex.storage.s3.region', 'us-east-1'),
+            'bucket' => (string) config('omnex.storage.s3.bucket'),
+            'key' => (string) config('omnex.storage.s3.key'),
+            'secret' => (string) config('omnex.storage.s3.secret'),
         ];
     }
 

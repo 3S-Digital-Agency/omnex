@@ -56,7 +56,7 @@ final class SecurityService
             ->orderBy('created_at', 'desc')
             ->get();
 
-        $penalties = config('nexus.security.severity_penalties', []);
+        $penalties = config('omnex.security.severity_penalties', []);
 
         $score = 100 - $findings->sum(fn (SecurityFinding $finding) => (int) ($penalties[$finding->severity] ?? 0));
         $score = max(0, min(100, $score));
@@ -153,7 +153,7 @@ final class SecurityService
             ]);
         }
 
-        $warningDays = (int) config('nexus.domain.expiration_warning_days', 30);
+        $warningDays = (int) config('omnex.domain.expiration_warning_days', 30);
 
         foreach (Domain::query()->where('expires_at', '>', now())->where('expires_at', '<=', now()->addDays($warningDays))->get() as $domain) {
             $candidates[] = $this->candidate('domain_expiring', 'medium', 'domain', $domain->id, [

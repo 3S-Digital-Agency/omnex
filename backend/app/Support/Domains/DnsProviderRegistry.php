@@ -23,7 +23,7 @@ final class DnsProviderRegistry
 
     public function get(?string $name = null): DnsProviderInterface
     {
-        $name ??= config('nexus.domain.dns_provider', 'sandbox');
+        $name ??= config('omnex.domain.dns_provider', 'sandbox');
 
         return $this->providers[$name]
             ?? throw new InvalidArgumentException("Unknown DNS provider [{$name}].");

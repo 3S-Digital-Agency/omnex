@@ -112,7 +112,6 @@ export interface SocialProviderDto {
   name: string;
   label: string;
   configured: boolean;
-  recommended?: boolean;
 }
 
 export interface SocialAccountDto {

@@ -25,7 +25,7 @@ final class StorageProviderRegistry
 
     public function get(?string $name = null): StorageProviderInterface
     {
-        $name ??= config('nexus.storage.provider', 'sandbox');
+        $name ??= config('omnex.storage.provider', 'sandbox');
 
         return $this->providers[$name]
             ?? throw new InvalidArgumentException("Unknown storage provider [{$name}].");

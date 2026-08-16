@@ -15,13 +15,13 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: nexus
-          POSTGRES_PASSWORD: nexus
-          POSTGRES_DB: nexus_test
+          POSTGRES_USER: omnex
+          POSTGRES_PASSWORD: omnex
+          POSTGRES_DB: omnex_test
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U nexus -d nexus_test"
+          --health-cmd "pg_isready -U omnex -d omnex_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -30,9 +30,9 @@ jobs:
       DB_CONNECTION: pgsql
       DB_HOST: 127.0.0.1
       DB_PORT: 5432
-      DB_DATABASE: nexus_test
-      DB_USERNAME: nexus
-      DB_PASSWORD: nexus
+      DB_DATABASE: omnex_test
+      DB_USERNAME: omnex
+      DB_PASSWORD: omnex
 
     steps:
       - name: Checkout

@@ -1,9 +1,9 @@
 {
-    "name": "nexus/core",
+    "name": "omnex/core",
     "type": "project",
     "description": "OMNEX Cloud OS — Laravel core (modular monolith, multi-tenant).",
-    "keywords": ["nexus", "cloud", "hosting", "laravel", "multi-tenant"],
-    "license": "proprietary",
+    "keywords": ["omnex", "cloud", "hosting", "laravel", "multi-tenant"],
+    "license": "MIT",
     "require": {
         "php": "^8.2",
         "laravel/framework": "^12.0",

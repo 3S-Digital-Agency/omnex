@@ -29,7 +29,7 @@ final class DomainProviderRegistry
 
     public function get(?string $name = null): DomainProviderInterface
     {
-        $name ??= config('nexus.domain.provider', 'sandbox');
+        $name ??= config('omnex.domain.provider', 'sandbox');
 
         return $this->providers[$name]
             ?? throw new InvalidArgumentException("Unknown domain provider [{$name}].");

@@ -14,7 +14,7 @@ use SimpleXMLElement;
  *
  * Talks to the Namecheap XML API (api.namecheap.com/xml.response) over
  * HTTPS via the Laravel HTTP client (Guzzle). Activates only when
- * NEXUS_DOMAIN_PROVIDER=namecheap AND the API credentials are set
+ * OMNEX_DOMAIN_PROVIDER=namecheap AND the API credentials are set
  * (config/namecheap.php). Registrant contacts come from config or the
  * `contacts` option — Namecheap refuses registrations without them.
  *

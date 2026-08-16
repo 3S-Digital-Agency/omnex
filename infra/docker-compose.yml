@@ -1,29 +1,29 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: nexus-postgres
+    container_name: omnex-postgres
     environment:
-      POSTGRES_DB: nexus
-      POSTGRES_USER: nexus
-      POSTGRES_PASSWORD: nexus
+      POSTGRES_DB: omnex
+      POSTGRES_USER: omnex
+      POSTGRES_PASSWORD: omnex
     ports:
       - "5432:5432"
     volumes:
-      - nexus_pg:/var/lib/postgresql/data
+      - omnex_pg:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nexus -d nexus"]
+      test: ["CMD-SHELL", "pg_isready -U omnex -d omnex"]
       interval: 5s
       timeout: 5s
       retries: 12
 
   redis:
     image: redis:7-alpine
-    container_name: nexus-redis
+    container_name: omnex-redis
     command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "6379:6379"
     volumes:
-      - nexus_redis:/data
+      - omnex_redis:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -31,5 +31,5 @@ services:
       retries: 12
 
 volumes:
-  nexus_pg:
-  nexus_redis:
+  omnex_pg:
+  omnex_redis:

@@ -8,13 +8,13 @@ use Illuminate\Console\Command;
 
 class CheckDomainExpirations extends Command
 {
-    protected $signature = 'nexus:check-domain-expirations {--days=}';
+    protected $signature = 'omnex:check-domain-expirations {--days=}';
 
     protected $description = 'Dispatch DomainExpiring events for domains nearing their expiration date.';
 
     public function handle(): int
     {
-        $days = (int) ($this->option('days') ?? config('nexus.domain.expiration_warning_days', 30));
+        $days = (int) ($this->option('days') ?? config('omnex.domain.expiration_warning_days', 30));
 
         $threshold = now()->addDays($days);
 

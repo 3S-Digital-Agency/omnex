@@ -30,10 +30,10 @@ export function CommandPalette() {
       setOpen(true);
     }
     window.addEventListener('keydown', onKey);
-    window.addEventListener('nexus:open-palette', onOpen);
+    window.addEventListener('omnex:open-palette', onOpen);
     return () => {
       window.removeEventListener('keydown', onKey);
-      window.removeEventListener('nexus:open-palette', onOpen);
+      window.removeEventListener('omnex:open-palette', onOpen);
     };
   }, []);
 

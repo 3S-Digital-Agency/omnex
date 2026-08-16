@@ -42,7 +42,7 @@ final class DnsPropagationService
     public function check(DnsZone $zone): array
     {
         $domain = $zone->domain;
-        $nameservers = $domain->nameservers ?: config('nexus.domain.default_nameservers', ['ns1.omnex.io', 'ns2.omnex.io']);
+        $nameservers = $domain->nameservers ?: config('omnex.domain.default_nameservers', ['ns1.omnex.io', 'ns2.omnex.io']);
 
         $expected = $zone->records()
             ->get()
@@ -93,7 +93,7 @@ final class DnsPropagationService
 
         return [
             'domain' => $zone->domain->name,
-            'nameservers' => $zone->domain->nameservers ?: config('nexus.domain.default_nameservers', ['ns1.omnex.io', 'ns2.omnex.io']),
+            'nameservers' => $zone->domain->nameservers ?: config('omnex.domain.default_nameservers', ['ns1.omnex.io', 'ns2.omnex.io']),
             'checked_at' => $checks !== [] ? $checks[0]->checked_at?->toIso8601String() : null,
             'data' => $checks,
             'summary' => $summary,

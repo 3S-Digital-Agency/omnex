@@ -14,7 +14,7 @@ return [
     |
     */
 
-    'enforce_rls' => env('NEXUS_ENFORCE_RLS', false),
+    'enforce_rls' => env('OMNEX_ENFORCE_RLS', false),
 
     'tenant' => [
         'header' => 'X-Organization',
@@ -50,14 +50,14 @@ return [
     */
 
     'domain' => [
-        'provider' => env('NEXUS_DOMAIN_PROVIDER', 'sandbox'),
-        'dns_provider' => env('NEXUS_DNS_PROVIDER', 'sandbox'),
-        'default_registration_years' => (int) env('NEXUS_DOMAIN_REGISTRATION_YEARS', 1),
+        'provider' => env('OMNEX_DOMAIN_PROVIDER', 'sandbox'),
+        'dns_provider' => env('OMNEX_DNS_PROVIDER', 'sandbox'),
+        'default_registration_years' => (int) env('OMNEX_DOMAIN_REGISTRATION_YEARS', 1),
         'default_nameservers' => [
             'ns1.omnex.io',
             'ns2.omnex.io',
         ],
-        'expiration_warning_days' => (int) env('NEXUS_DOMAIN_EXPIRATION_WARNING_DAYS', 30),
+        'expiration_warning_days' => (int) env('OMNEX_DOMAIN_EXPIRATION_WARNING_DAYS', 30),
     ],
 
     /*
@@ -72,15 +72,15 @@ return [
     */
 
     'storage' => [
-        'provider' => env('NEXUS_STORAGE_PROVIDER', 'sandbox'),
-        'default_quota_bytes' => (int) env('NEXUS_STORAGE_QUOTA_BYTES', 10 * 1024 * 1024 * 1024),
-        'signed_url_ttl' => (int) env('NEXUS_STORAGE_SIGNED_URL_TTL', 300),
+        'provider' => env('OMNEX_STORAGE_PROVIDER', 'sandbox'),
+        'default_quota_bytes' => (int) env('OMNEX_STORAGE_QUOTA_BYTES', 10 * 1024 * 1024 * 1024),
+        'signed_url_ttl' => (int) env('OMNEX_STORAGE_SIGNED_URL_TTL', 300),
         's3' => [
-            'endpoint' => env('NEXUS_STORAGE_S3_ENDPOINT', ''),
-            'region' => env('NEXUS_STORAGE_S3_REGION', 'us-east-1'),
-            'bucket' => env('NEXUS_STORAGE_S3_BUCKET', ''),
-            'key' => env('NEXUS_STORAGE_S3_KEY', ''),
-            'secret' => env('NEXUS_STORAGE_S3_SECRET', ''),
+            'endpoint' => env('OMNEX_STORAGE_S3_ENDPOINT', ''),
+            'region' => env('OMNEX_STORAGE_S3_REGION', 'us-east-1'),
+            'bucket' => env('OMNEX_STORAGE_S3_BUCKET', ''),
+            'key' => env('OMNEX_STORAGE_S3_KEY', ''),
+            'secret' => env('OMNEX_STORAGE_S3_SECRET', ''),
         ],
     ],
 

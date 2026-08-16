@@ -1,5 +1,5 @@
-const TOKEN_KEY = 'nexus.token';
-const ORG_KEY = 'nexus.organization';
+const TOKEN_KEY = 'omnex.token';
+const ORG_KEY = 'omnex.organization';
 
 export const session = {
   getToken(): string | null {

@@ -591,7 +591,7 @@ function parseZoneFile(zoneFile: string): DnsRecordInput[] {
 }
 
 const SOCIAL_PROVIDERS: SocialProviderDto[] = [
-  { name: 'sdp', label: 'Serveurs du Peuple', configured: true, recommended: true },
+  { name: 'sdp', label: 'Serveurs du Peuple', configured: true },
   { name: 'google', label: 'Google', configured: true },
   { name: 'microsoft', label: 'Microsoft', configured: true },
   { name: 'apple', label: 'Apple', configured: true },

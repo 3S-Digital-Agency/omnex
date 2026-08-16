@@ -17,7 +17,7 @@ class ResolveTenant
 
         if ($user !== null) {
             $membership = null;
-            $requested = $request->header(config('nexus.tenant.header'));
+            $requested = $request->header(config('omnex.tenant.header'));
 
             if ($requested !== null && $requested !== '') {
                 $membership = $user->allMemberships()
@@ -40,7 +40,7 @@ class ResolveTenant
 
         $response = $next($request);
 
-        if (config('nexus.enforce_rls')) {
+        if (config('omnex.enforce_rls')) {
             $this->clearRlsContext();
         }
 
@@ -49,7 +49,7 @@ class ResolveTenant
 
     private function setRlsContext(string $organizationId, string $userId): void
     {
-        if (! config('nexus.enforce_rls')) {
+        if (! config('omnex.enforce_rls')) {
             return;
         }
 
@@ -59,7 +59,7 @@ class ResolveTenant
 
     private function clearRlsContext(): void
     {
-        DB::statement("SELECT set_config('nexus.tenant_id', '', true)");
-        DB::statement("SELECT set_config('nexus.user_id', '', true)");
+        DB::statement("SELECT set_config('omnex.tenant_id', '', true)");
+        DB::statement("SELECT set_config('omnex.user_id', '', true)");
     }
 }

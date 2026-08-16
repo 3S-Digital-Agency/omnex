@@ -180,13 +180,12 @@ describe('MockApiClient', () => {
     expect(records.some((r) => r.name === 'staging')).toBe(false);
   });
 
-  it('recommends Serveurs du Peuple as the sovereign social provider', async () => {
+  it('lists Serveurs du Peuple as the sovereign social provider', async () => {
     const api = new MockApiClient();
     const providers = await api.socialProviders();
 
     expect(providers[0].name).toBe('sdp');
     expect(providers[0].label).toBe('Serveurs du Peuple');
-    expect(providers[0].recommended).toBe(true);
     expect(providers[0].configured).toBe(true);
 
     const redirect = await api.socialRedirect('sdp');

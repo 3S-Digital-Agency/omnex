@@ -74,7 +74,7 @@ export function Topbar() {
 
       <div className="flex items-center gap-2">
         <button
-          onClick={() => window.dispatchEvent(new Event('nexus:open-palette'))}
+          onClick={() => window.dispatchEvent(new Event('omnex:open-palette'))}
           className="flex h-9 items-center gap-2 rounded-md border border-edge bg-panel px-3 text-sm text-zinc-400 transition-colors hover:bg-raised hover:text-white"
         >
           <Search className="h-4 w-4" />

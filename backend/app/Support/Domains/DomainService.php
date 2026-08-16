@@ -214,16 +214,16 @@ final class DomainService
                 'auto_renew' => true,
                 'privacy_protection' => true,
                 'transfer_lock' => true,
-                'nameservers' => config('nexus.domain.default_nameservers'),
+                'nameservers' => config('omnex.domain.default_nameservers'),
             ], $attributes));
 
             $zone = DnsZone::create([
                 'domain_id' => $domain->id,
-                'provider' => config('nexus.domain.dns_provider', 'sandbox'),
+                'provider' => config('omnex.domain.dns_provider', 'sandbox'),
                 'status' => 'active',
             ]);
 
-            foreach (config('nexus.domain.default_nameservers') as $nameserver) {
+            foreach (config('omnex.domain.default_nameservers') as $nameserver) {
                 $zone->records()->create([
                     'type' => 'NS',
                     'name' => '@',

@@ -19,8 +19,8 @@ return new class extends Migration
         );
 
         // Defense-in-depth stays off until the RLS test suite passes on a real
-        // PostgreSQL instance (see config/nexus.php).
-        if (! config('nexus.enforce_rls')) {
+        // PostgreSQL instance (see config/omnex.php).
+        if (! config('omnex.enforce_rls')) {
             return;
         }
 

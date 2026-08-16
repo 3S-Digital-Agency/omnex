@@ -72,7 +72,7 @@ class AuthController extends Controller
 
         if ($user->mfa_enabled) {
             $challenge = Str::random(64);
-            Cache::put($this->mfaChallengeKey($challenge), $user->id, config('nexus.mfa.challenge_ttl'));
+            Cache::put($this->mfaChallengeKey($challenge), $user->id, config('omnex.mfa.challenge_ttl'));
 
             return response()->json([
                 'mfa_required' => true,
@@ -102,7 +102,7 @@ class AuthController extends Controller
         if (isset($data['recovery_code'])) {
             $valid = $this->consumeRecoveryCode($user, $data['recovery_code']);
         } else {
-            $valid = Totp::verify($user->mfa_secret, $data['code'], config('nexus.mfa.verification_window'));
+            $valid = Totp::verify($user->mfa_secret, $data['code'], config('omnex.mfa.verification_window'));
         }
 
         if (! $valid) {
@@ -140,7 +140,7 @@ class AuthController extends Controller
     public function updateProfile(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'locale' => ['required', 'string', Rule::in(config('nexus.locales', ['en', 'fr']))],
+            'locale' => ['required', 'string', Rule::in(config('omnex.locales', ['en', 'fr']))],
         ]);
 
         $user = $request->user();
@@ -179,7 +179,7 @@ class AuthController extends Controller
 
         return response()->json([
             'secret' => $secret,
-            'otpauth_uri' => Totp::otpauthUri($secret, $user->email, config('nexus.mfa.issuer')),
+            'otpauth_uri' => Totp::otpauthUri($secret, $user->email, config('omnex.mfa.issuer')),
         ]);
     }
 
@@ -193,7 +193,7 @@ class AuthController extends Controller
             abort(409, 'MFA has not been set up or is already enabled.');
         }
 
-        if (! Totp::verify($user->mfa_secret, $data['code'], config('nexus.mfa.verification_window'))) {
+        if (! Totp::verify($user->mfa_secret, $data['code'], config('omnex.mfa.verification_window'))) {
             throw ValidationException::withMessages(['code' => ['Invalid verification code.']]);
         }
 
@@ -260,7 +260,7 @@ class AuthController extends Controller
 
     private function issueToken(User $user): string
     {
-        return $user->createToken('nexus-spa')->plainTextToken;
+        return $user->createToken('omnex-spa')->plainTextToken;
     }
 
     private function mfaChallengeKey(string $token): string
@@ -270,7 +270,7 @@ class AuthController extends Controller
 
     private function generateRecoveryCodes(?int $count = null): array
     {
-        $count ??= config('nexus.mfa.recovery_codes_count');
+        $count ??= config('omnex.mfa.recovery_codes_count');
 
         $codes = [];
         for ($i = 0; $i < $count; $i++) {

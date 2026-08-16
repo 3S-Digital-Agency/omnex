@@ -217,7 +217,7 @@ it('trashes, restores and permanently deletes a file', function () {
 it('rejects a quota-exceeding upload', function () {
     [$user, $organization] = driveContext();
 
-    config()->set('nexus.storage.default_quota_bytes', 10);
+    config()->set('omnex.storage.default_quota_bytes', 10);
 
     $this->withHeader('X-Organization', $organization->id)
         ->postJson('/api/v1/storage/files', ['name' => 'big.bin', 'contents' => b64(str_repeat('a', 20))])

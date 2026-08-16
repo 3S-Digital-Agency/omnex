@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
  * transfer) plus the /domain service endpoints (details, contacts, Whois
  * privacy, transfer lock, nameservers, renewal).
  *
- * Activates only when NEXUS_DOMAIN_PROVIDER=ovh AND the credentials are set
+ * Activates only when OMNEX_DOMAIN_PROVIDER=ovh AND the credentials are set
  * (config/ovh.php). Prices come from the cart offer response.
  */
 final class OvhDomainProvider implements DomainProviderInterface
@@ -231,7 +231,7 @@ final class OvhDomainProvider implements DomainProviderInterface
             if ($label === 'OWNER_LEGAL_AGE') {
                 $this->addConfiguration($cartId, $itemId, $label, true);
             } elseif ($label === 'DNS') {
-                $this->addConfiguration($cartId, $itemId, $label, implode(';', config('nexus.domain.default_nameservers')));
+                $this->addConfiguration($cartId, $itemId, $label, implode(';', config('omnex.domain.default_nameservers')));
             } elseif ($label === 'AUTH_INFO' && $authCode !== null) {
                 $this->addConfiguration($cartId, $itemId, $label, $authCode);
             }

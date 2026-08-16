@@ -45,18 +45,7 @@ function ProviderIcon({ provider }: { provider: string }) {
         </svg>
       );
     case 'sdp':
-      return (
-        <svg viewBox="0 0 39.96 35.42" className="h-4 w-4 shrink-0" aria-hidden="true">
-          <polyline
-            points="19.92,19.97 20.31,20.81 20.48,21.82 20.36,22.93 19.93,24.07 19.18,25.15 18.11,26.07 16.75,26.75 15.18,27.11 13.46,27.09 11.69,26.63 9.99,25.74 8.46,24.40 7.22,22.67 6.37,20.60 6.00,18.29 6.17,15.85 6.92,13.41 8.25,11.11 10.14,9.09 12.51,7.49 15.29,6.43 18.34,6.00 21.51,6.27 24.64,7.27 27.56,9.00 30.10,11.41 32.10,14.41 33.42,17.88 33.96,21.66 33.63,25.57 32.41,29.42"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      );
+      return <img src="/sdp.png" alt="" className="h-4 w-4 shrink-0 rounded-[3px] object-contain" />;
     default:
       return null;
   }
@@ -104,6 +93,9 @@ export function SocialLoginButtons() {
 
   if (providers.length === 0) return null;
 
+  const sdpProvider = providers.find((provider) => provider.name === 'sdp');
+  const otherProviders = providers.filter((provider) => provider.name !== 'sdp');
+
   return (
     <div className="mt-4">
       <div className="flex items-center gap-3 py-2">
@@ -111,25 +103,34 @@ export function SocialLoginButtons() {
         <span className="text-xs text-zinc-500">{t('auth.orContinue')}</span>
         <div className="h-px flex-1 bg-edge" />
       </div>
-      <div className="space-y-2">
-        {providers.map((provider) => (
-          <button
-            key={provider.name}
-            type="button"
-            onClick={() => start(provider.name)}
-            disabled={busy !== null}
-            className="flex w-full items-center justify-center gap-2 rounded-md border border-edge bg-raised px-4 py-2 text-sm font-medium text-zinc-200 transition-colors hover:bg-edge disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <ProviderIcon provider={provider.name} />
-            <span>{provider.label}</span>
-            {provider.recommended ? (
-              <span className="rounded-full bg-emerald-900/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
-                {t('auth.recommended')}
-              </span>
-            ) : null}
-          </button>
-        ))}
-      </div>
+      {sdpProvider ? (
+        <button
+          type="button"
+          onClick={() => start(sdpProvider.name)}
+          disabled={busy !== null}
+          className="flex w-full items-center justify-center gap-2 rounded-md border border-edge bg-raised px-4 py-2 text-sm font-medium text-zinc-200 transition-colors hover:bg-edge disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <ProviderIcon provider={sdpProvider.name} />
+          <span>{sdpProvider.label}</span>
+        </button>
+      ) : null}
+      {otherProviders.length > 0 ? (
+        <div className="mt-2 flex items-center justify-between gap-2">
+          {otherProviders.map((provider) => (
+            <button
+              key={provider.name}
+              type="button"
+              onClick={() => start(provider.name)}
+              disabled={busy !== null}
+              aria-label={provider.label}
+              title={provider.label}
+              className="flex h-10 flex-1 items-center justify-center rounded-md border border-edge bg-raised transition-colors hover:bg-edge disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ProviderIcon provider={provider.name} />
+            </button>
+          ))}
+        </div>
+      ) : null}
       {error ? <p className="mt-2 text-xs text-red-300">{error}</p> : null}
     </div>
   );

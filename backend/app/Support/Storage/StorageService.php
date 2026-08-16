@@ -166,7 +166,7 @@ final class StorageService
         return $this->provider()->signedDownloadUrl(
             $file->storage_key,
             $file->name,
-            (int) config('nexus.storage.signed_url_ttl', 300),
+            (int) config('omnex.storage.signed_url_ttl', 300),
         );
     }
 
@@ -253,7 +253,7 @@ final class StorageService
     {
         return [
             'used' => (int) DriveVersion::query()->sum('size'),
-            'limit' => (int) config('nexus.storage.default_quota_bytes', 0),
+            'limit' => (int) config('omnex.storage.default_quota_bytes', 0),
         ];
     }
 
@@ -345,7 +345,7 @@ final class StorageService
 
     private function assertQuota(int $incomingBytes): void
     {
-        $limit = (int) config('nexus.storage.default_quota_bytes', 0);
+        $limit = (int) config('omnex.storage.default_quota_bytes', 0);
 
         if ($limit <= 0) {
             return;

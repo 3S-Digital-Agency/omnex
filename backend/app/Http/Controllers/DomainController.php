@@ -86,7 +86,7 @@ class DomainController extends Controller
         try {
             $domain = $this->domains->register(
                 $data['domain'],
-                ['years' => $data['years'] ?? config('nexus.domain.default_registration_years')],
+                ['years' => $data['years'] ?? config('omnex.domain.default_registration_years')],
                 $request->user(),
                 $provider,
             );

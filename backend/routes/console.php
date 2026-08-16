@@ -2,4 +2,4 @@
 
 use Illuminate\Support\Facades\Schedule;
 
-Schedule::command('nexus:check-domain-expirations')->daily();
+Schedule::command('omnex:check-domain-expirations')->daily();

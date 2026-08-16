@@ -7,7 +7,7 @@ return [
     | OVHcloud registrar (behind DomainProviderInterface)
     |--------------------------------------------------------------------------
     |
-    | Activates only when NEXUS_DOMAIN_PROVIDER=ovh AND the three credentials
+    | Activates only when OMNEX_DOMAIN_PROVIDER=ovh AND the three credentials
     | below are present. Credentials are created at
     | https://eu.api.ovh.com/createToken/ (or the regional console). The
     | subsidiary drives pricing/eligibility in the order cart (FR, GB, CA, …).

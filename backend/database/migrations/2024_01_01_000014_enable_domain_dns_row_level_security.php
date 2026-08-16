@@ -7,7 +7,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (! config('nexus.enforce_rls')) {
+        if (! config('omnex.enforce_rls')) {
             return;
         }
 

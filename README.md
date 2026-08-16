@@ -145,7 +145,7 @@ Demo accounts (seeded): `demo@omnex.dev` and `dev@omnex.dev`, both `password`.
 For the test suite, create the test database first:
 
 ```bash
-docker exec -it nexus-postgres createdb -U nexus nexus_test
+docker exec -it omnex-postgres createdb -U omnex omnex_test
 ```
 
 ---
@@ -168,7 +168,7 @@ code**. Swap a registrar, DNS or storage backend without touching module code:
 ## Security invariants (non-negotiable)
 
 - **Multi-tenant from day one**: global scope + PostgreSQL RLS (defense-in-depth,
-  opt-in via `NEXUS_ENFORCE_RLS`) + tenant-scoped storage namespaces.
+  opt-in via `OMNEX_ENFORCE_RLS`) + tenant-scoped storage namespaces.
 - **Default-deny authorization**: every request resolves an active organization
   and every route requires a permission or a policy.
 - **Audit**: all critical mutations are recorded before/after, immutable.

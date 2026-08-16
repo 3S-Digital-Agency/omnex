@@ -9,7 +9,7 @@ return [
     |
     | Points at any HTTP/JSON registrar gateway. The provider POSTs
     | {"command": ..., ...} and expects the interface's response shapes under
-    | a `data` key. Set NEXUS_DOMAIN_PROVIDER=custom to activate it.
+    | a `data` key. Set OMNEX_DOMAIN_PROVIDER=custom to activate it.
     |
     */
 

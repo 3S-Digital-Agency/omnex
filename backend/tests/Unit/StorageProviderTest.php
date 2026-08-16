@@ -39,10 +39,10 @@ it('reports S3 configuration from credentials', function () {
     expect($provider->label())->toBe('S3');
     expect($provider->isConfigured())->toBeFalse();
 
-    config()->set('nexus.storage.s3.endpoint', 'https://s3.example.com');
-    config()->set('nexus.storage.s3.bucket', 'omnex');
-    config()->set('nexus.storage.s3.key', 'AKIA');
-    config()->set('nexus.storage.s3.secret', 'secret');
+    config()->set('omnex.storage.s3.endpoint', 'https://s3.example.com');
+    config()->set('omnex.storage.s3.bucket', 'omnex');
+    config()->set('omnex.storage.s3.key', 'AKIA');
+    config()->set('omnex.storage.s3.secret', 'secret');
 
     expect($provider->isConfigured())->toBeTrue();
 });

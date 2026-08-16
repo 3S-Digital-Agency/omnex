@@ -7,9 +7,9 @@ return [
     | Namecheap registrar (behind DomainProviderInterface)
     |--------------------------------------------------------------------------
     |
-    | The provider activates only when NEXUS_DOMAIN_PROVIDER=namecheap AND the
+    | The provider activates only when OMNEX_DOMAIN_PROVIDER=namecheap AND the
     | three credentials below are present. Keep the sandbox as the default
-    | (NEXUS_DOMAIN_PROVIDER=sandbox) — no real domain is registered there.
+    | (OMNEX_DOMAIN_PROVIDER=sandbox) — no real domain is registered there.
     |
     | ClientIp must be a public IP whitelisted in the Namecheap API settings
     | (production). For the sandbox endpoint (api.sandbox.namecheap.com) any
