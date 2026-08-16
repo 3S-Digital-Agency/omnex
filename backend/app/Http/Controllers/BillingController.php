@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\CouponRedemptionResource;
+use App\Http\Resources\CouponResource;
 use App\Http\Resources\InvoiceResource;
 use App\Http\Resources\PlanResource;
 use App\Http\Resources\SubscriptionResource;
+use App\Models\Coupon;
 use App\Models\Organization;
 use App\Models\Subscription;
 use App\Support\Billing\BillingService;
@@ -92,6 +95,59 @@ class BillingController extends Controller
         ]);
 
         return response()->json(['data' => $this->billing->validateCoupon($data['code'])]);
+    }
+
+    public function coupons(Request $request): JsonResponse
+    {
+        $this->authorize('billing.read');
+
+        return response()->json(['data' => CouponResource::collection($this->billing->coupons())]);
+    }
+
+    public function storeCoupon(Request $request): JsonResponse
+    {
+        $this->authorize('billing.manage');
+
+        $data = $request->validate([
+            'code' => ['required', 'string', 'max:64', 'unique:coupons,code'],
+            'name' => ['required', 'string', 'max:255'],
+            'description' => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'discount_type' => ['required', 'in:percent,amount'],
+            'discount_value' => ['required', 'integer', 'min:1'],
+            'currency' => ['sometimes', 'string', 'size:3'],
+            'max_redemptions' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'expires_at' => ['sometimes', 'nullable', 'date'],
+            'active' => ['sometimes', 'boolean'],
+        ]);
+
+        return response()->json(new CouponResource($this->billing->createCoupon($data)), 201);
+    }
+
+    public function updateCoupon(Request $request, Coupon $coupon): JsonResponse
+    {
+        $this->authorize('billing.manage');
+
+        $data = $request->validate([
+            'name' => ['sometimes', 'string', 'max:255'],
+            'description' => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'discount_type' => ['sometimes', 'in:percent,amount'],
+            'discount_value' => ['sometimes', 'integer', 'min:1'],
+            'currency' => ['sometimes', 'string', 'size:3'],
+            'max_redemptions' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'expires_at' => ['sometimes', 'nullable', 'date'],
+            'active' => ['sometimes', 'boolean'],
+        ]);
+
+        return response()->json(new CouponResource($this->billing->updateCoupon($coupon, $data)));
+    }
+
+    public function couponRedemptions(Request $request, Coupon $coupon): JsonResponse
+    {
+        $this->authorize('billing.read');
+
+        return response()->json([
+            'data' => CouponRedemptionResource::collection($this->billing->couponRedemptions($coupon)),
+        ]);
     }
 
     public function changePlan(Request $request): JsonResponse

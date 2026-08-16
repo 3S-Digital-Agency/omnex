@@ -304,6 +304,197 @@ final class BillingService
             ->get();
     }
 
+    /**
+     * @return array<int, Coupon>
+     */
+    public function coupons(): array
+    {
+        return Coupon::query()
+            ->withCount('redemptions')
+            ->orderBy('code')
+            ->get()
+            ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function createCoupon(array $data): Coupon
+    {
+        $this->assertDiscountValue($data['discount_type'], (int) $data['discount_value']);
+
+        $code = mb_strtoupper(trim((string) $data['code']));
+
+        if (Coupon::query()->where('code', $code)->exists()) {
+            throw ValidationException::withMessages(['code' => ['This coupon code already exists.']]);
+        }
+
+        $coupon = Coupon::create([
+            'code' => $code,
+            'name' => trim((string) $data['name']),
+            'description' => isset($data['description']) ? trim((string) $data['description']) : null,
+            'discount_type' => $data['discount_type'],
+            'discount_value' => (int) $data['discount_value'],
+            'currency' => $data['currency'] ?? config('omnex.billing.currency', 'usd'),
+            'max_redemptions' => isset($data['max_redemptions']) ? (int) $data['max_redemptions'] : null,
+            'expires_at' => isset($data['expires_at']) ? (string) $data['expires_at'] : null,
+            'active' => isset($data['active']) ? (bool) $data['active'] : true,
+        ]);
+
+        AuditLogger::record('coupon.created', 'coupon', $coupon->id, null, [
+            'code' => $coupon->code,
+            'discount_type' => $coupon->discount_type,
+            'discount_value' => $coupon->discount_value,
+        ]);
+
+        return $coupon;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function updateCoupon(Coupon $coupon, array $data): Coupon
+    {
+        if (isset($data['discount_type'], $data['discount_value'])) {
+            $this->assertDiscountValue($data['discount_type'], (int) $data['discount_value']);
+        }
+
+        $fill = array_intersect_key($data, array_flip([
+            'name', 'description', 'discount_type', 'discount_value', 'currency',
+            'max_redemptions', 'expires_at', 'active',
+        ]));
+
+        if (isset($fill['max_redemptions']) && $fill['max_redemptions'] !== null) {
+            $fill['max_redemptions'] = (int) $fill['max_redemptions'];
+        }
+        if (isset($fill['active'])) {
+            $fill['active'] = (bool) $fill['active'];
+        }
+
+        $coupon->update($fill);
+
+        AuditLogger::record('coupon.updated', 'coupon', $coupon->id, null, [
+            'code' => $coupon->code,
+            'changes' => array_keys($fill),
+        ]);
+
+        return $coupon->fresh();
+    }
+
+    /**
+     * @return Collection<int, CouponRedemption>
+     */
+    public function couponRedemptions(Coupon $coupon): Collection
+    {
+        return $coupon->redemptions()
+            ->with('organization')
+            ->orderByDesc('created_at')
+            ->get();
+    }
+
+    /**
+     * @param  'percent'|'amount'  $type
+     */
+    private function assertDiscountValue(string $type, int $value): void
+    {
+        if ($type === 'percent' && ($value < 1 || $value > 100)) {
+            throw ValidationException::withMessages(['discount_value' => ['A percent discount must be between 1 and 100.']]);
+        }
+
+        if ($type === 'amount' && $value < 1) {
+            throw ValidationException::withMessages(['discount_value' => ['An amount discount must be at least 1 cent.']]);
+        }
+    }
+
+    /**
+     * @return Collection<int, Subscription>
+     */
+    public function overdueSubscriptions(): Collection
+    {
+        return Subscription::withoutTenancy()
+            ->with(['plan', 'coupon', 'organization'])
+            ->where('status', 'active')
+            ->whereNotNull('current_period_end')
+            ->where('current_period_end', '<=', now())
+            // Provider-managed subscriptions (e.g. a live Stripe subscription
+            // with its own billing engine) renew through provider webhooks;
+            // OMNEX only rolls the period over for simulated/sandbox plans.
+            ->whereNull('provider_subscription_id')
+            ->get();
+    }
+
+    /**
+     * Roll an expired sandbox subscription into its next billing period and
+     * record the renewal invoice (coupon discount + available credits applied,
+     * exactly like the activation path). Returns the new invoice.
+     */
+    public function renewSubscription(Subscription $subscription): Invoice
+    {
+        $plan = $subscription->plan;
+        $number = $this->nextInvoiceNumber($subscription->organization_id);
+        $currency = $plan->currency;
+
+        $coupon = $subscription->coupon;
+        $discount = $coupon !== null && $coupon->isValid() ? $coupon->discountFor($plan->price_monthly) : 0;
+
+        $netAfterCoupon = max($plan->price_monthly - $discount, 0);
+        $creditApplied = min($this->creditBalance($subscription->organization), $netAfterCoupon);
+        $amountDue = $netAfterCoupon - $creditApplied;
+
+        if ($creditApplied > 0) {
+            $this->addCredit(
+                $subscription->organization,
+                -$creditApplied,
+                'invoice:'.$number,
+                null,
+                $subscription,
+            );
+        }
+
+        $periodStart = $subscription->current_period_end ?? now();
+        $periodEnd = $periodStart->copy()->addMonth();
+
+        $subscription->update([
+            'current_period_start' => $periodStart,
+            'current_period_end' => $periodEnd,
+            'canceled_at' => null,
+        ]);
+
+        $invoice = Invoice::create([
+            'organization_id' => $subscription->organization_id,
+            'subscription_id' => $subscription->id,
+            'provider' => $subscription->provider,
+            'provider_invoice_id' => null,
+            'number' => $number,
+            'amount' => $plan->price_monthly,
+            'discount' => $discount,
+            'credit_applied' => $creditApplied,
+            'amount_due' => $amountDue,
+            'currency' => $currency,
+            'status' => 'paid',
+            'paid_at' => now(),
+            'period_start' => $periodStart,
+            'period_end' => $periodEnd,
+        ]);
+
+        AuditLogger::record('subscription.renewed', 'subscription', $subscription->id, null, [
+            'plan' => $plan->slug,
+            'invoice' => $invoice->number,
+            'amount_due' => $amountDue,
+        ]);
+
+        $this->notifyOwners(
+            $subscription->organization,
+            'billing',
+            'Subscription renewed',
+            "Your {$plan->name} subscription renewed for the next month.",
+            '/billing',
+            'info',
+        );
+
+        return $invoice;
+    }
+
     private function resolveCoupon(string $code): Coupon
     {
         $coupon = Coupon::query()->where('code', mb_strtoupper(trim($code)))->first();

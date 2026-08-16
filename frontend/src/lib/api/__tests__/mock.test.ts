@@ -561,4 +561,39 @@ describe('MockApiClient', () => {
     expect(credits.balance).toBe(9950); // half of business
     expect(credits.entries[0].reason).toBe('proration');
   });
+
+  it('administers coupons (create, toggle, usage)', async () => {
+    const api = new MockApiClient();
+    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+
+    const initial = await api.listCoupons();
+    expect(initial.map((c) => c.code)).toEqual(['CREDIT10', 'LAUNCH25']);
+    // The earlier coupon test redeemed LAUNCH25 on business.
+    expect(initial.find((c) => c.code === 'LAUNCH25')?.times_redeemed).toBeGreaterThanOrEqual(1);
+
+    const created = await api.createCoupon({
+      code: 'welcome15',
+      name: 'Welcome 15%',
+      discount_type: 'percent',
+      discount_value: 15,
+      max_redemptions: 50,
+    });
+    expect(created.code).toBe('WELCOME15');
+    expect(created.times_redeemed).toBe(0);
+    expect(created.active).toBe(true);
+
+    await expect(
+      api.createCoupon({ code: 'LAUNCH25', name: 'Dup', discount_type: 'percent', discount_value: 10 }),
+    ).rejects.toMatchObject({ status: 422 });
+
+    const toggled = await api.updateCoupon(created.id, { active: false });
+    expect(toggled.active).toBe(false);
+
+    const redemptions = await api.listCouponRedemptions('coupon-launch25');
+    expect(redemptions.length).toBeGreaterThanOrEqual(1);
+    expect(redemptions[0].organization_name).toBe('OMNEX HQ');
+    expect(redemptions[0].discount_amount).toBeGreaterThan(0);
+
+    expect(await api.listCouponRedemptions(created.id)).toHaveLength(0);
+  });
 });

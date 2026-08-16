@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, CreditCard, Tag, Wallet } from 'lucide-react';
+import { Check, CreditCard, Settings2, Tag, Wallet } from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../app/AuthProvider';
 import { api } from '../../lib/api';
 import type { BillingPlanDto, CouponDto, InvoiceDto, SubscriptionDto } from '../../lib/api/types';
@@ -126,6 +127,15 @@ export function BillingPage() {
           <h1 className="text-2xl font-bold text-white">{t('billing.title')}</h1>
           <p className="text-sm text-zinc-400">{t('billing.subtitle', { name: activeOrganization?.name ?? '' })}</p>
         </div>
+        {hasPermission('billing.read') ? (
+          <Link
+            to="/billing/coupons"
+            className="ml-auto inline-flex h-9 items-center gap-2 rounded-md border border-edge bg-panel px-3 text-sm text-zinc-300 transition hover:border-brand-700 hover:text-white"
+          >
+            <Settings2 className="h-3.5 w-3.5" />
+            {t('billing.manageCoupons')}
+          </Link>
+        ) : null}
       </header>
 
       <Card>

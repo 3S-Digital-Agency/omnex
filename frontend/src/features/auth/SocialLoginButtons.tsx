@@ -114,6 +114,9 @@ export function SocialLoginButtons({ standalone = false }: { standalone?: boolea
     ...providers.filter((provider) => provider.name === 'sdp'),
   ];
 
+  const sdp = orderedProviders.find((provider) => provider.name === 'sdp');
+  const iconProviders = orderedProviders.filter((provider) => provider.name !== 'sdp');
+
   return (
     <div className="mt-2">
       {standalone ? (
@@ -128,19 +131,32 @@ export function SocialLoginButtons({ standalone = false }: { standalone?: boolea
         </div>
       )}
       <div className="flex flex-col gap-2">
-        {orderedProviders.map((provider) => (
+        <div className="flex flex-wrap gap-2">
+          {iconProviders.map((provider) => (
+            <button
+              key={provider.name}
+              type="button"
+              onClick={() => start(provider.name)}
+              disabled={busy !== null}
+              aria-label={provider.label}
+              title={provider.label}
+              className="flex h-10 min-w-10 flex-1 items-center justify-center rounded-md border border-edge bg-raised px-2 transition-colors hover:bg-edge disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ProviderIcon provider={provider.name} />
+            </button>
+          ))}
+        </div>
+        {sdp ? (
           <button
-            key={provider.name}
             type="button"
-            onClick={() => start(provider.name)}
+            onClick={() => start(sdp.name)}
             disabled={busy !== null}
-            aria-label={provider.label}
             className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-edge bg-raised px-4 transition-colors hover:bg-edge disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <ProviderIcon provider={provider.name} />
-            <span className="text-sm font-medium text-zinc-200">{provider.label}</span>
+            <ProviderIcon provider="sdp" />
+            <span className="text-sm font-medium text-zinc-200">{sdp.label}</span>
           </button>
-        ))}
+        ) : null}
       </div>
       {error ? <p className="mt-2 text-xs text-red-300">{error}</p> : null}
     </div>

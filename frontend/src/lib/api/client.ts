@@ -5,7 +5,11 @@ import type {
   AuthSession,
   BillingPlanDto,
   BillingSubscribeResponse,
+  CouponAdminDto,
+  CouponCreateInput,
   CouponDto,
+  CouponRedemptionDto,
+  CouponUpdateInput,
   CreditEntryDto,
   CreditSummaryDto,
   DnsHistoryDto,
@@ -172,6 +176,10 @@ export interface ApiClient {
   changePlan(plan: string): Promise<SubscriptionDto>;
   getCredits(): Promise<CreditSummaryDto>;
   addCredits(amount: number, reason: string): Promise<CreditEntryDto>;
+  listCoupons(): Promise<CouponAdminDto[]>;
+  createCoupon(input: CouponCreateInput): Promise<CouponAdminDto>;
+  updateCoupon(id: string, input: CouponUpdateInput): Promise<CouponAdminDto>;
+  listCouponRedemptions(id: string): Promise<CouponRedemptionDto[]>;
 
   listSiteProviders(): Promise<SiteProviderDto[]>;
   listSites(): Promise<SiteDto[]>;

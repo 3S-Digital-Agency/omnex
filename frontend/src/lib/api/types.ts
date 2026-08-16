@@ -534,6 +534,52 @@ export interface CreditSummaryDto {
   entries: CreditEntryDto[];
 }
 
+export interface CouponAdminDto {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  discount_type: 'percent' | 'amount';
+  discount_value: number;
+  currency: string;
+  max_redemptions: number | null;
+  times_redeemed: number;
+  active: boolean;
+  expires_at: string | null;
+  created_at: string | null;
+}
+
+export interface CouponCreateInput {
+  code: string;
+  name: string;
+  description?: string | null;
+  discount_type: 'percent' | 'amount';
+  discount_value: number;
+  currency?: string;
+  max_redemptions?: number | null;
+  expires_at?: string | null;
+}
+
+export interface CouponUpdateInput {
+  name?: string;
+  description?: string | null;
+  discount_type?: 'percent' | 'amount';
+  discount_value?: number;
+  currency?: string;
+  max_redemptions?: number | null;
+  expires_at?: string | null;
+  active?: boolean;
+}
+
+export interface CouponRedemptionDto {
+  id: string;
+  organization_id: string;
+  organization_name: string | null;
+  discount_amount: number;
+  currency: string;
+  created_at: string | null;
+}
+
 export type SecuritySeverity = 'high' | 'medium' | 'low';
 export type SecurityFindingStatus = 'open' | 'resolved' | 'dismissed';
 

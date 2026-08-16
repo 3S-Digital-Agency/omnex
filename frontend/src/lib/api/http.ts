@@ -8,7 +8,11 @@ import type {
   AuthSession,
   BillingPlanDto,
   BillingSubscribeResponse,
+  CouponAdminDto,
+  CouponCreateInput,
   CouponDto,
+  CouponRedemptionDto,
+  CouponUpdateInput,
   CreditEntryDto,
   CreditSummaryDto,
   DnsHistoryDto,
@@ -694,6 +698,24 @@ export class HttpApiClient implements ApiClient {
       method: 'POST',
       body: { amount, reason },
     });
+    return res.data;
+  }
+
+  async listCoupons(): Promise<CouponAdminDto[]> {
+    const res = await this.request<{ data: CouponAdminDto[] }>('/billing/coupons');
+    return res.data;
+  }
+
+  async createCoupon(input: CouponCreateInput): Promise<CouponAdminDto> {
+    return this.request('/billing/coupons', { method: 'POST', body: input });
+  }
+
+  async updateCoupon(id: string, input: CouponUpdateInput): Promise<CouponAdminDto> {
+    return this.request(`/billing/coupons/${id}`, { method: 'PATCH', body: input });
+  }
+
+  async listCouponRedemptions(id: string): Promise<CouponRedemptionDto[]> {
+    const res = await this.request<{ data: CouponRedemptionDto[] }>(`/billing/coupons/${id}/redemptions`);
     return res.data;
   }
 }

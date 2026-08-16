@@ -110,7 +110,12 @@ handling, audit + owner notifications, and the OMNEX Billing UI.
   Stripe `discounts[0][coupon]`, `omnex:stripe-sync-coupons`), **credits**
   (signed ledger applied against invoices) and **proration** (unused period of
   a plan change becomes credit). Invoices break down `amount` / `discount` /
-  `credit_applied` / `amount_due`.
+  `credit_applied` / `amount_due`. A coupon **admin page** (`/billing/coupons`)
+  creates/activates/deactivates coupons and shows per-organization usage.
+- **Automatic renewals**: `omnex:billing-renewals` (scheduled daily) rolls
+  overdue sandbox subscriptions into their next period and records the renewal
+  invoice (coupon + credits applied); Stripe-managed subscriptions renew via
+  Stripe webhooks and are skipped. Run with `--dry-run` to preview.
 
 ### 🛡️ Security Center (Phase 7)
 - Findings engine behind the live score: MFA, unverified email, single-member
@@ -178,6 +183,11 @@ pnpm dev
 ```
 
 Demo accounts (seeded): `demo@omnex.dev` and `dev@omnex.dev`, both `password`.
+
+Scheduled tasks (domain-expiration warnings, billing renewals) run through the
+Laravel scheduler — in dev start `php artisan schedule:work`; in production add
+`* * * * * cd backend && php artisan schedule:run` to cron. Renewals can be
+previewed with `php artisan omnex:billing-renewals --dry-run`.
 
 For the test suite, create the test database first:
 

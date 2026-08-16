@@ -33,4 +33,9 @@ class CouponRedemption extends Model
     {
         return $this->belongsTo(Subscription::class);
     }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
 }

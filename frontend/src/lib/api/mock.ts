@@ -9,7 +9,11 @@ import type {
   AuthSession,
   BillingPlanDto,
   BillingSubscribeResponse,
+  CouponAdminDto,
+  CouponCreateInput,
   CouponDto,
+  CouponRedemptionDto,
+  CouponUpdateInput,
   CreditEntryDto,
   CreditSummaryDto,
   DnsHistoryDto,
@@ -532,15 +536,17 @@ const subscriptions: SubscriptionDto[] = [];
 const invoices: InvoiceDto[] = [];
 
 // Demo coupon catalog mirroring the backend `coupons` table.
-const MOCK_COUPONS: CouponDto[] = [
-  { code: 'LAUNCH25', name: 'Launch 25%', discount_type: 'percent', discount_value: 25, discount: 0 },
-  { code: 'CREDIT10', name: '10$ off', discount_type: 'amount', discount_value: 1000, discount: 0 },
+const mockCoupons: CouponAdminDto[] = [
+  { id: 'coupon-launch25', code: 'LAUNCH25', name: 'Launch 25%', description: '25% off the first month.', discount_type: 'percent', discount_value: 25, currency: 'usd', max_redemptions: 500, times_redeemed: 0, active: true, expires_at: null, created_at: '2026-08-01T09:00:00Z' },
+  { id: 'coupon-credit10', code: 'CREDIT10', name: '10$ off', description: '10 USD off any plan.', discount_type: 'amount', discount_value: 1000, currency: 'usd', max_redemptions: null, times_redeemed: 0, active: true, expires_at: null, created_at: '2026-08-01T09:00:00Z' },
 ];
 
+const couponRedemptions: Array<CouponRedemptionDto & { couponId: string }> = [];
+
 function couponByCode(code: string): CouponDto {
-  const coupon = MOCK_COUPONS.find((c) => c.code === code.trim().toUpperCase());
+  const coupon = mockCoupons.find((c) => c.code === code.trim().toUpperCase() && c.active);
   if (!coupon) throw new ApiError(422, 'Validation failed', undefined, { coupon: ['This coupon code does not exist.'] });
-  return coupon;
+  return { code: coupon.code, name: coupon.name, discount_type: coupon.discount_type, discount_value: coupon.discount_value, discount: 0 };
 }
 
 function couponDiscount(coupon: CouponDto, amountCents: number): number {
@@ -2060,6 +2066,19 @@ export class MockApiClient implements ApiClient {
 
     const coupon = couponCode && couponCode.trim() !== '' ? couponByCode(couponCode) : null;
     const discount = coupon ? couponDiscount(coupon, planDto.price_monthly) : 0;
+    if (coupon && discount > 0) {
+      const admin = mockCoupons.find((c) => c.code === coupon.code);
+      if (admin) admin.times_redeemed += 1;
+      couponRedemptions.unshift({
+        id: uid('redem'),
+        couponId: admin?.id ?? coupon.code,
+        organization_id: activeOrganization()?.id ?? 'org-omnex-hq',
+        organization_name: activeOrganization()?.name ?? 'OMNEX HQ',
+        discount_amount: discount,
+        currency: planDto.currency,
+        created_at: nowIso(),
+      });
+    }
     const netAfterCoupon = Math.max(planDto.price_monthly - discount, 0);
     const creditApplied = Math.min(creditBalance(), netAfterCoupon);
     const amountDue = netAfterCoupon - creditApplied;
@@ -2175,6 +2194,62 @@ export class MockApiClient implements ApiClient {
     };
     creditEntries.unshift(entry);
     return Promise.resolve(entry);
+  }
+
+  async listCoupons(): Promise<CouponAdminDto[]> {
+    requireUser();
+    return Promise.resolve([...mockCoupons].sort((a, b) => a.code.localeCompare(b.code)));
+  }
+
+  async createCoupon(input: CouponCreateInput): Promise<CouponAdminDto> {
+    requireUser();
+    const code = input.code.trim().toUpperCase();
+    if (mockCoupons.some((c) => c.code === code)) {
+      throw new ApiError(422, 'Validation failed', undefined, { code: ['This coupon code already exists.'] });
+    }
+    if (input.discount_type === 'percent' && (input.discount_value < 1 || input.discount_value > 100)) {
+      throw new ApiError(422, 'Validation failed', undefined, { discount_value: ['A percent discount must be between 1 and 100.'] });
+    }
+    const coupon: CouponAdminDto = {
+      id: uid('coupon'),
+      code,
+      name: input.name,
+      description: input.description ?? null,
+      discount_type: input.discount_type,
+      discount_value: input.discount_value,
+      currency: input.currency ?? 'usd',
+      max_redemptions: input.max_redemptions ?? null,
+      times_redeemed: 0,
+      active: true,
+      expires_at: input.expires_at ?? null,
+      created_at: nowIso(),
+    };
+    mockCoupons.push(coupon);
+    return Promise.resolve({ ...coupon });
+  }
+
+  async updateCoupon(id: string, input: CouponUpdateInput): Promise<CouponAdminDto> {
+    requireUser();
+    const coupon = mockCoupons.find((c) => c.id === id);
+    if (!coupon) throw new ApiError(404, 'Not found', 'Coupon not found.');
+    if (input.name !== undefined) coupon.name = input.name;
+    if (input.description !== undefined) coupon.description = input.description;
+    if (input.discount_type !== undefined) coupon.discount_type = input.discount_type;
+    if (input.discount_value !== undefined) coupon.discount_value = input.discount_value;
+    if (input.currency !== undefined) coupon.currency = input.currency;
+    if (input.max_redemptions !== undefined) coupon.max_redemptions = input.max_redemptions;
+    if (input.expires_at !== undefined) coupon.expires_at = input.expires_at;
+    if (input.active !== undefined) coupon.active = input.active;
+    return Promise.resolve({ ...coupon });
+  }
+
+  async listCouponRedemptions(id: string): Promise<CouponRedemptionDto[]> {
+    requireUser();
+    return Promise.resolve(
+      couponRedemptions
+        .filter((r) => r.couponId === id)
+        .map(({ couponId: _couponId, ...redemption }) => ({ ...redemption })),
+    );
   }
 
   async cancelSubscription(id: string): Promise<SubscriptionDto> {

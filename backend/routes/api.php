@@ -75,6 +75,10 @@ Route::prefix('v1')->group(function () {
         Route::post('/billing/subscribe', [BillingController::class, 'subscribe']);
         Route::post('/billing/subscriptions/{subscription}/cancel', [BillingController::class, 'cancel']);
         Route::post('/billing/coupons/validate', [BillingController::class, 'validateCoupon']);
+        Route::get('/billing/coupons', [BillingController::class, 'coupons']);
+        Route::post('/billing/coupons', [BillingController::class, 'storeCoupon']);
+        Route::patch('/billing/coupons/{coupon}', [BillingController::class, 'updateCoupon']);
+        Route::get('/billing/coupons/{coupon}/redemptions', [BillingController::class, 'couponRedemptions']);
         Route::post('/billing/change-plan', [BillingController::class, 'changePlan']);
         Route::get('/billing/credits', [BillingController::class, 'credits']);
         Route::post('/billing/credits', [BillingController::class, 'addCredits']);

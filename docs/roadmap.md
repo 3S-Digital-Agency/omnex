@@ -156,7 +156,9 @@ REST + public webhook route, RBAC `billing.read`/`billing.manage`, audit + owner
 notifications, and the Billing UI. **Coupons** (percent/amount, expiry,
 redemption caps, Stripe `discounts[0][coupon]` + `omnex:stripe-sync-coupons`),
 **credits** (signed ledger, applied against invoices) and **proration**
-(plan change credits the unused period) shipped with tests. **Remaining:** live
+(plan change credits the unused period) and **automatic renewals**
+(`omnex:billing-renewals`, scheduled daily, `--dry-run` preview, Stripe-managed
+subscriptions skipped) shipped with tests. **Remaining:** live
 Stripe keys, taxes, refunds, dunning schedules, customer portal.
 
 ---
