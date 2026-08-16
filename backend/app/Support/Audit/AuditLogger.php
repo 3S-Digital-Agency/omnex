@@ -3,6 +3,9 @@
 namespace App\Support\Audit;
 
 use App\Models\AuditLog;
+use App\Support\Activity\ActivityPresenter;
+use App\Support\Streams\StreamBroker;
+use App\Support\Streams\StreamChannels;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 
@@ -19,7 +22,7 @@ final class AuditLogger
         /** @var Request|null $request */
         $request = app('request');
 
-        return AuditLog::create([
+        $log = AuditLog::create([
             'organization_id' => app(TenantContext::class)->id(),
             'user_id' => $request?->user()?->id,
             'action' => $action,
@@ -31,5 +34,15 @@ final class AuditLogger
             'user_agent' => $request?->userAgent(),
             'result' => $result,
         ]);
+
+        // Broadcast to any open SSE stream for this tenant (real-time activity).
+        if ($log->organization_id !== null) {
+            app(StreamBroker::class)->publish(
+                StreamChannels::activity($log->organization_id),
+                ActivityPresenter::toArray($log),
+            );
+        }
+
+        return $log;
     }
 }

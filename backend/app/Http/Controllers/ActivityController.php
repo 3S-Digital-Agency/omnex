@@ -3,8 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
+use App\Support\Activity\ActivityPresenter;
+use App\Support\Streams\StreamBroker;
+use App\Support\Streams\StreamChannels;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ActivityController extends Controller
 {
@@ -30,88 +35,64 @@ class ActivityController extends Controller
             ->get();
 
         return response()->json([
-            'data' => $logs->map(fn (AuditLog $log) => $this->toActivity($log))->values(),
+            'data' => $logs->map(fn (AuditLog $log) => ActivityPresenter::toArray($log))->values(),
             'latest_id' => $logs->max('id') ?? $since,
         ]);
     }
 
-    private function toActivity(AuditLog $log): array
-    {
-        [$type, $severity, $title] = $this->classify($log->action);
-
-        return [
-            'id' => $log->id,
-            'type' => $type,
-            'severity' => $severity,
-            'title' => $title,
-            'description' => $this->describe($log),
-            'actor' => $log->user?->name,
-            'created_at' => $log->created_at?->toIso8601String(),
-        ];
-    }
-
     /**
-     * @return array{0: string, 1: string, 2: string}
+     * Server-Sent Events stream of `activity.created` frames for the active
+     * tenant. AuditLogger queues events as they are recorded; this endpoint
+     * drains and writes them. The client reconnects after `sse_max_seconds`;
+     * comment frames keep intermediaries from buffering the connection.
      */
-    private function classify(string $action): array
+    public function stream(Request $request): StreamedResponse
     {
-        return match ($action) {
-            'user.registered' => ['auth', 'info', 'User registered'],
-            'user.logged_in' => ['auth', 'info', 'Sign in'],
-            'user.logged_out' => ['auth', 'info', 'Sign out'],
-            'user.mfa_enabled' => ['security', 'success', 'MFA enabled'],
-            'user.mfa_disabled' => ['security', 'warning', 'MFA disabled'],
-            'user.mfa_failed' => ['security', 'warning', 'Failed MFA attempt'],
-            'organization.created' => ['organization', 'success', 'Organization created'],
-            'organization.switched' => ['organization', 'info', 'Switched organization'],
-            'member.invited' => ['member', 'info', 'Member invited'],
-            'member.invitation_accepted' => ['member', 'success', 'Invitation accepted'],
-            'member.invitation_cancelled' => ['member', 'info', 'Invitation cancelled'],
-            'member.role_changed' => ['member', 'warning', 'Role changed'],
-            'member.removed' => ['member', 'warning', 'Member removed'],
-            'domain.registered' => ['domain', 'success', 'Domain registered'],
-            'domain.renewed' => ['domain', 'success', 'Domain renewed'],
-            'domain.transferred' => ['domain', 'success', 'Domain transferred'],
-            'domain.updated' => ['domain', 'info', 'Domain settings updated'],
-            'domain.expiring' => ['domain', 'warning', 'Domain expiring'],
-            'dns.record_created' => ['dns', 'info', 'DNS record created'],
-            'dns.record_updated' => ['dns', 'warning', 'DNS record updated'],
-            'dns.record_deleted' => ['dns', 'warning', 'DNS record deleted'],
-            'dns.record_rolled_back' => ['dns', 'warning', 'DNS change rolled back'],
-            'dns.record_imported' => ['dns', 'warning', 'DNS zone imported'],
-            default => ['system', 'info', $action],
-        };
-    }
+        $this->authorize('audit.read');
 
-    private function describe(AuditLog $log): ?string
-    {
-        if ($log->after && isset($log->after['email'])) {
-            return $log->after['email'];
-        }
+        $organizationId = app(TenantContext::class)->id();
+        $channel = StreamChannels::activity($organizationId);
+        $broker = app(StreamBroker::class);
+        $maxSeconds = (int) config('omnex.activity.sse_max_seconds', 60);
+        $heartbeat = max(1, (int) config('omnex.activity.sse_heartbeat_seconds', 15));
 
-        if ($log->before && isset($log->before['email'])) {
-            return $log->before['email'];
-        }
+        return response()->stream(function () use ($channel, $broker, $maxSeconds, $heartbeat) {
+            $started = microtime(true);
 
-        if ($log->after && isset($log->after['name'])) {
-            return $log->after['name'];
-        }
+            $emit = function (array $event): void {
+                echo "event: activity.created\n";
+                echo 'data: '.json_encode($event)."\n\n";
+            };
 
-        // DNS record snapshots carry type/name/content.
-        if ($log->after && isset($log->after['type'])) {
-            $name = $log->after['name'] ?? '@';
+            while (true) {
+                $remaining = $maxSeconds - (microtime(true) - $started);
 
-            return sprintf('%s %s → %s', $log->after['type'], $name, $log->after['content'] ?? '');
-        }
+                if ($remaining <= 0) {
+                    // Final non-blocking pass so buffered events (in-process
+                    // driver) are still flushed before the connection closes.
+                    $broker->listen($channel, $emit, 0);
+                    break;
+                }
 
-        if ($log->before && isset($log->before['type'])) {
-            $name = $log->before['name'] ?? '@';
+                $broker->listen($channel, $emit, (int) min($heartbeat, max(1, $remaining)));
 
-            return sprintf('%s %s → %s', $log->before['type'], $name, $log->before['content'] ?? '');
-        }
+                // Keep-alive comment so proxies do not buffer the stream.
+                echo ": ping\n\n";
 
-        return $log->resource_type !== null
-            ? "{$log->resource_type} {$log->resource_id}"
-            : null;
+                if (connection_aborted()) {
+                    break;
+                }
+
+                if (ob_get_level() > 0) {
+                    ob_flush();
+                }
+                flush();
+            }
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'Connection' => 'keep-alive',
+            'X-Accel-Buffering' => 'no',
+        ]);
     }
 }

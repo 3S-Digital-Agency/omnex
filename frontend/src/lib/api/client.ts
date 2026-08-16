@@ -1,7 +1,13 @@
 import type {
   ActivityFeed,
+  ActivityItem,
   AuditLogDto,
   AuthSession,
+  BillingPlanDto,
+  BillingSubscribeResponse,
+  CouponDto,
+  CreditEntryDto,
+  CreditSummaryDto,
   DnsHistoryDto,
   DnsRecordDto,
   DnsRecordInput,
@@ -18,6 +24,7 @@ import type {
   DriveListing,
   DriveVersionDto,
   InvitationDto,
+  InvoiceDto,
   LoginInput,
   LoginResponse,
   MeResponse,
@@ -25,17 +32,27 @@ import type {
   MfaConfirmResponse,
   MfaSetupResponse,
   NotificationDto,
+  NotificationListDto,
+  NotificationQuery,
   OrganizationDto,
+  PaginatedNotificationList,
   Paginated,
+  PaymentProviderDto,
   PropagationStatusDto,
   RegisterInput,
   RoleDto,
   SecurityFindingDto,
   SecurityScoreDto,
+  SiteCreateInput,
+  SiteDeploymentDto,
+  SiteDto,
+  SiteProviderDto,
+  SiteUpdateInput,
   SocialAccountDto,
   SocialProviderDto,
   SocialRedirectResponse,
   StorageProviderDto,
+  SubscriptionDto,
   SwitchResponse,
   UpdateProfileInput,
   UserDto,
@@ -90,8 +107,14 @@ export interface ApiClient {
   listRoles(): Promise<RoleDto[]>;
   listAudit(perPage?: number): Promise<Paginated<AuditLogDto>>;
   listActivity(sinceId?: number): Promise<ActivityFeed>;
-  listNotifications(): Promise<NotificationDto[]>;
-  markNotificationRead(id: string): Promise<void>;
+  /** Subscribe to real-time activity events; returns an unsubscribe fn. */
+  subscribeActivity(handler: (item: ActivityItem) => void): () => void;
+  listNotifications(): Promise<NotificationListDto>;
+  listNotificationsPage(query?: NotificationQuery): Promise<PaginatedNotificationList>;
+  markNotificationRead(id: string): Promise<NotificationDto>;
+  markAllNotificationsRead(): Promise<void>;
+  /** Subscribe to real-time notification events; returns an unsubscribe fn. */
+  subscribeNotifications(handler: (notification: NotificationDto) => void): () => void;
 
   listDomains(): Promise<DomainDto[]>;
   listDomainProviders(): Promise<DomainProviderDto[]>;
@@ -138,4 +161,26 @@ export interface ApiClient {
   scanSecurity(): Promise<SecurityScoreDto>;
   dismissSecurityFinding(id: string): Promise<SecurityFindingDto>;
   reopenSecurityFinding(id: string): Promise<SecurityFindingDto>;
+
+  listBillingProviders(): Promise<PaymentProviderDto[]>;
+  listBillingPlans(): Promise<BillingPlanDto[]>;
+  getSubscription(): Promise<SubscriptionDto | null>;
+  listInvoices(): Promise<InvoiceDto[]>;
+  subscribeToPlan(plan: string, provider?: string, coupon?: string): Promise<BillingSubscribeResponse>;
+  cancelSubscription(id: string): Promise<SubscriptionDto>;
+  validateCoupon(code: string): Promise<CouponDto>;
+  changePlan(plan: string): Promise<SubscriptionDto>;
+  getCredits(): Promise<CreditSummaryDto>;
+  addCredits(amount: number, reason: string): Promise<CreditEntryDto>;
+
+  listSiteProviders(): Promise<SiteProviderDto[]>;
+  listSites(): Promise<SiteDto[]>;
+  getSite(id: string): Promise<SiteDto>;
+  createSite(input: SiteCreateInput): Promise<SiteDto>;
+  updateSite(id: string, input: SiteUpdateInput): Promise<SiteDto>;
+  deleteSite(id: string): Promise<void>;
+  listSiteDeployments(siteId: string): Promise<SiteDeploymentDto[]>;
+  getSiteDeployment(siteId: string, deploymentId: string): Promise<SiteDeploymentDto>;
+  deploySite(siteId: string): Promise<SiteDeploymentDto>;
+  rollbackSite(siteId: string, deploymentId: string): Promise<SiteDeploymentDto>;
 }

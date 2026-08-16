@@ -20,8 +20,19 @@
   `DomainProviderInterface`/`DnsProviderInterface`; sandbox registrar; search,
   register, renew, transfer; full DNS record CRUD with validation, templates,
   zone-file import/export, immutable history + rollback; expiration scheduler;
-  events → audit stream). DNSSEC + propagation monitoring + a real registrar
-  are the remaining steps.
+  events → audit stream). DNSSEC + propagation monitoring + real registrars
+  (Namecheap, OVH, custom) are delivered.
+- **Phase 4 — Storage (Drive): IMPLEMENTED** (`StorageProviderInterface`,
+  S3-compatible + sandbox; upload/download, folders, versions, trash,
+  quotas, tenant isolation).
+- **Phase 5 — Sites: IMPLEMENTED** (`SiteProviderInterface`, sandbox + custom;
+  provision/deploy/rollback, encrypted env vars, auto-rollback on failure).
+- **Phase 6 — Billing: IMPLEMENTED** (`PaymentProviderInterface`, sandbox +
+  Stripe; plans, subscriptions, invoices, webhook-verified activation, cancel).
+- **Phase 7 — Security: PARTIALLY DELIVERED** (findings engine + Security
+  Score live). Remaining: MFA enforcement policy, session management,
+  SSL/vulnerability monitoring, backup status.
+- **Phase 8+ — Cloud, Deploy, Mail, AI, Automate, Marketplace: PLANNED.**
 
 ---
 
@@ -120,6 +131,13 @@ environment variables (encrypted), logs, SSL, CDN, cache, rollback, backups.
 **DoD:** deploy a static + a Laravel site from Git in a few clicks; failed
 deploy → automatic rollback; env vars never leak via API.
 
+**Delivered:** `SiteProviderInterface` (sandbox + Custom HTTP/JSON gateway),
+`SiteService` (provision/deploy/rollback/delete, encrypted env vars at rest),
+`SiteController` REST API, RBAC `sites.read`/`sites.manage`, and the Sites UI
+(list → provision → deploy → live, build logs, manual rollback, automatic
+rollback on failed deploy). **Remaining:** real hosting providers (Vercel,
+Netlify, Forge…), Git webhooks/auto-deploy, SSL/CDN/cache, backups.
+
 ---
 
 ## Phase 6 — OMNEX Billing
@@ -130,6 +148,16 @@ downgrades/prorata, refunds, failed payments, renewals.
 
 **DoD:** subscribe → invoice → webhook-verified payment state; idempotent
 checkout; failure/dunning path produces `PaymentFailed` events.
+
+**Delivered:** `PaymentProviderInterface` (sandbox + Stripe), plans catalog,
+tenant-scoped `subscriptions` + `invoices`, `BillingService` (subscribe →
+webhook-verified activate/fail, idempotent redelivery, cancel), `BillingController`
+REST + public webhook route, RBAC `billing.read`/`billing.manage`, audit + owner
+notifications, and the Billing UI. **Coupons** (percent/amount, expiry,
+redemption caps, Stripe `discounts[0][coupon]` + `omnex:stripe-sync-coupons`),
+**credits** (signed ledger, applied against invoices) and **proration**
+(plan change credits the unused period) shipped with tests. **Remaining:** live
+Stripe keys, taxes, refunds, dunning schedules, customer portal.
 
 ---
 

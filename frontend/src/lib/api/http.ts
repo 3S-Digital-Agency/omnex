@@ -3,8 +3,14 @@ import type { ApiClient } from './client';
 import { session } from './session';
 import type {
   ActivityFeed,
+  ActivityItem,
   AuditLogDto,
   AuthSession,
+  BillingPlanDto,
+  BillingSubscribeResponse,
+  CouponDto,
+  CreditEntryDto,
+  CreditSummaryDto,
   DnsHistoryDto,
   DnsRecordDto,
   DnsRecordInput,
@@ -21,6 +27,7 @@ import type {
   DriveListing,
   DriveVersionDto,
   InvitationDto,
+  InvoiceDto,
   LoginInput,
   LoginResponse,
   MeResponse,
@@ -28,17 +35,27 @@ import type {
   MfaConfirmResponse,
   MfaSetupResponse,
   NotificationDto,
+  NotificationListDto,
+  NotificationQuery,
   OrganizationDto,
   Paginated,
+  PaginatedNotificationList,
+  PaymentProviderDto,
   PropagationStatusDto,
   RegisterInput,
   RoleDto,
   SecurityFindingDto,
   SecurityScoreDto,
+  SiteCreateInput,
+  SiteDeploymentDto,
+  SiteDto,
+  SiteProviderDto,
+  SiteUpdateInput,
   SocialAccountDto,
   SocialProviderDto,
   SocialRedirectResponse,
   StorageProviderDto,
+  SubscriptionDto,
   SwitchResponse,
   UpdateProfileInput,
   UserDto,
@@ -216,13 +233,169 @@ export class HttpApiClient implements ApiClient {
     return this.request(`/activity${query}`);
   }
 
-  async listNotifications(): Promise<NotificationDto[]> {
-    const res = await this.request<{ data: NotificationDto[] }>('/notifications');
-    return res.data;
+  subscribeActivity(handler: (item: ActivityItem) => void): () => void {
+    const controller = new AbortController();
+    let stopped = false;
+    let reconnect: ReturnType<typeof setTimeout> | undefined;
+
+    async function connect() {
+      const headers: Record<string, string> = {
+        Accept: 'text/event-stream',
+        'Cache-Control': 'no-cache',
+      };
+      const token = session.getToken();
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const org = session.getOrganizationId();
+      if (org) headers['X-Organization'] = org;
+
+      try {
+        const response = await fetch(`${BASE}/activity/stream`, {
+          headers,
+          signal: controller.signal,
+        });
+
+        if (!response.ok || !response.body) {
+          throw new Error(`SSE connection failed with HTTP ${response.status}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (!stopped) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const frames = buffer.split('\n\n');
+          buffer = frames.pop() ?? '';
+
+          for (const frame of frames) {
+            let event = 'message';
+            let data = '';
+            for (const line of frame.split('\n')) {
+              if (line.startsWith('event:')) event = line.slice(6).trim();
+              else if (line.startsWith('data:')) data += line.slice(5).trim();
+            }
+            if (event === 'activity.created' && data) {
+              try {
+                handler(JSON.parse(data) as ActivityItem);
+              } catch {
+                // Ignore malformed frames.
+              }
+            }
+          }
+        }
+      } catch (error) {
+        if ((error as Error)?.name === 'AbortError') return;
+      }
+
+      if (!stopped) {
+        reconnect = setTimeout(connect, 3000);
+      }
+    }
+
+    void connect();
+
+    return () => {
+      stopped = true;
+      controller.abort();
+      if (reconnect) clearTimeout(reconnect);
+    };
   }
 
-  markNotificationRead(id: string): Promise<void> {
+  async listNotifications(): Promise<NotificationListDto> {
+    const res = await this.request<{ data: NotificationDto[]; unread: number }>('/notifications?per_page=50');
+    return { data: res.data, unread: res.unread ?? res.data.filter((n) => !n.read_at).length };
+  }
+
+  listNotificationsPage(query: NotificationQuery = {}): Promise<PaginatedNotificationList> {
+    const params = new URLSearchParams();
+    if (query.type) params.set('type', query.type);
+    if (query.severity) params.set('severity', query.severity);
+    if (query.unread !== undefined) params.set('unread', query.unread ? '1' : '0');
+    if (query.page) params.set('page', String(query.page));
+    if (query.perPage) params.set('per_page', String(query.perPage));
+    return this.request(`/notifications?${params.toString()}`);
+  }
+
+  markNotificationRead(id: string): Promise<NotificationDto> {
     return this.request(`/notifications/${id}/read`, { method: 'POST' });
+  }
+
+  markAllNotificationsRead(): Promise<void> {
+    return this.request('/notifications/read-all', { method: 'POST' });
+  }
+
+  subscribeNotifications(handler: (notification: NotificationDto) => void): () => void {
+    const controller = new AbortController();
+    let stopped = false;
+    let reconnect: ReturnType<typeof setTimeout> | undefined;
+
+    async function connect() {
+      const headers: Record<string, string> = {
+        Accept: 'text/event-stream',
+        'Cache-Control': 'no-cache',
+      };
+      const token = session.getToken();
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const org = session.getOrganizationId();
+      if (org) headers['X-Organization'] = org;
+
+      try {
+        const response = await fetch(`${BASE}/notifications/stream`, {
+          headers,
+          signal: controller.signal,
+        });
+
+        if (!response.ok || !response.body) {
+          throw new Error(`SSE connection failed with HTTP ${response.status}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (!stopped) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const frames = buffer.split('\n\n');
+          buffer = frames.pop() ?? '';
+
+          for (const frame of frames) {
+            let event = 'message';
+            let data = '';
+            for (const line of frame.split('\n')) {
+              if (line.startsWith('event:')) event = line.slice(6).trim();
+              else if (line.startsWith('data:')) data += line.slice(5).trim();
+            }
+            if (event === 'notification.created' && data) {
+              try {
+                handler(JSON.parse(data) as NotificationDto);
+              } catch {
+                // Ignore malformed frames.
+              }
+            }
+          }
+        }
+      } catch (error) {
+        if ((error as Error)?.name === 'AbortError') return;
+      }
+
+      if (!stopped) {
+        reconnect = setTimeout(connect, 3000);
+      }
+    }
+
+    void connect();
+
+    return () => {
+      stopped = true;
+      controller.abort();
+      if (reconnect) clearTimeout(reconnect);
+    };
   }
 
   async listDomains(): Promise<DomainDto[]> {
@@ -423,5 +596,104 @@ export class HttpApiClient implements ApiClient {
 
   reopenSecurityFinding(id: string): Promise<SecurityFindingDto> {
     return this.request(`/security/findings/${id}/reopen`, { method: 'POST' });
+  }
+
+  async listSiteProviders(): Promise<SiteProviderDto[]> {
+    const res = await this.request<{ data: SiteProviderDto[] }>('/sites/providers');
+    return res.data;
+  }
+
+  async listSites(): Promise<SiteDto[]> {
+    const res = await this.request<{ data: SiteDto[] }>('/sites');
+    return res.data;
+  }
+
+  getSite(id: string): Promise<SiteDto> {
+    return this.request(`/sites/${id}`);
+  }
+
+  createSite(input: SiteCreateInput): Promise<SiteDto> {
+    return this.request('/sites', { method: 'POST', body: input });
+  }
+
+  updateSite(id: string, input: SiteUpdateInput): Promise<SiteDto> {
+    return this.request(`/sites/${id}`, { method: 'PATCH', body: input });
+  }
+
+  deleteSite(id: string): Promise<void> {
+    return this.request(`/sites/${id}`, { method: 'DELETE' });
+  }
+
+  async listSiteDeployments(siteId: string): Promise<SiteDeploymentDto[]> {
+    const res = await this.request<{ data: SiteDeploymentDto[] }>(`/sites/${siteId}/deployments`);
+    return res.data;
+  }
+
+  getSiteDeployment(siteId: string, deploymentId: string): Promise<SiteDeploymentDto> {
+    return this.request(`/sites/${siteId}/deployments/${deploymentId}`);
+  }
+
+  deploySite(siteId: string): Promise<SiteDeploymentDto> {
+    return this.request(`/sites/${siteId}/deployments`, { method: 'POST' });
+  }
+
+  rollbackSite(siteId: string, deploymentId: string): Promise<SiteDeploymentDto> {
+    return this.request(`/sites/${siteId}/deployments/${deploymentId}/rollback`, { method: 'POST' });
+  }
+
+  async listBillingProviders(): Promise<PaymentProviderDto[]> {
+    const res = await this.request<{ data: PaymentProviderDto[] }>('/billing/providers');
+    return res.data;
+  }
+
+  async listBillingPlans(): Promise<BillingPlanDto[]> {
+    const res = await this.request<{ data: BillingPlanDto[] }>('/billing/plans');
+    return res.data;
+  }
+
+  async getSubscription(): Promise<SubscriptionDto | null> {
+    const res = await this.request<{ data: SubscriptionDto | null }>('/billing/subscription');
+    return res.data;
+  }
+
+  async listInvoices(): Promise<InvoiceDto[]> {
+    const res = await this.request<{ data: InvoiceDto[] }>('/billing/invoices');
+    return res.data;
+  }
+
+  subscribeToPlan(plan: string, provider?: string, coupon?: string): Promise<BillingSubscribeResponse> {
+    return this.request('/billing/subscribe', {
+      method: 'POST',
+      body: { plan, ...(provider ? { provider } : {}), ...(coupon ? { coupon } : {}) },
+    });
+  }
+
+  cancelSubscription(id: string): Promise<SubscriptionDto> {
+    return this.request(`/billing/subscriptions/${id}/cancel`, { method: 'POST' });
+  }
+
+  async validateCoupon(code: string): Promise<CouponDto> {
+    const res = await this.request<{ data: CouponDto }>('/billing/coupons/validate', {
+      method: 'POST',
+      body: { code },
+    });
+    return res.data;
+  }
+
+  changePlan(plan: string): Promise<SubscriptionDto> {
+    return this.request('/billing/change-plan', { method: 'POST', body: { plan } });
+  }
+
+  async getCredits(): Promise<CreditSummaryDto> {
+    const res = await this.request<{ data: CreditSummaryDto }>('/billing/credits');
+    return res.data;
+  }
+
+  async addCredits(amount: number, reason: string): Promise<CreditEntryDto> {
+    const res = await this.request<{ data: CreditEntryDto }>('/billing/credits', {
+      method: 'POST',
+      body: { amount, reason },
+    });
+    return res.data;
   }
 }

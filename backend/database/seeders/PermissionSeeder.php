@@ -24,6 +24,10 @@ class PermissionSeeder extends Seeder
             'storage.manage' => 'Upload, version, trash and delete Drive files and folders.',
             'security.read' => 'View the security score and findings.',
             'security.manage' => 'Run security scans and dismiss or reopen findings.',
+            'sites.read' => 'View sites and their deployments.',
+            'sites.manage' => 'Create, deploy, roll back and delete sites.',
+            'billing.read' => 'View plans, the current subscription and invoices.',
+            'billing.manage' => 'Subscribe to plans and cancel the subscription.',
         ];
 
         foreach ($permissions as $key => $description) {

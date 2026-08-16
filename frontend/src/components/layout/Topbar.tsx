@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Check, ChevronsUpDown, LogOut, Plus, Search } from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
 import { useI18n } from '../../lib/i18n';
+import { NotificationBell } from './NotificationBell';
 
 export function Topbar() {
   const { activeOrganization, memberships, switchOrganization, logout } = useAuth();
@@ -81,6 +82,7 @@ export function Topbar() {
           <span className="hidden sm:inline">{t('nav.search')}</span>
           <kbd className="rounded border border-edge bg-raised px-1.5 text-[10px]">Ctrl K</kbd>
         </button>
+        <NotificationBell />
         <button
           onClick={() => void logout()}
           className="flex h-9 w-9 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-raised hover:text-white"

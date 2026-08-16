@@ -1,4 +1,5 @@
 import { MockApiClient } from '../mock';
+import type { ActivityItem } from '../types';
 
 describe('MockApiClient', () => {
   it('logs in with the seeded demo account', async () => {
@@ -188,6 +189,10 @@ describe('MockApiClient', () => {
     expect(providers[0].label).toBe('Serveurs du Peuple');
     expect(providers[0].configured).toBe(true);
 
+    const names = providers.map((p) => p.name);
+    expect(names).toContain('github');
+    expect(names).toContain('openai');
+
     const redirect = await api.socialRedirect('sdp');
     expect(redirect.url).toContain('provider=sdp');
   });
@@ -279,5 +284,281 @@ describe('MockApiClient', () => {
     const api = new MockApiClient();
     await api.login({ email: 'demo@omnex.dev', password: 'password' });
     await expect(api.dismissSecurityFinding('sec-does-not-exist')).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('lists site providers', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Sites Provider Tester',
+      email: 'sites-provider@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    const providers = await api.listSiteProviders();
+    expect(providers.map((p) => p.name)).toEqual(['sandbox', 'custom']);
+    expect(providers.find((p) => p.name === 'sandbox')?.configured).toBe(true);
+    expect(providers.find((p) => p.name === 'custom')?.configured).toBe(false);
+  });
+
+  it('creates, deploys, rolls back and deletes a site', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Sites Tester',
+      email: 'sites@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    expect(await api.listSites()).toHaveLength(0);
+
+    const site = await api.createSite({
+      name: 'Marketing',
+      framework: 'static',
+      git_url: 'https://github.com/acme/marketing.git',
+      environment_variables: { API_SECRET: 'super-secret' },
+    });
+    expect(site.status).toBe('provisioning');
+    expect(site.environment_variable_keys).toEqual(['API_SECRET']);
+    expect(JSON.stringify(site)).not.toContain('super-secret');
+
+    const first = await api.deploySite(site.id);
+    expect(first.status).toBe('live');
+    expect(first.number).toBe(1);
+
+    expect((await api.getSite(site.id)).current_deployment_id).toBe(first.id);
+
+    await api.updateSite(site.id, { git_branch: 'main-v2' });
+    await api.deploySite(site.id);
+
+    const rolledBack = await api.rollbackSite(site.id, first.id);
+    expect(rolledBack.id).toBe(first.id);
+    expect((await api.getSite(site.id)).current_deployment_id).toBe(first.id);
+
+    const deployments = await api.listSiteDeployments(site.id);
+    expect(deployments).toHaveLength(2);
+
+    await api.deleteSite(site.id);
+    expect(await api.listSites()).toHaveLength(0);
+  });
+
+  it('keeps serving the previous deployment when a deploy fails', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Sites Rollback Tester',
+      email: 'sites-rollback@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    const site = await api.createSite({
+      name: 'Rollback',
+      framework: 'static',
+      git_url: 'https://github.com/acme/rollback.git',
+    });
+
+    const good = await api.deploySite(site.id);
+    await api.updateSite(site.id, { git_branch: 'fail' });
+
+    const failed = await api.deploySite(site.id);
+    expect(failed.status).toBe('failed');
+    expect((await api.getSite(site.id)).current_deployment_id).toBe(good.id);
+    expect((await api.getSite(site.id)).status).toBe('ready');
+  });
+
+  it('lists notifications newest first with severity and unread count', async () => {
+    const api = new MockApiClient();
+    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+
+    const list = await api.listNotifications();
+    expect(list.data.length).toBeGreaterThan(0);
+    expect(list.unread).toBe(list.data.filter((n) => !n.read_at).length);
+
+    // Sorted newest first.
+    const timestamps = list.data.map((n) => n.created_at ?? '');
+    expect([...timestamps].sort((a, b) => b.localeCompare(a))).toEqual(timestamps);
+
+    const security = list.data.find((n) => n.type === 'security');
+    expect(security?.severity).toBe('danger');
+    expect(security?.route).toBe('/settings');
+  });
+
+  it('paginates and filters the notification page', async () => {
+    const api = new MockApiClient();
+    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+
+    const first = await api.listNotificationsPage({ page: 1, perPage: 3 });
+    expect(first.data).toHaveLength(3);
+    expect(first.meta.current_page).toBe(1);
+    expect(first.meta.total).toBeGreaterThan(3);
+    expect(first.meta.last_page).toBeGreaterThan(1);
+
+    const second = await api.listNotificationsPage({ page: 2, perPage: 3 });
+    expect(second.meta.current_page).toBe(2);
+    expect(second.data.length).toBeGreaterThan(0);
+
+    const security = await api.listNotificationsPage({ type: 'security' });
+    expect(security.data.length).toBeGreaterThan(0);
+    expect(security.data.every((n) => n.type === 'security')).toBe(true);
+
+    const warning = await api.listNotificationsPage({ severity: 'warning' });
+    expect(warning.data.length).toBeGreaterThan(0);
+    expect(warning.data.every((n) => n.severity === 'warning')).toBe(true);
+
+    const unreadOnly = await api.listNotificationsPage({ unread: true });
+    expect(unreadOnly.data.length).toBeGreaterThan(0);
+    expect(unreadOnly.data.every((n) => !n.read_at)).toBe(true);
+  });
+
+  it('marks a single notification read and decrements the counter', async () => {
+    const api = new MockApiClient();
+    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+
+    const before = await api.listNotifications();
+    const target = before.data.find((n) => !n.read_at);
+    expect(target).toBeDefined();
+
+    const updated = await api.markNotificationRead(target!.id);
+    expect(updated.read_at).toBeTruthy();
+
+    const after = await api.listNotifications();
+    expect(after.unread).toBe(before.unread - 1);
+  });
+
+  it('marks all notifications read', async () => {
+    const api = new MockApiClient();
+    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+
+    expect((await api.listNotifications()).unread).toBeGreaterThan(0);
+
+    await api.markAllNotificationsRead();
+
+    const after = await api.listNotifications();
+    expect(after.unread).toBe(0);
+    expect(after.data.every((n) => !!n.read_at)).toBe(true);
+  });
+
+  it('pushes notifications to subscribers in real time', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Realtime Tester',
+      email: 'realtime@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    const received: string[] = [];
+    const unsubscribe = api.subscribeNotifications((n) => received.push(n.title));
+
+    const site = await api.createSite({
+      name: 'Realtime',
+      framework: 'static',
+      git_url: 'https://github.com/acme/realtime.git',
+    });
+    await api.deploySite(site.id);
+
+    expect(received).toContain('Deployment completed');
+    expect((await api.listNotifications()).data[0].title).toBe('Deployment completed');
+
+    unsubscribe();
+
+    await api.deploySite(site.id);
+    expect(received.filter((t) => t === 'Deployment completed')).toHaveLength(1);
+  });
+
+  it('pushes activity events to subscribers in real time', async () => {
+    const api = new MockApiClient();
+    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+
+    const received: ActivityItem[] = [];
+    const unsubscribe = api.subscribeActivity((item) => received.push(item));
+
+    const site = await api.createSite({
+      name: 'Activity Stream',
+      framework: 'static',
+      git_url: 'https://github.com/acme/activity.git',
+    });
+    await api.deploySite(site.id);
+
+    expect(received.some((item) => item.title === 'Deployment completed')).toBe(true);
+
+    unsubscribe();
+
+    await api.deploySite(site.id);
+    expect(received.filter((item) => item.title === 'Deployment completed')).toHaveLength(1);
+  });
+
+  it('lists billing plans and subscribes with a paid invoice', async () => {
+    const api = new MockApiClient();
+    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+
+    const plans = await api.listBillingPlans();
+    expect(plans.map((p) => p.slug)).toEqual(['free', 'starter', 'pro', 'business']);
+
+    expect(await api.getSubscription()).toBeNull();
+
+    const result = await api.subscribeToPlan('pro');
+    expect(result.subscription.status).toBe('active');
+    expect(result.checkout_url).toContain('/billing/sandbox/checkout/');
+
+    const current = await api.getSubscription();
+    expect(current?.plan?.slug).toBe('pro');
+
+    const invoices = await api.listInvoices();
+    expect(invoices).toHaveLength(1);
+    expect(invoices[0].status).toBe('paid');
+    expect(invoices[0].plan?.slug).toBe('pro');
+  });
+
+  it('rejects a duplicate billing subscription', async () => {
+    const api = new MockApiClient();
+    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+
+    await api.subscribeToPlan('starter');
+    await expect(api.subscribeToPlan('starter')).rejects.toMatchObject({
+      status: 422,
+      fieldErrors: { plan: ['This organization already has an active subscription to this plan.'] },
+    });
+  });
+
+  it('applies a coupon and credits to billing', async () => {
+    const api = new MockApiClient();
+    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+
+    const coupon = await api.validateCoupon('launch25');
+    expect(coupon.code).toBe('LAUNCH25');
+    expect(coupon.discount_type).toBe('percent');
+    expect(coupon.discount).toBe(2500); // 25% of the 10000 sample
+
+    await api.addCredits(2000, 'Welcome credit');
+    expect((await api.getCredits()).balance).toBe(2000);
+
+    const result = await api.subscribeToPlan('business', 'sandbox', 'LAUNCH25');
+    expect(result.subscription.coupon?.code).toBe('LAUNCH25');
+
+    const invoices = await api.listInvoices();
+    const invoice = invoices[0];
+    expect(invoice.amount).toBe(19900);
+    expect(invoice.discount).toBe(4975); // 25% of 19900
+    expect(invoice.credit_applied).toBe(2000);
+    expect(invoice.amount_due).toBe(12925);
+    expect((await api.getCredits()).balance).toBe(0);
+
+    await expect(api.validateCoupon('NOPE')).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('changes plan with proration credit', async () => {
+    const api = new MockApiClient();
+    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+
+    const existing = await api.getSubscription();
+    if (existing) await api.cancelSubscription(existing.id);
+    await api.subscribeToPlan('business');
+    const changed = await api.changePlan('pro');
+    expect(changed.plan?.slug).toBe('pro');
+
+    const credits = await api.getCredits();
+    expect(credits.balance).toBe(9950); // half of business
+    expect(credits.entries[0].reason).toBe('proration');
   });
 });

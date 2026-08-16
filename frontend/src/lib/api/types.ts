@@ -61,14 +61,40 @@ export interface AuditLogDto {
   user?: UserDto | null;
 }
 
+export type NotificationSeverity = 'info' | 'success' | 'warning' | 'danger';
+
 export interface NotificationDto {
   id: string;
   type: string;
+  severity: NotificationSeverity;
   title: string;
   body?: string | null;
   data?: unknown;
+  route?: string | null;
   read_at?: string | null;
   created_at?: string;
+}
+
+export interface NotificationListDto {
+  data: NotificationDto[];
+  unread: number;
+}
+
+export interface NotificationQuery {
+  type?: string;
+  severity?: NotificationSeverity;
+  unread?: boolean;
+  page?: number;
+  perPage?: number;
+}
+
+export interface PaginatedNotificationList extends NotificationListDto {
+  meta: {
+    current_page: number;
+    per_page: number;
+    total: number;
+    last_page: number;
+  };
 }
 
 export interface AuthSession {
@@ -365,6 +391,147 @@ export interface DriveFileUpdateInput {
   name?: string;
   contents?: string;
   mime_type?: string;
+}
+
+export interface SiteProviderDto {
+  name: string;
+  label: string;
+  configured: boolean;
+}
+
+export type SiteFramework = 'static' | 'laravel' | 'next';
+export type SiteStatus = 'provisioning' | 'ready' | 'failed';
+export type SiteDeploymentStatus = 'building' | 'live' | 'failed' | 'rolled_back';
+
+export interface SiteDto {
+  id: string;
+  name: string;
+  framework: string;
+  git_url: string;
+  git_branch: string;
+  provider: string;
+  status: string;
+  url: string | null;
+  current_deployment_id: string | null;
+  environment_variable_keys: string[];
+  deployments_count?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SiteDeploymentDto {
+  id: string;
+  site_id: string;
+  number: number;
+  commit_sha: string | null;
+  status: string;
+  url: string | null;
+  logs: string | null;
+  deployed_at: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SiteCreateInput {
+  name: string;
+  framework: SiteFramework;
+  git_url: string;
+  git_branch?: string;
+  environment_variables?: Record<string, string>;
+  provider?: string;
+}
+
+export interface SiteUpdateInput {
+  name?: string;
+  framework?: SiteFramework;
+  git_url?: string;
+  git_branch?: string;
+  environment_variables?: Record<string, string>;
+}
+
+export interface PaymentProviderDto {
+  name: string;
+  label: string;
+  configured: boolean;
+}
+
+export interface BillingPlanDto {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  price_monthly: number;
+  price_yearly: number;
+  currency: string;
+  features: string[];
+}
+
+export type SubscriptionStatus = 'pending' | 'active' | 'past_due' | 'trialing' | 'canceled';
+
+export interface AppliedCouponDto {
+  id: string;
+  code: string;
+  name: string;
+  discount_type: string;
+  discount_value: number;
+}
+
+export interface SubscriptionDto {
+  id: string;
+  plan: BillingPlanDto | null;
+  coupon: AppliedCouponDto | null;
+  provider: string;
+  status: SubscriptionStatus;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  canceled_at: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type InvoiceStatus = 'open' | 'paid' | 'failed' | 'void';
+
+export interface InvoiceDto {
+  id: string;
+  number: string;
+  amount: number;
+  discount: number;
+  credit_applied: number;
+  amount_due: number;
+  currency: string;
+  status: InvoiceStatus;
+  provider: string;
+  paid_at: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  plan: BillingPlanDto | null;
+  created_at?: string;
+}
+
+export interface BillingSubscribeResponse {
+  subscription: SubscriptionDto;
+  checkout_url: string;
+}
+
+export interface CouponDto {
+  code: string;
+  name: string;
+  discount_type: 'percent' | 'amount';
+  discount_value: number;
+  discount: number;
+}
+
+export interface CreditEntryDto {
+  id: string;
+  amount: number;
+  currency: string;
+  reason: string;
+  created_at: string | null;
+}
+
+export interface CreditSummaryDto {
+  balance: number;
+  entries: CreditEntryDto[];
 }
 
 export type SecuritySeverity = 'high' | 'medium' | 'low';

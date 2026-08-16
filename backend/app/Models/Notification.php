@@ -16,6 +16,7 @@ class Notification extends Model
         'organization_id',
         'user_id',
         'type',
+        'severity',
         'title',
         'body',
         'data',
@@ -30,5 +31,17 @@ class Notification extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Optional client-side route the notification links to (e.g. the domain
+     * detail page). Stored in the `data` payload so the bell can navigate
+     * without a dedicated column.
+     */
+    public function getRouteAttribute(): ?string
+    {
+        $route = $this->data['route'] ?? null;
+
+        return is_string($route) ? $route : null;
     }
 }

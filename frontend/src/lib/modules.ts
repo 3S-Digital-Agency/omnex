@@ -21,7 +21,20 @@ export interface ModuleDefinition {
   live: boolean;
 }
 
+export const activityModule: ModuleDefinition = {
+  id: 'activity',
+  name: 'Activity',
+  path: '/activity',
+  icon: Activity,
+  tagline: 'Live event stream',
+  description: 'Everything happening in your organization, in real time.',
+  phase: 'Phase 2',
+  capabilities: [],
+  live: true,
+};
+
 export const modules: ModuleDefinition[] = [
+  activityModule,
   {
     id: 'domains',
     name: 'Domains',
@@ -42,7 +55,7 @@ export const modules: ModuleDefinition[] = [
     description: 'Deploy sites from Git with staging, preview and rollback.',
     phase: 'Phase 5',
     capabilities: ['Git deployment', 'Staging & production', 'Environment variables', 'SSL, logs, rollback'],
-    live: false,
+    live: true,
   },
   {
     id: 'cloud',
@@ -86,21 +99,9 @@ export const modules: ModuleDefinition[] = [
     description: 'Plans, subscriptions, invoices and payments — provider-agnostic.',
     phase: 'Phase 6',
     capabilities: ['Plans & subscriptions', 'Invoices & taxes', 'Coupons & credits', 'Stripe (sandbox first)'],
-    live: false,
+    live: true,
   },
 ];
-
-export const activityModule: ModuleDefinition = {
-  id: 'activity',
-  name: 'Activity',
-  path: '/activity',
-  icon: Activity,
-  tagline: 'Live event stream',
-  description: 'Everything happening in your organization, in real time.',
-  phase: 'Phase 2',
-  capabilities: [],
-  live: true,
-};
 
 export function moduleById(id: string): ModuleDefinition {
   return modules.find((module) => module.id === id) ?? modules[0];

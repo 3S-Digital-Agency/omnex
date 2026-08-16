@@ -136,9 +136,9 @@ export function DashboardPage() {
             <div className="p-5">
               {notifications.isLoading ? (
                 <Spinner />
-              ) : notifications.data && notifications.data.length > 0 ? (
+              ) : notifications.data && notifications.data.data.length > 0 ? (
                 <ul className="space-y-3">
-                  {notifications.data.slice(0, 4).map((notification) => (
+                  {notifications.data.data.slice(0, 4).map((notification) => (
                     <li key={notification.id} className="flex items-start gap-3">
                       <Bell className="mt-0.5 h-4 w-4 shrink-0 text-brand-400" />
                       <div>

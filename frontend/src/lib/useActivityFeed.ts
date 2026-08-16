@@ -4,9 +4,10 @@ import { api } from './api';
 import type { ActivityItem } from './api/types';
 
 /**
- * Incrementally polls the activity endpoint (every 5s) and merges new events
- * into a bounded in-memory list. Near-real-time without a WebSocket dependency;
- * a Reverb/WebSocket transport can replace this hook's body later.
+ * Real-time activity feed. Subscribes to the server-sent activity stream and
+ * merges events as they arrive; a slow poll remains as a fallback if the
+ * stream drops (same contract as the notification stream). A Reverb/WebSocket
+ * transport could replace the hook body without changing its callers.
  */
 export function useActivityFeed(enabled: boolean, limit = 100) {
   const cursorRef = useRef(0);
@@ -18,6 +19,18 @@ export function useActivityFeed(enabled: boolean, limit = 100) {
     refetchInterval: 5000,
     enabled,
   });
+
+  // Real-time: prepend streamed events instantly; the poll is the fallback.
+  useEffect(() => {
+    if (!enabled) return;
+    return api.subscribeActivity((item) => {
+      cursorRef.current = Math.max(cursorRef.current, item.id);
+      setItems((previous) => {
+        if (previous.some((existing) => existing.id === item.id)) return previous;
+        return [item, ...previous].slice(0, limit);
+      });
+    });
+  }, [enabled, limit]);
 
   useEffect(() => {
     if (!feed.data) return;

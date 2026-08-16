@@ -86,6 +86,99 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | OMNEX Sites
+    |--------------------------------------------------------------------------
+    |
+    | Provider names resolve through SiteProviderRegistry. The sandbox is a
+    | deterministic in-memory platform; the custom provider activates only
+    | once its endpoint is set (config/customsites.php).
+    |
+    */
+
+    'sites' => [
+        'provider' => env('OMNEX_SITE_PROVIDER', 'sandbox'),
+        'default_branch' => env('OMNEX_SITE_DEFAULT_BRANCH', 'main'),
+        'frameworks' => ['static', 'laravel', 'next'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notifications
+    |--------------------------------------------------------------------------
+    |
+    | Server-Sent Events settings for the real-time notification stream.
+    | `sse_max_seconds` caps a single stream connection (clients reconnect);
+    | `sse_heartbeat_seconds` is the comment-frame keep-alive interval.
+    |
+    */
+
+    'notifications' => [
+        'sse_max_seconds' => (int) env('OMNEX_NOTIFICATIONS_SSE_MAX_SECONDS', 60),
+        'sse_heartbeat_seconds' => (int) env('OMNEX_NOTIFICATIONS_SSE_HEARTBEAT_SECONDS', 15),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Activity stream
+    |--------------------------------------------------------------------------
+    |
+    | Server-Sent Events settings for the real-time activity feed. Mirrors the
+    | notification stream: `sse_max_seconds` caps a connection, `sse_heartbeat_seconds`
+    | is the comment-frame keep-alive interval.
+    |
+    */
+
+    'activity' => [
+        'sse_max_seconds' => (int) env('OMNEX_ACTIVITY_SSE_MAX_SECONDS', 60),
+        'sse_heartbeat_seconds' => (int) env('OMNEX_ACTIVITY_SSE_HEARTBEAT_SECONDS', 15),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Real-time streams (SSE transport)
+    |--------------------------------------------------------------------------
+    |
+    | Backing store for the notification and activity streams.
+    |
+    |   inprocess — in-memory, single process. Safe default for local dev and
+    |               the test suite.
+    |   redis     — Redis pub/sub, so events published by one PHP worker reach
+    |               subscribers on another (required for horizontal scaling).
+    |
+    | `prefix` namespaces the pub/sub channels; `redis_connection` selects the
+    | connection defined in the `database.redis` config.
+    |
+    */
+
+    'streams' => [
+        'driver' => env('OMNEX_STREAM_DRIVER', 'inprocess'),
+        'prefix' => env('OMNEX_STREAM_PREFIX', 'omnex:'),
+        'redis_connection' => env('OMNEX_STREAM_REDIS_CONNECTION', 'default'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Billing
+    |--------------------------------------------------------------------------
+    |
+    | Provider names resolve through PaymentProviderRegistry. The sandbox is
+    | deterministic and safe for local/test environments; the Stripe provider
+    | activates only once its keys are set.
+    |
+    */
+
+    'billing' => [
+        'provider' => env('OMNEX_BILLING_PROVIDER', 'sandbox'),
+        'currency' => env('OMNEX_BILLING_CURRENCY', 'usd'),
+        'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
+        'stripe' => [
+            'secret' => env('STRIPE_SECRET_KEY'),
+            'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Security Center
     |--------------------------------------------------------------------------
     |

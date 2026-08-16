@@ -4,7 +4,7 @@ import { Building2, LayoutDashboard, LogOut, Plus, ScrollText, Settings, Users }
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
 import { useI18n } from '../../lib/i18n';
-import { activityModule, modules } from '../../lib/modules';
+import { modules } from '../../lib/modules';
 
 interface Command {
   label: string;
@@ -47,11 +47,6 @@ export function CommandPalette() {
         icon: module.icon,
         action: () => navigate(module.path),
       })),
-      {
-        label: t('nav.goto', { name: moduleName(activityModule.id) }),
-        icon: activityModule.icon,
-        action: () => navigate(activityModule.path),
-      },
       { label: t('nav.goto', { name: t('nav.members') }), icon: Users, action: () => navigate('/members') },
       { label: t('nav.goto', { name: t('nav.audit') }), icon: ScrollText, action: () => navigate('/audit') },
       { label: t('nav.goto', { name: t('nav.settings') }), icon: Settings, action: () => navigate('/settings') },

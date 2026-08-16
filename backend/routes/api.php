@@ -3,6 +3,7 @@
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\AuditController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BillingController;
 use App\Http\Controllers\DnsController;
 use App\Http\Controllers\DomainController;
 use App\Http\Controllers\InvitationController;
@@ -11,6 +12,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SecurityController;
+use App\Http\Controllers\SiteController;
 use App\Http\Controllers\SocialAuthController;
 use App\Http\Controllers\StorageController;
 use Illuminate\Support\Facades\Route;
@@ -28,6 +30,10 @@ Route::prefix('v1')->group(function () {
     Route::post('/auth/social/complete', [SocialAuthController::class, 'complete']);
     Route::get('/auth/{provider}/redirect', [SocialAuthController::class, 'redirect']);
     Route::get('/auth/{provider}/callback', [SocialAuthController::class, 'callback']);
+
+    // Billing webhook is public: the payment provider calls back without an
+    // OMNEX session. The tenant is resolved from the webhook event itself.
+    Route::post('/billing/webhooks/{provider}', [BillingController::class, 'webhook']);
 
     // Invitation acceptance requires auth but is not tenant-scoped (the target
     // organization is resolved from the token, not the active context).
@@ -61,6 +67,18 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/roles', [RoleController::class, 'index']);
 
+        // Billing (Phase 6). Static routes precede the {subscription} route.
+        Route::get('/billing/providers', [BillingController::class, 'providers']);
+        Route::get('/billing/plans', [BillingController::class, 'plans']);
+        Route::get('/billing/subscription', [BillingController::class, 'subscription']);
+        Route::get('/billing/invoices', [BillingController::class, 'invoices']);
+        Route::post('/billing/subscribe', [BillingController::class, 'subscribe']);
+        Route::post('/billing/subscriptions/{subscription}/cancel', [BillingController::class, 'cancel']);
+        Route::post('/billing/coupons/validate', [BillingController::class, 'validateCoupon']);
+        Route::post('/billing/change-plan', [BillingController::class, 'changePlan']);
+        Route::get('/billing/credits', [BillingController::class, 'credits']);
+        Route::post('/billing/credits', [BillingController::class, 'addCredits']);
+
         // Security Center (Phase 7).
         Route::get('/security', [SecurityController::class, 'index']);
         Route::post('/security/scan', [SecurityController::class, 'scan']);
@@ -69,7 +87,10 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/audit', [AuditController::class, 'index']);
         Route::get('/activity', [ActivityController::class, 'index']);
+        Route::get('/activity/stream', [ActivityController::class, 'stream']);
         Route::get('/notifications', [NotificationController::class, 'index']);
+        Route::get('/notifications/stream', [NotificationController::class, 'stream']);
+        Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead']);
         Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead']);
 
         // Domain engine (Phase 3). Static routes are registered before the
@@ -118,5 +139,18 @@ Route::prefix('v1')->group(function () {
         Route::delete('/storage/trash/{file}', [StorageController::class, 'destroyFile']);
         Route::get('/storage/files/{file}/versions', [StorageController::class, 'versions']);
         Route::post('/storage/files/{file}/versions/{version}/restore', [StorageController::class, 'restoreVersion']);
+
+        // OMNEX Sites (Phase 5). Static routes precede the {site} route so
+        // they are not captured as a site id.
+        Route::get('/sites/providers', [SiteController::class, 'providers']);
+        Route::get('/sites', [SiteController::class, 'index']);
+        Route::post('/sites', [SiteController::class, 'store']);
+        Route::get('/sites/{site}', [SiteController::class, 'show']);
+        Route::patch('/sites/{site}', [SiteController::class, 'update']);
+        Route::delete('/sites/{site}', [SiteController::class, 'destroy']);
+        Route::get('/sites/{site}/deployments', [SiteController::class, 'deployments']);
+        Route::post('/sites/{site}/deployments', [SiteController::class, 'deploy']);
+        Route::get('/sites/{site}/deployments/{deployment}', [SiteController::class, 'showDeployment']);
+        Route::post('/sites/{site}/deployments/{deployment}/rollback', [SiteController::class, 'rollback']);
     });
 });

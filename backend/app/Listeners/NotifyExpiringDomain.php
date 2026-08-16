@@ -24,8 +24,9 @@ class NotifyExpiringDomain
                 'domain.expiring',
                 "Domain expiring: {$domain->name}",
                 "{$domain->name} expires in {$event->days} days.",
-                ['domain_id' => $domain->id, 'expires_at' => $domain->expires_at?->toIso8601String()],
+                ['domain_id' => $domain->id, 'expires_at' => $domain->expires_at?->toIso8601String(), 'route' => '/domains/'.$domain->id],
                 $domain->organization_id,
+                'warning',
             );
         }
     }

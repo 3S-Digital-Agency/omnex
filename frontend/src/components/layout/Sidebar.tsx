@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import {
   Activity,
   Command,
@@ -65,12 +65,15 @@ export function Sidebar() {
 
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-edge bg-panel">
-      <div className="flex items-center gap-3 border-b border-edge px-4 py-4">
-        <img src="/logo.png" alt={`${brand.name} logo`} className="h-auto w-24 rounded-lg" />
-        <div className="min-w-0">
-          <div className="text-sm font-bold tracking-wide text-white">{brand.name}</div>
-          <div className="text-[11px] text-zinc-500">{t('nav.cloudOs')}</div>
-        </div>
+      <div className="flex justify-center border-b border-edge px-4 py-4">
+        <Link
+          to="/"
+          title={t('nav.overview')}
+          aria-label={t('nav.overview')}
+          className="transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded-lg"
+        >
+          <img src="/logo.png" alt={`${brand.name} logo`} className="h-auto w-40 rounded-lg" />
+        </Link>
       </div>
 
       <nav className="flex-1 space-y-4 overflow-y-auto p-2">

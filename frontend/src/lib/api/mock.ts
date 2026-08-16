@@ -4,8 +4,14 @@ import { session } from './session';
 import type {
   ActivityFeed,
   ActivityItem,
+  AppliedCouponDto,
   AuditLogDto,
   AuthSession,
+  BillingPlanDto,
+  BillingSubscribeResponse,
+  CouponDto,
+  CreditEntryDto,
+  CreditSummaryDto,
   DnsHistoryDto,
   DnsRecordDto,
   DnsRecordInput,
@@ -23,6 +29,7 @@ import type {
   DriveListing,
   DriveVersionDto,
   InvitationDto,
+  InvoiceDto,
   LoginInput,
   LoginResponse,
   MeResponse,
@@ -30,8 +37,12 @@ import type {
   MfaConfirmResponse,
   MfaSetupResponse,
   NotificationDto,
+  NotificationListDto,
+  NotificationQuery,
   OrganizationDto,
   Paginated,
+  PaginatedNotificationList,
+  PaymentProviderDto,
   PropagationCheckDto,
   PropagationStatus,
   PropagationStatusDto,
@@ -39,10 +50,16 @@ import type {
   RoleDto,
   SecurityFindingDto,
   SecurityScoreDto,
+  SiteCreateInput,
+  SiteDeploymentDto,
+  SiteDto,
+  SiteProviderDto,
+  SiteUpdateInput,
   SocialAccountDto,
   SocialProviderDto,
   SocialRedirectResponse,
   StorageProviderDto,
+  SubscriptionDto,
   SwitchResponse,
   UpdateProfileInput,
   UserDto,
@@ -94,6 +111,10 @@ const ALL_PERMISSIONS = [
   'storage.manage',
   'security.read',
   'security.manage',
+  'sites.read',
+  'sites.manage',
+  'billing.read',
+  'billing.manage',
 ];
 
 const roles: RoleDto[] = [
@@ -103,21 +124,21 @@ const roles: RoleDto[] = [
     name: 'Admin',
     key: 'admin',
     description: 'Manage members and settings.',
-    permissions: ['organizations.read', 'organizations.invite', 'members.manage', 'audit.read', 'notifications.read', 'domains.read', 'domains.manage', 'dns.read', 'dns.manage', 'storage.read', 'storage.manage', 'security.read', 'security.manage'],
+    permissions: ['organizations.read', 'organizations.invite', 'members.manage', 'audit.read', 'notifications.read', 'domains.read', 'domains.manage', 'dns.read', 'dns.manage', 'storage.read', 'storage.manage', 'security.read', 'security.manage', 'sites.read', 'sites.manage', 'billing.read', 'billing.manage'],
   },
   {
     id: 'role-developer',
     name: 'Developer',
     key: 'developer',
     description: 'Read access to the organization and audit log.',
-    permissions: ['organizations.read', 'audit.read', 'notifications.read', 'domains.read', 'dns.read', 'storage.read', 'security.read'],
+    permissions: ['organizations.read', 'audit.read', 'notifications.read', 'domains.read', 'dns.read', 'storage.read', 'security.read', 'sites.read', 'billing.read'],
   },
   {
     id: 'role-viewer',
     name: 'Viewer',
     key: 'viewer',
     description: 'Read-only access.',
-    permissions: ['organizations.read', 'notifications.read', 'domains.read', 'dns.read', 'storage.read', 'security.read'],
+    permissions: ['organizations.read', 'notifications.read', 'domains.read', 'dns.read', 'storage.read', 'security.read', 'sites.read', 'billing.read'],
   },
 ];
 
@@ -179,13 +200,118 @@ const auditLogs: AuditLogDto[] = [
 const notifications: NotificationDto[] = [
   {
     id: 'notif-1',
+    type: 'security',
+    severity: 'danger',
+    title: 'MFA is disabled',
+    body: 'Protect your account by enabling two-factor authentication.',
+    route: '/settings',
+    read_at: null,
+    created_at: '2026-08-16T10:45:00Z',
+  },
+  {
+    id: 'notif-2',
+    type: 'domain',
+    severity: 'warning',
+    title: 'Domain expiring soon',
+    body: 'omnex.dev expires in 24 days.',
+    route: '/domains/dom-omnex-dev',
+    read_at: null,
+    created_at: '2026-08-15T18:30:00Z',
+  },
+  {
+    id: 'notif-3',
+    type: 'deployment',
+    severity: 'success',
+    title: 'Deployment completed',
+    body: 'main → production succeeded for Marketing.',
+    route: '/sites',
+    read_at: null,
+    created_at: '2026-08-14T12:00:00Z',
+  },
+  {
+    id: 'notif-4',
     type: 'welcome',
+    severity: 'info',
     title: 'Welcome to OMNEX',
     body: 'Your OMNEX Cloud OS organization is ready.',
+    route: null,
+    read_at: '2026-01-15T09:06:00Z',
+    created_at: '2026-01-15T09:05:00Z',
+  },
+  {
+    id: 'notif-5',
+    type: 'billing',
+    severity: 'info',
+    title: 'Invoice generated',
+    body: 'Invoice #2026-0814 for the OMNEX free plan.',
+    route: '/billing',
+    read_at: '2026-08-13T11:00:00Z',
+    created_at: '2026-08-13T11:00:00Z',
+  },
+  {
+    id: 'notif-6',
+    type: 'system',
+    severity: 'info',
+    title: 'Backup completed',
+    body: 'Daily incremental snapshot finished.',
+    route: null,
     read_at: null,
-    created_at: '2026-01-15T09:06:00Z',
+    created_at: '2026-08-12T02:00:00Z',
+  },
+  {
+    id: 'notif-7',
+    type: 'member',
+    severity: 'success',
+    title: 'Member invited',
+    body: 'Dev User was invited to OMNEX HQ.',
+    route: '/members',
+    read_at: '2026-08-11T10:30:00Z',
+    created_at: '2026-08-11T10:30:00Z',
+  },
+  {
+    id: 'notif-8',
+    type: 'security',
+    severity: 'warning',
+    title: 'SSL certificate expiring',
+    body: 'omnex.dev certificate expires in 24 days.',
+    route: '/security',
+    read_at: '2026-08-10T09:15:00Z',
+    created_at: '2026-08-10T09:15:00Z',
   },
 ];
+
+function sortedNotifications(): NotificationDto[] {
+  return [...notifications].sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''));
+}
+
+type NotificationListener = (notification: NotificationDto) => void;
+const notificationListeners = new Set<NotificationListener>();
+
+function emitNotification(notification: NotificationDto): void {
+  for (const listener of notificationListeners) listener(notification);
+}
+
+function pushNotification(
+  type: string,
+  severity: NotificationDto['severity'],
+  title: string,
+  body: string,
+  route: string | null = null,
+): NotificationDto {
+  const notification: NotificationDto = {
+    id: uid('notif'),
+    type,
+    severity,
+    title,
+    body,
+    route,
+    read_at: null,
+    created_at: nowIso(),
+  };
+  notifications.unshift(notification);
+  emitNotification(notification);
+  return notification;
+}
 
 const activityType = (action: string): string => {
   if (action.startsWith('user.mfa')) return 'security';
@@ -214,13 +340,23 @@ const activityTitle = (action: string): string => {
   }
 };
 
+const activityDescription = (action: string): string => {
+  switch (action) {
+    case 'organization.created': return 'New organization created';
+    case 'member.invited': return 'Invitation sent to a new member';
+    case 'user.logged_in': return 'Signed in';
+    case 'user.registered': return 'New account created';
+    default: return action;
+  }
+};
+
 let activitySeq = 100;
 let activity: ActivityItem[] = auditLogs.map((log) => ({
   id: log.id,
   type: activityType(log.action),
   severity: log.result === 'success' ? 'success' : 'danger',
   title: activityTitle(log.action),
-  description: log.action,
+  description: activityDescription(log.action),
   actor: null,
   created_at: log.created_at,
 }));
@@ -234,6 +370,40 @@ const activityPool: Array<Omit<ActivityItem, 'id' | 'created_at'>> = [
   { type: 'backup', severity: 'success', title: 'Backup completed', description: 'Daily incremental snapshot', actor: 'System' },
   { type: 'incident', severity: 'warning', title: 'High CPU detected', description: 'worker-1 above 90% for 5 min', actor: 'System' },
 ];
+
+type ActivityListener = (item: ActivityItem) => void;
+const activityListeners = new Set<ActivityListener>();
+
+function emitActivity(item: ActivityItem): void {
+  for (const listener of activityListeners) listener(item);
+}
+
+function addActivityEvent(item: Omit<ActivityItem, 'id' | 'created_at'>): ActivityItem {
+  const next: ActivityItem = { ...item, id: ++activitySeq, created_at: nowIso() };
+  activity = [...activity, next];
+  emitActivity(next);
+  return next;
+}
+
+// Keep the demo feed alive with a synthetic event stream, mirroring the real
+// backend pushing audit events. Starts on first subscriber, stops on last.
+let activityTicker: ReturnType<typeof setInterval> | null = null;
+const ACTIVITY_TICK_MS = 5000;
+
+function ensureActivityTicker(): void {
+  if (activityTicker !== null) return;
+  activityTicker = setInterval(() => {
+    const next = activityPool[Math.floor(Math.random() * activityPool.length)];
+    addActivityEvent(next);
+  }, ACTIVITY_TICK_MS);
+}
+
+function stopActivityTicker(): void {
+  if (activityTicker !== null) {
+    clearInterval(activityTicker);
+    activityTicker = null;
+  }
+}
 
 // --- Domain + DNS engine (Phase 3 sandbox) ---------------------------------
 
@@ -344,6 +514,89 @@ function driveFileById(fileId: string): DriveFileDto {
 
 function driveVersionsOf(fileId: string): MockDriveVersion[] {
   return driveVersions.filter((v) => v.file_id === fileId).sort((a, b) => b.version - a.version);
+}
+
+const BILLING_PROVIDERS: PaymentProviderDto[] = [
+  { name: 'sandbox', label: 'Sandbox', configured: true },
+  { name: 'stripe', label: 'Stripe', configured: false },
+];
+
+const BILLING_PLANS: BillingPlanDto[] = [
+  { id: 'plan-free', slug: 'free', name: 'Free', description: 'For personal projects and evaluation.', price_monthly: 0, price_yearly: 0, currency: 'usd', features: ['1 seat', '1 domain', '1 GB storage', 'Community support'] },
+  { id: 'plan-starter', slug: 'starter', name: 'Starter', description: 'For small teams shipping their first product.', price_monthly: 1200, price_yearly: 12000, currency: 'usd', features: ['5 seats', '10 domains', '25 GB storage', 'Email support'] },
+  { id: 'plan-pro', slug: 'pro', name: 'Pro', description: 'For growing teams with production workloads.', price_monthly: 4900, price_yearly: 49000, currency: 'usd', features: ['Unlimited seats', 'Unlimited domains', '250 GB storage', 'Priority support'] },
+  { id: 'plan-business', slug: 'business', name: 'Business', description: 'For organizations with compliance and scale needs.', price_monthly: 19900, price_yearly: 199000, currency: 'usd', features: ['Unlimited everything', 'SLA & compliance', 'Dedicated support', 'SSO & audit'] },
+];
+
+const subscriptions: SubscriptionDto[] = [];
+const invoices: InvoiceDto[] = [];
+
+// Demo coupon catalog mirroring the backend `coupons` table.
+const MOCK_COUPONS: CouponDto[] = [
+  { code: 'LAUNCH25', name: 'Launch 25%', discount_type: 'percent', discount_value: 25, discount: 0 },
+  { code: 'CREDIT10', name: '10$ off', discount_type: 'amount', discount_value: 1000, discount: 0 },
+];
+
+function couponByCode(code: string): CouponDto {
+  const coupon = MOCK_COUPONS.find((c) => c.code === code.trim().toUpperCase());
+  if (!coupon) throw new ApiError(422, 'Validation failed', undefined, { coupon: ['This coupon code does not exist.'] });
+  return coupon;
+}
+
+function couponDiscount(coupon: CouponDto, amountCents: number): number {
+  if (coupon.discount_type === 'percent') return Math.round((amountCents * coupon.discount_value) / 100);
+  return Math.min(coupon.discount_value, amountCents);
+}
+
+function toAppliedCoupon(coupon: CouponDto): AppliedCouponDto {
+  return { id: coupon.code, code: coupon.code, name: coupon.name, discount_type: coupon.discount_type, discount_value: coupon.discount_value };
+}
+
+const creditEntries: CreditEntryDto[] = [];
+
+function creditBalance(): number {
+  return creditEntries.reduce((sum, entry) => sum + entry.amount, 0);
+}
+
+function billingPlanById(id: string): BillingPlanDto {
+  const plan = BILLING_PLANS.find((p) => p.id === id);
+  if (!plan) throw new ApiError(404, 'Not found', 'Plan not found.');
+  return plan;
+}
+
+const SITE_PROVIDERS: SiteProviderDto[] = [
+  { name: 'sandbox', label: 'Sandbox', configured: true },
+  { name: 'custom', label: 'Custom', configured: false },
+];
+
+const sites: SiteDto[] = [];
+const siteDeployments: SiteDeploymentDto[] = [];
+
+function siteById(siteId: string): SiteDto {
+  const site = sites.find((s) => s.id === siteId);
+  if (!site) throw new ApiError(404, 'Not found', 'Site not found.');
+  return site;
+}
+
+function siteDeploymentsOf(siteId: string): SiteDeploymentDto[] {
+  return siteDeployments
+    .filter((d) => d.site_id === siteId)
+    .sort((a, b) => b.number - a.number);
+}
+
+function sandboxCommitSha(gitUrl: string, branch: string): string {
+  // Deterministic pseudo-hash, mirroring the backend sandbox.
+  let hash = 0;
+  const input = `${gitUrl}:${branch}`;
+  for (let i = 0; i < input.length; i += 1) {
+    hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
+  }
+  return hash.toString(16).padStart(12, '0').slice(0, 12);
+}
+
+function sandboxSiteUrl(name: string): string {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  return `https://${slug}.omnex-sites.test`;
 }
 
 const dismissedSecurityFindingIds = new Set<string>();
@@ -597,6 +850,8 @@ const SOCIAL_PROVIDERS: SocialProviderDto[] = [
   { name: 'apple', label: 'Apple', configured: true },
   { name: 'facebook', label: 'Facebook', configured: true },
   { name: 'amazon', label: 'Amazon', configured: true },
+  { name: 'github', label: 'GitHub', configured: true },
+  { name: 'openai', label: 'OpenAI', configured: true },
 ];
 
 interface MockSocialAccount extends SocialAccountDto {
@@ -985,32 +1240,75 @@ export class MockApiClient implements ApiClient {
     });
   }
 
-  async listNotifications(): Promise<NotificationDto[]> {
+  async listNotifications(): Promise<NotificationListDto> {
     requireUser();
-    return Promise.resolve(notifications);
+    const data = sortedNotifications();
+    return Promise.resolve({ data, unread: data.filter((n) => !n.read_at).length });
   }
 
-  async  markNotificationRead(id: string): Promise<void> {
+  async listNotificationsPage(query: NotificationQuery = {}): Promise<PaginatedNotificationList> {
+    requireUser();
+
+    let list = sortedNotifications();
+    if (query.type) list = list.filter((n) => n.type === query.type);
+    if (query.severity) list = list.filter((n) => n.severity === query.severity);
+    if (query.unread !== undefined) {
+      list = list.filter((n) => (query.unread ? !n.read_at : !!n.read_at));
+    }
+
+    const perPage = query.perPage ?? 10;
+    const page = Math.max(1, query.page ?? 1);
+    const total = list.length;
+    const lastPage = Math.max(1, Math.ceil(total / perPage));
+    const data = list.slice((page - 1) * perPage, page * perPage);
+
+    return Promise.resolve({
+      data,
+      unread: notifications.filter((n) => !n.read_at).length,
+      meta: { current_page: page, per_page: perPage, total, last_page: lastPage },
+    });
+  }
+
+  async markNotificationRead(id: string): Promise<NotificationDto> {
     requireUser();
     const n = notifications.find((x) => x.id === id);
     if (!n) throw new ApiError(404, 'Not found');
     n.read_at = nowIso();
+    return Promise.resolve({ ...n });
+  }
+
+  async markAllNotificationsRead(): Promise<void> {
+    requireUser();
+    for (const n of notifications) n.read_at = nowIso();
     return Promise.resolve();
+  }
+
+  subscribeNotifications(handler: NotificationListener): () => void {
+    notificationListeners.add(handler);
+    return () => {
+      notificationListeners.delete(handler);
+    };
   }
 
   async listActivity(sinceId?: number): Promise<ActivityFeed> {
     requireUser();
 
-    // Simulate a live event stream so the feed grows between polls.
-    const next = activityPool[Math.floor(Math.random() * activityPool.length)];
-    activity = [...activity, { ...next, id: ++activitySeq, created_at: nowIso() }];
-
+    // Pure cursor read; new events arrive through subscribeActivity().
     const filtered = sinceId ? activity.filter((a) => a.id > sinceId) : activity;
     const latestId = filtered.length > 0 ? Math.max(...filtered.map((a) => a.id)) : (sinceId ?? 0);
 
     return {
       data: filtered.slice().reverse().slice(0, 50),
       latest_id: latestId,
+    };
+  }
+
+  subscribeActivity(handler: ActivityListener): () => void {
+    activityListeners.add(handler);
+    ensureActivityTicker();
+    return () => {
+      activityListeners.delete(handler);
+      if (activityListeners.size === 0) stopActivityTicker();
     };
   }
 
@@ -1094,6 +1392,9 @@ export class MockApiClient implements ApiClient {
       { id: uid('rr'), zone_id: zoneId, type: 'NS', name: '@', content: 'ns1.omnex.io', ttl: 3600, priority: null, proxied: false, created_at: registered },
       { id: uid('rr'), zone_id: zoneId, type: 'NS', name: '@', content: 'ns2.omnex.io', ttl: 3600, priority: null, proxied: false, created_at: registered },
     );
+
+    pushNotification('domain', 'success', 'Domain registered', name, `/domains/${domainDto.id}`);
+    addActivityEvent({ type: 'domain', severity: 'success', title: 'Domain registered', description: name, actor: 'Demo Owner' });
 
     return Promise.resolve(domainDto);
   }
@@ -1572,5 +1873,317 @@ export class MockApiClient implements ApiClient {
     if (!finding) throw new ApiError(404, 'Not found', 'Finding not found.');
     dismissedSecurityFindingIds.delete(id);
     return Promise.resolve({ ...finding, status: 'open', dismissed_at: null });
+  }
+
+  async listSiteProviders(): Promise<SiteProviderDto[]> {
+    requireUser();
+    return Promise.resolve(SITE_PROVIDERS.map((p) => ({ ...p })));
+  }
+
+  async listSites(): Promise<SiteDto[]> {
+    requireUser();
+    return Promise.resolve(
+      sites
+        .map((site) => ({
+          ...site,
+          deployments_count: siteDeploymentsOf(site.id).length,
+        }))
+        .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '')),
+    );
+  }
+
+  async getSite(id: string): Promise<SiteDto> {
+    requireUser();
+    const site = siteById(id);
+    return Promise.resolve({ ...site, deployments_count: siteDeploymentsOf(id).length });
+  }
+
+  async createSite(input: SiteCreateInput): Promise<SiteDto> {
+    requireUser();
+    if (!input.name?.trim()) throw new ApiError(422, 'Validation failed', undefined, { name: ['The name is required.'] });
+    if (!input.git_url?.trim()) throw new ApiError(422, 'Validation failed', undefined, { git_url: ['The git URL is required.'] });
+
+    const provider = input.provider ?? 'sandbox';
+    if (provider === 'custom') throw new ApiError(422, 'Validation failed', undefined, { provider: ['The Custom provider is not configured.'] });
+
+    const site: SiteDto = {
+      id: uid('site'),
+      name: input.name.trim(),
+      framework: input.framework,
+      git_url: input.git_url.trim(),
+      git_branch: input.git_branch ?? 'main',
+      provider,
+      status: 'provisioning',
+      url: sandboxSiteUrl(input.name),
+      current_deployment_id: null,
+      environment_variable_keys: Object.keys(input.environment_variables ?? {}),
+      deployments_count: 0,
+      created_at: nowIso(),
+      updated_at: nowIso(),
+    };
+    sites.push(site);
+    return Promise.resolve({ ...site });
+  }
+
+  async updateSite(id: string, input: SiteUpdateInput): Promise<SiteDto> {
+    requireUser();
+    const site = siteById(id);
+    if (input.name !== undefined) site.name = input.name.trim();
+    if (input.framework !== undefined) site.framework = input.framework;
+    if (input.git_url !== undefined) site.git_url = input.git_url.trim();
+    if (input.git_branch !== undefined) site.git_branch = input.git_branch;
+    if (input.environment_variables !== undefined) {
+      site.environment_variable_keys = Object.keys(input.environment_variables);
+    }
+    site.updated_at = nowIso();
+    return Promise.resolve({ ...site, deployments_count: siteDeploymentsOf(id).length });
+  }
+
+  async deleteSite(id: string): Promise<void> {
+    requireUser();
+    const site = siteById(id);
+    for (const d of siteDeploymentsOf(id)) {
+      siteDeployments.splice(siteDeployments.indexOf(d), 1);
+    }
+    sites.splice(sites.indexOf(site), 1);
+    return Promise.resolve();
+  }
+
+  async listSiteDeployments(siteId: string): Promise<SiteDeploymentDto[]> {
+    requireUser();
+    siteById(siteId);
+    return Promise.resolve(siteDeploymentsOf(siteId).map((d) => ({ ...d })));
+  }
+
+  async getSiteDeployment(siteId: string, deploymentId: string): Promise<SiteDeploymentDto> {
+    requireUser();
+    const deployment = siteDeployments.find((d) => d.site_id === siteId && d.id === deploymentId);
+    if (!deployment) throw new ApiError(404, 'Not found', 'Deployment not found.');
+    return Promise.resolve({ ...deployment });
+  }
+
+  async deploySite(siteId: string): Promise<SiteDeploymentDto> {
+    requireUser();
+    const site = siteById(siteId);
+    const number = siteDeploymentsOf(siteId).length + 1;
+    const failed = site.git_branch === 'fail';
+
+    const deployment: SiteDeploymentDto = {
+      id: uid('site-dep'),
+      site_id: siteId,
+      number,
+      commit_sha: failed ? null : sandboxCommitSha(site.git_url, site.git_branch),
+      status: failed ? 'failed' : 'live',
+      url: failed ? null : sandboxSiteUrl(site.name),
+      logs: failed
+        ? '[omnex-sites] ERROR: build script exited with code 1'
+        : `[omnex-sites] deploy succeeded @ ${sandboxCommitSha(site.git_url, site.git_branch)}`,
+      deployed_at: failed ? null : nowIso(),
+      created_at: nowIso(),
+      updated_at: nowIso(),
+    };
+    siteDeployments.push(deployment);
+
+    if (!failed) {
+      site.status = 'ready';
+      site.url = sandboxSiteUrl(site.name);
+      site.current_deployment_id = deployment.id;
+      pushNotification('deployment', 'success', 'Deployment completed', `${site.name} is live.`, '/sites');
+      addActivityEvent({ type: 'deployment', severity: 'success', title: 'Deployment completed', description: `${site.name} is live`, actor: 'Demo Owner' });
+    } else {
+      if (!site.current_deployment_id) site.status = 'failed';
+      pushNotification('deployment', 'danger', 'Deployment failed', `${site.name} build failed.`, '/sites');
+      addActivityEvent({ type: 'deployment', severity: 'danger', title: 'Deployment failed', description: `${site.name} build failed`, actor: 'System' });
+    }
+    site.updated_at = nowIso();
+
+    return Promise.resolve({ ...deployment });
+  }
+
+  async rollbackSite(siteId: string, deploymentId: string): Promise<SiteDeploymentDto> {
+    requireUser();
+    const site = siteById(siteId);
+    const target = siteDeployments.find((d) => d.site_id === siteId && d.id === deploymentId);
+    if (!target) throw new ApiError(404, 'Not found', 'Deployment not found.');
+    if (target.status !== 'live') {
+      throw new ApiError(422, 'Validation failed', undefined, { deployment: ['Only a live deployment can be rolled back to.'] });
+    }
+    if (site.current_deployment_id === target.id) {
+      throw new ApiError(422, 'Validation failed', undefined, { deployment: ['This deployment is already serving traffic.'] });
+    }
+
+    const current = siteDeployments.find((d) => d.site_id === siteId && d.id === site.current_deployment_id);
+    if (current) current.status = 'rolled_back';
+    site.current_deployment_id = target.id;
+    site.updated_at = nowIso();
+
+    return Promise.resolve({ ...target });
+  }
+
+  async listBillingProviders(): Promise<PaymentProviderDto[]> {
+    requireUser();
+    return Promise.resolve(BILLING_PROVIDERS.map((p) => ({ ...p })));
+  }
+
+  async listBillingPlans(): Promise<BillingPlanDto[]> {
+    requireUser();
+    return Promise.resolve(BILLING_PLANS.map((p) => ({ ...p, features: [...p.features] })));
+  }
+
+  async getSubscription(): Promise<SubscriptionDto | null> {
+    requireUser();
+    const sub = subscriptions
+      .filter((s) => s.status !== 'canceled')
+      .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))[0];
+    return Promise.resolve(sub ? { ...sub } : null);
+  }
+
+  async listInvoices(): Promise<InvoiceDto[]> {
+    requireUser();
+    return Promise.resolve(
+      [...invoices].sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '')),
+    );
+  }
+
+  async subscribeToPlan(plan: string, provider = 'sandbox', couponCode?: string): Promise<BillingSubscribeResponse> {
+    requireUser();
+    if (provider === 'stripe') {
+      throw new ApiError(422, 'Validation failed', undefined, { provider: ['The Stripe provider is not configured.'] });
+    }
+    const planDto = BILLING_PLANS.find((p) => p.slug === plan);
+    if (!planDto) throw new ApiError(422, 'Validation failed', undefined, { plan: ['The selected plan is not available.'] });
+
+    const existing = subscriptions.find((s) => s.status !== 'canceled' && s.plan?.slug === plan);
+    if (existing) {
+      throw new ApiError(422, 'Validation failed', undefined, { plan: ['This organization already has an active subscription to this plan.'] });
+    }
+
+    const coupon = couponCode && couponCode.trim() !== '' ? couponByCode(couponCode) : null;
+    const discount = coupon ? couponDiscount(coupon, planDto.price_monthly) : 0;
+    const netAfterCoupon = Math.max(planDto.price_monthly - discount, 0);
+    const creditApplied = Math.min(creditBalance(), netAfterCoupon);
+    const amountDue = netAfterCoupon - creditApplied;
+
+    if (creditApplied > 0) {
+      creditEntries.unshift({
+        id: uid('credit'),
+        amount: -creditApplied,
+        currency: planDto.currency,
+        reason: `invoice:${invoices.length + 1}`,
+        created_at: nowIso(),
+      });
+    }
+
+    const subscription: SubscriptionDto = {
+      id: uid('sub'),
+      plan: { ...planDto, features: [...planDto.features] },
+      coupon: coupon ? toAppliedCoupon(coupon) : null,
+      provider,
+      status: 'active',
+      current_period_start: nowIso(),
+      current_period_end: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
+      canceled_at: null,
+      created_at: nowIso(),
+      updated_at: nowIso(),
+    };
+    subscriptions.push(subscription);
+
+    const invoice: InvoiceDto = {
+      id: uid('inv'),
+      number: `${new Date().getFullYear()}-${String(invoices.length + 1).padStart(4, '0')}`,
+      amount: planDto.price_monthly,
+      discount,
+      credit_applied: creditApplied,
+      amount_due: amountDue,
+      currency: planDto.currency,
+      status: 'paid',
+      provider,
+      paid_at: nowIso(),
+      period_start: nowIso(),
+      period_end: subscription.current_period_end,
+      plan: { ...planDto, features: [...planDto.features] },
+      created_at: nowIso(),
+    };
+    invoices.push(invoice);
+
+    pushNotification('billing', 'success', 'Subscription activated', `Your ${planDto.name} subscription is active.`, '/billing');
+    addActivityEvent({ type: 'billing', severity: 'success', title: 'Subscription activated', description: `${planDto.name} plan`, actor: 'Demo Owner' });
+
+    return Promise.resolve({
+      subscription: { ...subscription },
+      checkout_url: `/billing/sandbox/checkout/${subscription.id}`,
+    });
+  }
+
+  async validateCoupon(code: string): Promise<CouponDto> {
+    requireUser();
+    const coupon = couponByCode(code);
+    return Promise.resolve({ ...coupon, discount: couponDiscount(coupon, 10000) });
+  }
+
+  async changePlan(plan: string): Promise<SubscriptionDto> {
+    requireUser();
+    const current = subscriptions
+      .filter((s) => s.status !== 'canceled')
+      .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))[0];
+    if (!current || current.status !== 'active') {
+      throw new ApiError(422, 'Validation failed', undefined, { plan: ['Only an active subscription can change plan.'] });
+    }
+    if (current.plan?.slug === plan) {
+      throw new ApiError(422, 'Validation failed', undefined, { plan: ['This organization is already subscribed to this plan.'] });
+    }
+
+    const planDto = BILLING_PLANS.find((p) => p.slug === plan);
+    if (!planDto) throw new ApiError(422, 'Validation failed', undefined, { plan: ['The selected plan is not available.'] });
+
+    // Proration: half of the current period is credited on change.
+    const prorated = current.plan ? Math.round(current.plan.price_monthly / 2) : 0;
+    if (prorated > 0) {
+      creditEntries.unshift({ id: uid('credit'), amount: prorated, currency: 'usd', reason: 'proration', created_at: nowIso() });
+    }
+
+    current.plan = { ...planDto, features: [...planDto.features] };
+    current.current_period_start = nowIso();
+    current.current_period_end = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
+    current.updated_at = nowIso();
+
+    const org = activeOrganization();
+    if (org) org.plan_tier = plan;
+
+    pushNotification('billing', 'info', 'Plan changed', `Your plan is now ${planDto.name}.`, '/billing');
+    addActivityEvent({ type: 'billing', severity: 'info', title: 'Plan changed', description: `${planDto.name} plan`, actor: 'Demo Owner' });
+
+    return Promise.resolve({ ...current });
+  }
+
+  async getCredits(): Promise<CreditSummaryDto> {
+    requireUser();
+    return Promise.resolve({
+      balance: creditBalance(),
+      entries: [...creditEntries].sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '')),
+    });
+  }
+
+  async addCredits(amount: number, reason: string): Promise<CreditEntryDto> {
+    requireUser();
+    const entry: CreditEntryDto = {
+      id: uid('credit'),
+      amount,
+      currency: 'usd',
+      reason,
+      created_at: nowIso(),
+    };
+    creditEntries.unshift(entry);
+    return Promise.resolve(entry);
+  }
+
+  async cancelSubscription(id: string): Promise<SubscriptionDto> {
+    requireUser();
+    const sub = subscriptions.find((s) => s.id === id);
+    if (!sub) throw new ApiError(404, 'Not found', 'Subscription not found.');
+    sub.status = 'canceled';
+    sub.canceled_at = nowIso();
+    sub.updated_at = nowIso();
+    return Promise.resolve({ ...sub });
   }
 }

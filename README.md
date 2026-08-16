@@ -23,14 +23,15 @@ API.
 | 2 | Command Center — dashboard, activity, Ctrl+K, i18n (EN/FR) | ✅ Delivered |
 | 3 | Domain + DNS engine — registry, DNS, DNSSEC, propagation | ✅ Delivered |
 | 4 | OMNEX Drive — storage abstraction (S3-compatible) | ✅ Delivered |
+| 5 | OMNEX Sites — Git deploys, rollback, encrypted env vars | ✅ Delivered |
+| 6 | Billing — plans, subscriptions, invoices, Stripe + sandbox | ✅ Delivered |
 | 7 | Security — findings engine, score, dismiss/reopen | ✅ Delivered |
-| 5+ | Sites, Billing, Cloud, CI/CD, Mail, AI… | 🔜 Planned |
+| 8+ | Cloud, CI/CD, Mail, AI… | 🔜 Planned |
 
-Phase 4 is delivered: `StorageProviderInterface` with a deterministic
-**sandbox** and a real **S3** provider (AWS SigV4 over Guzzle — AWS S3,
-Cloudflare R2, MinIO, OVH), plus the full drive lifecycle (folders, files,
-versions, trash, quotas, signed URLs) behind `StorageService`, a REST API
-and the OMNEX Drive UI.
+Phase 6 is delivered: `PaymentProviderInterface` with a deterministic **sandbox**
+and a **Stripe** adapter (hosted Checkout Sessions + HMAC-verified webhooks);
+plans catalog, tenant-scoped subscriptions and invoices, idempotent webhook
+handling, audit + owner notifications, and the OMNEX Billing UI.
 
 ---
 
@@ -41,9 +42,10 @@ and the OMNEX Drive UI.
   Developer / Viewer), org switching.
 - **MFA** — RFC 6238 TOTP implemented in-house + recovery codes.
 - **Social login (GAFAM + sovereign)** — Google, Microsoft (OpenID), Apple
-  (JWT ES256), Facebook, Amazon and **Serveurs du Peuple** (Nextcloud OAuth2),
-  behind `SocialAuthProviderInterface`; sandbox works with zero credentials,
-  real providers activate via `.env`.
+  (JWT ES256), Facebook, Amazon, **GitHub** (OAuth2), **OpenAI** (OIDC) and
+  **Serveurs du Peuple** (Nextcloud OAuth2), behind
+  `SocialAuthProviderInterface`; sandbox works with zero credentials, real
+  providers activate via `.env`.
 - Every request resolves an active organization; all tenant queries are
   scoped automatically; **default-deny** authorization; immutable audit log.
 
@@ -51,6 +53,18 @@ and the OMNEX Drive UI.
 - Live dashboard, activity feed, notifications, security score, Ctrl+K
   command palette, full **EN/FR** i18n (browser-language detection on first
   launch, explicit choice persisted).
+- **Notification bell** in the header: unread badge, read/unread states,
+  per-item + mark-all-as-read, severity icons (info/success/warning/danger),
+  clickable notifications that deep-link to the related resource, and
+  **real-time delivery over Server-Sent Events** (`/notifications/stream`)
+  with a polling fallback.
+- A merged **Notifications & Activity** page: notifications with type / severity /
+  read-state filters and pagination, alongside the live activity feed — both
+  update in real time without a reload.
+- **Real-time transport is swappable**: an in-memory `StreamBroker` for local
+  dev/tests and a **Redis pub/sub** broker (`OMNEX_STREAM_DRIVER=redis`) so
+  events published by one PHP worker reach SSE subscribers on another — the
+  requirement for horizontal scaling.
 
 ### 🌐 Domain + DNS engine (Phase 3)
 - Search / availability / register / renew / transfer behind
@@ -74,6 +88,29 @@ and the OMNEX Drive UI.
   `storage.manage`).
 - Rule: **no Nextcloud/ownCloud/Seafile by default** — OMNEX owns its storage
   abstraction and its own cloud UI.
+
+### 🧱 OMNEX Sites (Phase 5)
+- `SiteProviderInterface` with **sandbox** (deterministic) + **Custom**
+  (HTTP/JSON hosting gateway) providers, selectable per request.
+- Provision sites from Git (static / Laravel / Next), deploy builds, list
+  deployments and build logs, roll back to any previous live release.
+- **Failed deploy → automatic rollback** to the previous live deployment.
+- Environment variables are encrypted at rest and **never returned by the
+  API** — only their key names are exposed (`sites.read` / `sites.manage`).
+
+### 💳 OMNEX Billing (Phase 6)
+- `PaymentProviderInterface` with **sandbox** (deterministic) + **Stripe**
+  (hosted Checkout Sessions, webhook signature verified with HMAC-SHA256).
+- Plans catalog, tenant-scoped **subscriptions** and **invoices**, subscribe →
+  webhook-verified activation (paid invoice + plan tier) or failure path
+  (`past_due`), idempotent webhook redelivery, cancel.
+- Every mutation is audited and payment outcomes notify organization owners
+  (`billing.read` / `billing.manage`).
+- **Coupons** (percent/amount, expiry, redemption caps — applied at checkout,
+  Stripe `discounts[0][coupon]`, `omnex:stripe-sync-coupons`), **credits**
+  (signed ledger applied against invoices) and **proration** (unused period of
+  a plan change becomes credit). Invoices break down `amount` / `discount` /
+  `credit_applied` / `amount_due`.
 
 ### 🛡️ Security Center (Phase 7)
 - Findings engine behind the live score: MFA, unverified email, single-member
@@ -186,9 +223,9 @@ cross-tenant attack test checklist.
 | Layer | Status |
 |---|---|
 | Frontend typecheck (`pnpm typecheck`) | ✅ green |
-| Frontend tests (`pnpm test`) | ✅ 27/27 |
+| Frontend tests (`pnpm test`) | ✅ 38/38 |
 | Frontend build (`pnpm build`) | ✅ green |
-| Backend (`php artisan test`) | ✅ 117/117 (407 assertions) |
+| Backend (`php artisan test`) | ✅ 166 passed + 1 skipped (626 assertions) |
 
 The Laravel backend is validated against a local portable PHP + PostgreSQL
 setup (see `infra/dev-env.sh`); `php artisan test` runs the full Pest suite.

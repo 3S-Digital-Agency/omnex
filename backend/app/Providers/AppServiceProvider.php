@@ -13,6 +13,8 @@ use App\Events\DomainUpdated;
 use App\Listeners\DomainEventAuditor;
 use App\Listeners\NotifyExpiringDomain;
 use App\Models\User;
+use App\Support\Billing\BillingService;
+use App\Support\Billing\PaymentProviderRegistry;
 use App\Support\Domains\DnsPropagationService;
 use App\Support\Domains\DnsProviderRegistry;
 use App\Support\Domains\DnsService;
@@ -20,10 +22,15 @@ use App\Support\Domains\DomainProviderRegistry;
 use App\Support\Domains\DomainService;
 use App\Support\Domains\Providers\SandboxDnsPropagationChecker;
 use App\Support\Security\SecurityService;
+use App\Support\Sites\SiteProviderRegistry;
+use App\Support\Sites\SiteService;
 use App\Support\SocialAuth\SocialAuthRegistry;
 use App\Support\SocialAuth\SocialAuthService;
 use App\Support\Storage\StorageProviderRegistry;
 use App\Support\Storage\StorageService;
+use App\Support\Streams\InProcessStreamBroker;
+use App\Support\Streams\RedisStreamBroker;
+use App\Support\Streams\StreamBroker;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
@@ -44,7 +51,23 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(SocialAuthService::class);
         $this->app->singleton(StorageProviderRegistry::class, fn () => new StorageProviderRegistry);
         $this->app->singleton(StorageService::class);
+        $this->app->singleton(SiteProviderRegistry::class, fn () => new SiteProviderRegistry);
+        $this->app->singleton(SiteService::class);
         $this->app->singleton(SecurityService::class);
+        $this->app->singleton(PaymentProviderRegistry::class, fn () => new PaymentProviderRegistry);
+        $this->app->singleton(BillingService::class);
+        $this->app->singleton(StreamBroker::class, function () {
+            $driver = config('omnex.streams.driver', 'inprocess');
+
+            if ($driver === 'redis') {
+                return new RedisStreamBroker(
+                    (string) config('omnex.streams.prefix', 'omnex:'),
+                    (string) config('omnex.streams.redis_connection', 'default'),
+                );
+            }
+
+            return new InProcessStreamBroker;
+        });
     }
 
     public function boot(): void

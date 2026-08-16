@@ -17,6 +17,8 @@ import { SecurityPage } from './features/security/SecurityPage';
 import { DomainsPage } from './features/domains/DomainsPage';
 import { DomainDetailPage } from './features/domains/DomainDetailPage';
 import { StoragePage } from './features/storage/StoragePage';
+import { SitesPage } from './features/sites/SitesPage';
+import { BillingPage } from './features/billing/BillingPage';
 import { ModulePage } from './features/modules/ModulePage';
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -57,10 +59,10 @@ export function App() {
         <Route path="/security" element={<SecurityPage />} />
         <Route path="/domains" element={<DomainsPage />} />
         <Route path="/domains/:domainId" element={<DomainDetailPage />} />
-        <Route path="/sites" element={<ModulePage moduleId="sites" />} />
+        <Route path="/sites" element={<SitesPage />} />
         <Route path="/cloud" element={<ModulePage moduleId="cloud" />} />
         <Route path="/storage" element={<StoragePage />} />
-        <Route path="/billing" element={<ModulePage moduleId="billing" />} />
+        <Route path="/billing" element={<BillingPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
