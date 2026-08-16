@@ -47,6 +47,21 @@ import type {
   RoleDto,
   SecurityFindingDto,
   SecurityScoreDto,
+  CloudProviderDto,
+  CloudProviderVerifyDto,
+  ServerCreateInput,
+  ServerDto,
+  ServerMetricsDto,
+  ServerOperationDto,
+  ServerSnapshotDto,
+  ServerUpdateInput,
+  SshKeyCreateInput,
+  SshKeyDto,
+  SshKeyGenerateInput,
+  SshKeyGenerateResponse,
+  SshKeyInstallResponse,
+  SshKeyUnlockResponse,
+  SshKeyUpdateInput,
   SiteCreateInput,
   SiteDeploymentDto,
   SiteDto,
@@ -191,4 +206,29 @@ export interface ApiClient {
   getSiteDeployment(siteId: string, deploymentId: string): Promise<SiteDeploymentDto>;
   deploySite(siteId: string): Promise<SiteDeploymentDto>;
   rollbackSite(siteId: string, deploymentId: string): Promise<SiteDeploymentDto>;
+
+  listCloudProviders(): Promise<CloudProviderDto[]>;
+  verifyCloudProviders(provider?: string): Promise<CloudProviderVerifyDto[]>;
+  listSshKeys(): Promise<SshKeyDto[]>;
+  createSshKey(input: SshKeyCreateInput): Promise<SshKeyDto>;
+  generateSshKey(input: SshKeyGenerateInput): Promise<SshKeyGenerateResponse>;
+  unlockSshKey(id: string, vaultPassword: string): Promise<SshKeyUnlockResponse>;
+  updateSshKey(id: string, input: SshKeyUpdateInput): Promise<SshKeyDto>;
+  deleteSshKey(id: string): Promise<void>;
+  installServerSshKey(serverId: string, sshKeyId: string): Promise<SshKeyInstallResponse>;
+  listServers(): Promise<ServerDto[]>;
+  getServer(id: string): Promise<ServerDto>;
+  createServer(input: ServerCreateInput): Promise<ServerDto>;
+  updateServer(id: string, input: ServerUpdateInput): Promise<ServerDto>;
+  deleteServer(id: string): Promise<void>;
+  listServerOperations(serverId: string): Promise<ServerOperationDto[]>;
+  listServerSnapshots(serverId: string): Promise<ServerSnapshotDto[]>;
+  createServerSnapshot(serverId: string, label?: string): Promise<ServerSnapshotDto>;
+  deleteServerSnapshot(serverId: string, snapshotId: string): Promise<void>;
+  listServerMetricsHistory(serverId: string, limit?: number): Promise<ServerMetricsDto[]>;
+  subscribeServerMetrics(serverId: string, handler: (metrics: ServerMetricsDto) => void): () => void;
+  startServer(serverId: string): Promise<ServerOperationDto>;
+  stopServer(serverId: string): Promise<ServerOperationDto>;
+  rebootServer(serverId: string): Promise<ServerOperationDto>;
+  rebuildServer(serverId: string, image: string): Promise<ServerOperationDto>;
 }

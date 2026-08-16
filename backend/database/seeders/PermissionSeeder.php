@@ -26,6 +26,8 @@ class PermissionSeeder extends Seeder
             'security.manage' => 'Run security scans and dismiss or reopen findings.',
             'sites.read' => 'View sites and their deployments.',
             'sites.manage' => 'Create, deploy, roll back and delete sites.',
+            'cloud.read' => 'View cloud servers and their operations.',
+            'cloud.manage' => 'Provision, power and delete cloud servers.',
             'billing.read' => 'View plans, the current subscription and invoices.',
             'billing.manage' => 'Subscribe to plans and cancel the subscription.',
         ];

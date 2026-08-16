@@ -69,7 +69,7 @@ it('rejects registering an unavailable domain', function () {
     Sanctum::actingAs($user);
 
     $this->withHeader('X-Organization', $organization->id)
-        ->postJson('/api/v1/domains', ['domain' => 'omnex.dev'])
+        ->postJson('/api/v1/domains', ['domain' => 'omnex.cloud'])
         ->assertStatus(422);
 });
 

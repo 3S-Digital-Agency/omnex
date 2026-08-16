@@ -9,6 +9,8 @@ import type {
   AuthSession,
   BillingPlanDto,
   BillingSubscribeResponse,
+  CloudProviderDto,
+  CloudProviderVerifyDto,
   CouponAdminDto,
   CouponCreateInput,
   CouponDto,
@@ -54,6 +56,19 @@ import type {
   RoleDto,
   SecurityFindingDto,
   SecurityScoreDto,
+  ServerCreateInput,
+  ServerDto,
+  ServerMetricsDto,
+  ServerOperationDto,
+  ServerSnapshotDto,
+  ServerUpdateInput,
+  SshKeyCreateInput,
+  SshKeyDto,
+  SshKeyGenerateInput,
+  SshKeyGenerateResponse,
+  SshKeyInstallResponse,
+  SshKeyUnlockResponse,
+  SshKeyUpdateInput,
   SiteCreateInput,
   SiteDeploymentDto,
   SiteDto,
@@ -72,7 +87,17 @@ import type {
 
 let seq = 0;
 const uid = (prefix: string): string => `${prefix}-${(++seq).toString(36)}${Date.now().toString(36)}`;
-const nowIso = (): string => new Date().toISOString();
+
+// Monotonic clock: several mock operations can run within the same
+// millisecond, and features sort by created_at. Bumping ties guarantees
+// stable newest-first ordering regardless of wall-clock precision.
+let lastTimestamp = 0;
+const nowIso = (): string => {
+  const now = Date.now();
+  const timestamp = now > lastTimestamp ? now : lastTimestamp + 1;
+  lastTimestamp = timestamp;
+  return new Date(timestamp).toISOString();
+};
 
 interface MockUser extends UserDto {
   password: string;
@@ -117,6 +142,8 @@ const ALL_PERMISSIONS = [
   'security.manage',
   'sites.read',
   'sites.manage',
+  'cloud.read',
+  'cloud.manage',
   'billing.read',
   'billing.manage',
 ];
@@ -128,21 +155,21 @@ const roles: RoleDto[] = [
     name: 'Admin',
     key: 'admin',
     description: 'Manage members and settings.',
-    permissions: ['organizations.read', 'organizations.invite', 'members.manage', 'audit.read', 'notifications.read', 'domains.read', 'domains.manage', 'dns.read', 'dns.manage', 'storage.read', 'storage.manage', 'security.read', 'security.manage', 'sites.read', 'sites.manage', 'billing.read', 'billing.manage'],
+    permissions: ['organizations.read', 'organizations.invite', 'members.manage', 'audit.read', 'notifications.read', 'domains.read', 'domains.manage', 'dns.read', 'dns.manage', 'storage.read', 'storage.manage', 'security.read', 'security.manage', 'sites.read', 'sites.manage', 'cloud.read', 'cloud.manage', 'billing.read', 'billing.manage'],
   },
   {
     id: 'role-developer',
     name: 'Developer',
     key: 'developer',
     description: 'Read access to the organization and audit log.',
-    permissions: ['organizations.read', 'audit.read', 'notifications.read', 'domains.read', 'dns.read', 'storage.read', 'security.read', 'sites.read', 'billing.read'],
+    permissions: ['organizations.read', 'audit.read', 'notifications.read', 'domains.read', 'dns.read', 'storage.read', 'security.read', 'sites.read', 'cloud.read', 'billing.read'],
   },
   {
     id: 'role-viewer',
     name: 'Viewer',
     key: 'viewer',
     description: 'Read-only access.',
-    permissions: ['organizations.read', 'notifications.read', 'domains.read', 'dns.read', 'storage.read', 'security.read', 'sites.read', 'billing.read'],
+    permissions: ['organizations.read', 'notifications.read', 'domains.read', 'dns.read', 'storage.read', 'security.read', 'sites.read', 'cloud.read', 'billing.read'],
   },
 ];
 
@@ -156,7 +183,7 @@ const users: MockUser[] = [
   {
     id: 'user-demo-owner',
     name: 'Demo Owner',
-    email: 'demo@omnex.dev',
+    email: 'demo@omnex.cloud',
     password: 'password',
     mfa_enabled: false,
     locale: null,
@@ -167,7 +194,7 @@ const users: MockUser[] = [
   {
     id: 'user-dev',
     name: 'Dev User',
-    email: 'dev@omnex.dev',
+    email: 'dev@omnex.cloud',
     password: 'password',
     mfa_enabled: false,
     locale: null,
@@ -217,7 +244,7 @@ const notifications: NotificationDto[] = [
     type: 'domain',
     severity: 'warning',
     title: 'Domain expiring soon',
-    body: 'omnex.dev expires in 24 days.',
+    body: 'omnex.cloud expires in 24 days.',
     route: '/domains/dom-omnex-dev',
     read_at: null,
     created_at: '2026-08-15T18:30:00Z',
@@ -277,7 +304,7 @@ const notifications: NotificationDto[] = [
     type: 'security',
     severity: 'warning',
     title: 'SSL certificate expiring',
-    body: 'omnex.dev certificate expires in 24 days.',
+    body: 'omnex.cloud certificate expires in 24 days.',
     route: '/security',
     read_at: '2026-08-10T09:15:00Z',
     created_at: '2026-08-10T09:15:00Z',
@@ -368,8 +395,8 @@ let activity: ActivityItem[] = auditLogs.map((log) => ({
 const activityPool: Array<Omit<ActivityItem, 'id' | 'created_at'>> = [
   { type: 'deployment', severity: 'info', title: 'Deployment started', description: 'main → production (OMNEX HQ)', actor: 'Dev User' },
   { type: 'deployment', severity: 'success', title: 'Deployment completed', description: 'main → production (OMNEX HQ)', actor: 'Dev User' },
-  { type: 'ssl', severity: 'warning', title: 'SSL certificate expiring', description: 'omnex.dev expires in 24 days', actor: 'System' },
-  { type: 'domain', severity: 'success', title: 'Domain registered', description: 'omnex.dev', actor: 'Demo Owner' },
+  { type: 'ssl', severity: 'warning', title: 'SSL certificate expiring', description: 'omnex.cloud expires in 24 days', actor: 'System' },
+  { type: 'domain', severity: 'success', title: 'Domain registered', description: 'omnex.cloud', actor: 'Demo Owner' },
   { type: 'security', severity: 'info', title: 'Security scan completed', description: 'No critical findings', actor: 'System' },
   { type: 'backup', severity: 'success', title: 'Backup completed', description: 'Daily incremental snapshot', actor: 'System' },
   { type: 'incident', severity: 'warning', title: 'High CPU detected', description: 'worker-1 above 90% for 5 min', actor: 'System' },
@@ -411,7 +438,7 @@ function stopActivityTicker(): void {
 
 // --- Domain + DNS engine (Phase 3 sandbox) ---------------------------------
 
-const RESERVED_DOMAINS = ['omnex.dev', 'omnex.io', 'nexus.com', 'cloud.com', 'google.com', 'apple.com'];
+const RESERVED_DOMAINS = ['omnex.cloud', 'omnex.io', 'nexus.com', 'cloud.com', 'google.com', 'apple.com'];
 const DOMAIN_PRICES: Record<string, number> = {
   com: 12.99,
   net: 14.99,
@@ -458,7 +485,7 @@ function requireProviderConfigured(provider?: string): void {
 const domains: DomainDto[] = [
   {
     id: 'dom-omnex-dev',
-    name: 'omnex.dev',
+    name: 'omnex.cloud',
     status: 'active',
     provider: 'sandbox',
     registered_at: '2025-10-01T00:00:00Z',
@@ -603,6 +630,192 @@ function sandboxCommitSha(gitUrl: string, branch: string): string {
 function sandboxSiteUrl(name: string): string {
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
   return `https://${slug}.omnex-sites.test`;
+}
+
+// Simulated provider tokens: set them to see the provider marked configured
+// in the UI (mirrors backend/.env HETZNER_API_TOKEN / DO_API_TOKEN / etc).
+const mockProviderTokens: Record<string, boolean> = {
+  sandbox: true,
+  hetzner: false,
+  digitalocean: false,
+  custom: false,
+};
+
+export function setMockProviderConfigured(provider: string, configured: boolean): void {
+  mockProviderTokens[provider] = configured;
+}
+
+const CLOUD_PROVIDERS: CloudProviderDto[] = [
+  { name: 'sandbox', label: 'Sandbox', configured: true },
+  { name: 'hetzner', label: 'Hetzner', configured: mockProviderTokens.hetzner },
+  { name: 'digitalocean', label: 'DigitalOcean', configured: mockProviderTokens.digitalocean },
+  { name: 'custom', label: 'Custom', configured: mockProviderTokens.custom },
+];
+
+export function cloudProviders(): CloudProviderDto[] {
+  return CLOUD_PROVIDERS.map((provider) => ({ ...provider, configured: mockProviderTokens[provider.name] ?? false }));
+}
+
+const sshKeys: SshKeyDto[] = [];
+const servers: ServerDto[] = [];
+const serverOperations: ServerOperationDto[] = [];
+const serverSnapshots: ServerSnapshotDto[] = [];
+
+// Encrypted vault (mock): the private key text is "sealed" with a verifier
+// derived from the vault password. Only the presence of a private key is
+// exposed on the DTO; the ciphertext and salt are never returned by the API.
+const sshVault = new Map<string, { privateKey: string; verifier: string }>();
+
+function mockVaultVerifier(password: string): string {
+  let hash = 2166136261;
+  const input = `omnex.vault.v1:${password}`;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash.toString(16).padStart(16, '0');
+}
+
+function sshKeyById(keyId: string): SshKeyDto {
+  const key = sshKeys.find((k) => k.id === keyId);
+  if (!key) throw new ApiError(404, 'Not found', 'SSH key not found.');
+  return key;
+}
+
+function mockFingerprint(publicKey: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < publicKey.length; i += 1) {
+    hash ^= publicKey.charCodeAt(i);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return `SHA256:${hash.toString(16).padStart(8, '0')}${hash.toString(16).slice(0, 8)}`;
+}
+
+function serverById(serverId: string): ServerDto {
+  const server = servers.find((s) => s.id === serverId);
+  if (!server) throw new ApiError(404, 'Not found', 'Server not found.');
+  return server;
+}
+
+function serverOperationsOf(serverId: string): ServerOperationDto[] {
+  return serverOperations
+    .filter((o) => o.server_id === serverId)
+    .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''));
+}
+
+function sandboxServerHash(name: string, region: string, plan: string, image: string): string {
+  let hash = 2166136261;
+  const input = `${name}:${region}:${plan}:${image}`;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+}
+
+function sandboxServerId(name: string, region: string, plan: string, image: string): string {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  return `sbox-srv-${slug}-${sandboxServerHash(name, region, plan, image).slice(0, 6)}`;
+}
+
+function sandboxServerIpv4(name: string, region: string, plan: string, image: string): string {
+  const hex = sandboxServerHash(name, region, plan, image);
+  const a = (parseInt(hex.slice(0, 2), 16) % 250) + 1;
+  const b = (parseInt(hex.slice(2, 4), 16) % 250) + 1;
+  const c = (parseInt(hex.slice(4, 6), 16) % 250) + 1;
+  return `10.${a}.${b}.${c}`;
+}
+
+function mockMetricsSample(seed: string, bucketOffset = 0): ServerMetricsDto {
+  // Deterministic walk over 5-second buckets, mirroring the backend sandbox.
+  // bucketOffset < 0 backfills the history (older buckets).
+  const bucket = Math.floor(Date.now() / 5000) + bucketOffset;
+  let hash = 2166136261;
+  const input = `${seed}:${bucket}`;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+
+  const cpu = Math.max(5, Math.min(95, 12 + (hash % 68) + (bucket % 6)));
+  const memoryTotal = 4 * 1024 * 1024 * 1024;
+  const memoryUsed = Math.round(memoryTotal * (0.26 + ((hash >>> 3) % 34) / 100));
+  const diskTotal = 80 * 1024 * 1024 * 1024;
+  const diskUsed = Math.round(diskTotal * (0.34 + ((hash >>> 5) % 8) / 100));
+
+  return {
+    server_id: seed,
+    cpu,
+    memory_used: memoryUsed,
+    memory_total: memoryTotal,
+    disk_used: diskUsed,
+    disk_total: diskTotal,
+    sampled_at: nowIso(),
+  };
+}
+
+// Threshold alerts: when a sample crosses a usage limit an OMNEX notification
+// (type `server.alert`) is raised — mirroring the backend's
+// `ServerService::checkMetricsThresholds`. Cooldown is per metric per server.
+// Exported so tests can force a breach (the synthetic cpu never exceeds 85%).
+export const ALERT_THRESHOLDS = { cpu: 90, memory: 90, disk: 90 };
+const ALERT_COOLDOWN_MS = 3600 * 1000;
+const lastAlertAt = new Map<string, number>();
+
+function checkMetricsThresholds(server: ServerDto, metrics: ServerMetricsDto): void {
+  const usage = {
+    cpu: metrics.cpu,
+    memory: metrics.memory_total > 0 ? (metrics.memory_used / metrics.memory_total) * 100 : 0,
+    disk: metrics.disk_total > 0 ? (metrics.disk_used / metrics.disk_total) * 100 : 0,
+  };
+
+  const now = Date.now();
+  const breached: string[] = [];
+
+  for (const [metric, limit] of Object.entries(ALERT_THRESHOLDS)) {
+    const percent = usage[metric as keyof typeof usage];
+    if (percent < limit) continue;
+
+    const key = `${server.id}:${metric}`;
+    const last = lastAlertAt.get(key) ?? 0;
+    if (now - last < ALERT_COOLDOWN_MS) continue;
+
+    lastAlertAt.set(key, now);
+    breached.push(`${metric} at ${Math.round(percent)}% (limit ${limit}%)`);
+  }
+
+  if (breached.length === 0) return;
+
+  pushNotification(
+    'server.alert',
+    'warning',
+    `High resource usage on ${server.name}`,
+    breached.join(', '),
+    '/cloud',
+  );
+}
+
+function runServerOperation(server: ServerDto, type: string, successStatus: string): ServerOperationDto {
+  const now = nowIso();
+  const failed = server.name.includes('fail');
+  const operation: ServerOperationDto = {
+    id: uid('server-op'),
+    server_id: server.id,
+    type,
+    status: failed ? 'failed' : 'succeeded',
+    started_at: now,
+    completed_at: now,
+    result: failed ? null : null,
+    error: failed ? `Operation failed: the server name contains the deterministic failure trigger "fail".` : null,
+    created_at: now,
+    updated_at: now,
+  };
+  serverOperations.push(operation);
+  if (!failed) {
+    server.status = successStatus;
+  }
+  server.updated_at = now;
+  return operation;
 }
 
 const dismissedSecurityFindingIds = new Set<string>();
@@ -1037,7 +1250,7 @@ export class MockApiClient implements ApiClient {
       return Promise.resolve({ url: null });
     }
 
-    const code = encodeURIComponent(`mock:${provider}:demo@omnex.dev`);
+    const code = encodeURIComponent(`mock:${provider}:demo@omnex.cloud`);
     return Promise.resolve({ url: `/social/callback?code=${code}&provider=${provider}` });
   }
 
@@ -2024,6 +2237,431 @@ export class MockApiClient implements ApiClient {
     site.updated_at = nowIso();
 
     return Promise.resolve({ ...target });
+  }
+
+  async listCloudProviders(): Promise<CloudProviderDto[]> {
+    requireUser();
+    return Promise.resolve(cloudProviders());
+  }
+
+  async verifyCloudProviders(provider?: string): Promise<CloudProviderVerifyDto[]> {
+    requireUser();
+    const all = cloudProviders();
+    const selected = provider ? all.filter((p) => p.name === provider) : all;
+    return Promise.resolve(
+      selected.map((p) => ({
+        ...p,
+        verified: p.configured
+          ? { ok: true, detail: `${p.label} API reachable with the configured token.` }
+          : { ok: false, detail: `${p.name.toUpperCase().replace(/^CUSTOM$/, 'CUSTOM_CLOUD_ENDPOINT')} is not set.` },
+      })),
+    );
+  }
+
+  async listSshKeys(): Promise<SshKeyDto[]> {
+    requireUser();
+    return Promise.resolve(
+      [...sshKeys]
+        .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))
+        .map((key) => ({ ...key, servers_count: servers.filter((s) => s.ssh_key_id === key.id).length })),
+    );
+  }
+
+  async createSshKey(input: SshKeyCreateInput): Promise<SshKeyDto> {
+    requireUser();
+    if (!input.name?.trim()) throw new ApiError(422, 'Validation failed', undefined, { name: ['The name is required.'] });
+    const body = input.public_key.trim();
+    const parts = body.split(/\s+/);
+    if (parts.length < 2 || !/^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)|ssh-dss)$/.test(parts[0])) {
+      throw new ApiError(422, 'Validation failed', undefined, { public_key: ['A valid OpenSSH public key is required (type + base64 body).'] });
+    }
+
+    // Normalize to type + body (comment stripped) before hashing, so a key
+    // pasted with or without its comment has the same fingerprint.
+    const normalized = `${parts[0]} ${parts[1]}`;
+    const fingerprint = mockFingerprint(normalized);
+    if (sshKeys.some((k) => k.fingerprint === fingerprint)) {
+      throw new ApiError(422, 'Validation failed', undefined, { public_key: ['This public key is already registered in the organization.'] });
+    }
+
+    const key: SshKeyDto = {
+      id: uid('ssh-key'),
+      name: input.name.trim(),
+      fingerprint,
+      public_key: normalized,
+      has_private_key: false,
+      servers_count: 0,
+      created_at: nowIso(),
+      updated_at: nowIso(),
+    };
+    sshKeys.push(key);
+    return Promise.resolve({ ...key });
+  }
+
+  async generateSshKey(input: SshKeyGenerateInput): Promise<SshKeyGenerateResponse> {
+    requireUser();
+    if (!input.name?.trim()) throw new ApiError(422, 'Validation failed', undefined, { name: ['The name is required.'] });
+    if (input.vault_password !== undefined && input.vault_password.length < 8) {
+      throw new ApiError(422, 'Validation failed', undefined, { vault_password: ['The vault password must be at least 8 characters.'] });
+    }
+
+    const type = input.type === 'rsa' ? 'ssh-rsa' : 'ssh-ed25519';
+    // Fake OpenSSH bodies — the mock only needs plausible shapes.
+    const body = `AAAAC3NzaC1lZDI1NTE5AAAAI${mockFingerprint(input.name).replace('SHA256:', '').slice(0, 32)}`;
+    const comment = `omnex-${input.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+    const normalized = `${type} ${body}`;
+    const fingerprint = mockFingerprint(normalized);
+
+    const sealed = input.vault_password !== undefined && input.vault_password !== '';
+    const key: SshKeyDto = {
+      id: uid('ssh-key'),
+      name: input.name.trim(),
+      fingerprint,
+      public_key: normalized,
+      has_private_key: sealed,
+      vault_enabled_at: sealed ? nowIso() : null,
+      servers_count: 0,
+      created_at: nowIso(),
+      updated_at: nowIso(),
+    };
+    sshKeys.push(key);
+
+    // Private key is returned exactly once. With a vault password the mock
+    // seals it (verifier only) so it can be recovered later via unlock.
+    const privateKey = `-----BEGIN OPENSSH PRIVATE KEY-----\nmock-private-key-for-${key.name}-${body.slice(0, 16)}\n-----END OPENSSH PRIVATE KEY-----\n`;
+    if (sealed) {
+      sshVault.set(key.id, { privateKey, verifier: mockVaultVerifier(input.vault_password!) });
+    }
+
+    return Promise.resolve({ data: { ...key }, private_key: privateKey });
+  }
+
+  async unlockSshKey(id: string, vaultPassword: string): Promise<SshKeyUnlockResponse> {
+    requireUser();
+    const key = sshKeyById(id);
+    const sealed = sshVault.get(id);
+    if (!key.has_private_key || !sealed) {
+      throw new ApiError(422, 'Validation failed', undefined, { vault_password: ['No private key is stored in the vault for this key.'] });
+    }
+    if (sealed.verifier !== mockVaultVerifier(vaultPassword)) {
+      throw new ApiError(422, 'Validation failed', undefined, { vault_password: ['The vault password is incorrect.'] });
+    }
+    return Promise.resolve({ data: { ...key }, private_key: sealed.privateKey });
+  }
+
+  async installServerSshKey(serverId: string, sshKeyId: string): Promise<SshKeyInstallResponse> {
+    requireUser();
+    const server = serverById(serverId);
+    const key = sshKeyById(sshKeyId);
+
+    const failed = server.name.includes('fail');
+    const now = nowIso();
+    serverOperations.push({
+      id: uid('server-op'),
+      server_id: server.id,
+      type: 'install_key',
+      status: failed ? 'failed' : 'succeeded',
+      started_at: now,
+      completed_at: now,
+      result: failed ? null : JSON.stringify({ status: 'installed' }),
+      error: failed ? `Operation failed: the server name contains the deterministic failure trigger "fail".` : null,
+      created_at: now,
+      updated_at: now,
+    });
+
+    if (failed) {
+      throw new ApiError(503, 'Provider error', `Operation failed: the server name contains the deterministic failure trigger "fail".`);
+    }
+
+    server.ssh_key = key.public_key;
+    server.ssh_key_id = key.id;
+    server.updated_at = now;
+
+    auditLogs.unshift({ id: auditLogs.length + 1, action: 'server.ssh_key_installed', resource_type: 'server', resource_id: server.id, result: 'success', created_at: now });
+    addActivityEvent({
+      type: 'cloud',
+      severity: 'success',
+      title: 'SSH key installed',
+      description: `${key.name} → ${server.name}`,
+      actor: null,
+    });
+
+    return Promise.resolve({ status: 'installed', detail: 'Key installed on the server.' });
+  }
+
+  async updateSshKey(id: string, input: SshKeyUpdateInput): Promise<SshKeyDto> {
+    requireUser();
+    const key = sshKeyById(id);
+    if (!input.name?.trim()) throw new ApiError(422, 'Validation failed', undefined, { name: ['The name is required.'] });
+    key.name = input.name.trim();
+    key.updated_at = nowIso();
+    return Promise.resolve({ ...key });
+  }
+
+  async deleteSshKey(id: string): Promise<void> {
+    requireUser();
+    const key = sshKeyById(id);
+    const inUseBy = servers.filter((s) => s.ssh_key_id === id).length;
+    if (inUseBy > 0) {
+      throw new ApiError(422, 'Validation failed', undefined, {
+        ssh_key: [`This key is used by ${inUseBy} server${inUseBy > 1 ? 's' : ''}. Remove it from those servers before deleting it.`],
+      });
+    }
+    sshKeys.splice(sshKeys.indexOf(key), 1);
+    return Promise.resolve();
+  }
+
+  async listServers(): Promise<ServerDto[]> {
+    requireUser();
+    return Promise.resolve(
+      servers
+        .map((server) => ({ ...server, operations_count: serverOperationsOf(server.id).length }))
+        .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '')),
+    );
+  }
+
+  async getServer(id: string): Promise<ServerDto> {
+    requireUser();
+    const server = serverById(id);
+    return Promise.resolve({ ...server, operations_count: serverOperationsOf(id).length });
+  }
+
+  async createServer(input: ServerCreateInput): Promise<ServerDto> {
+    requireUser();
+    if (!input.name?.trim()) throw new ApiError(422, 'Validation failed', undefined, { name: ['The name is required.'] });
+    if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(input.name)) {
+      throw new ApiError(422, 'Validation failed', undefined, { name: ['The name must contain only lowercase letters, numbers and dashes.'] });
+    }
+
+    const provider = input.provider ?? 'sandbox';
+    if (provider !== 'sandbox') {
+      throw new ApiError(422, 'Validation failed', undefined, { provider: ['This cloud provider is not configured.'] });
+    }
+    if (input.name === 'fail') {
+      throw new ApiError(503, 'Provider error', 'Provisioning failed: name "fail" is a deterministic failure trigger.');
+    }
+
+    const name = input.name.trim();
+    const region = input.region ?? 'fsn1';
+    const plan = input.plan ?? 'cpx11';
+    const image = input.image ?? 'ubuntu-24.04';
+    const now = nowIso();
+
+    // A saved key wins over a raw pasted key (mirrors the backend).
+    const savedKey = input.ssh_key_id ? sshKeyById(input.ssh_key_id) : null;
+    const sshKey = savedKey ? savedKey.public_key : (input.ssh_key?.trim() || null);
+
+    const server: ServerDto = {
+      id: uid('server'),
+      name,
+      region,
+      plan,
+      image,
+      provider,
+      status: 'running',
+      ipv4: sandboxServerIpv4(name, region, plan, image),
+      ipv6: null,
+      ssh_key: sshKey,
+      ssh_key_id: savedKey?.id ?? null,
+      tags: input.tags ?? [],
+      snapshot_frequency: input.snapshot_frequency ?? 'disabled',
+      snapshot_retention_days: input.snapshot_retention_days ?? 7,
+      last_snapshot_at: null,
+      operations_count: 1,
+      created_at: now,
+      updated_at: now,
+    };
+    servers.push(server);
+
+    serverOperations.push({
+      id: uid('server-op'),
+      server_id: server.id,
+      type: 'provision',
+      status: 'succeeded',
+      started_at: now,
+      completed_at: now,
+      result: server.ipv4,
+      error: null,
+      created_at: now,
+      updated_at: now,
+    });
+
+    pushNotification('cloud', 'success', 'Server provisioned', `${server.name} is running at ${server.ipv4}.`, '/cloud');
+    addActivityEvent({ type: 'provision', severity: 'success', title: 'Server provisioned', description: `${server.name} is running`, actor: 'Demo Owner' });
+
+    return Promise.resolve({ ...server });
+  }
+
+  async updateServer(id: string, input: ServerUpdateInput): Promise<ServerDto> {
+    requireUser();
+    const server = serverById(id);
+    if (input.name !== undefined) {
+      if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(input.name)) {
+        throw new ApiError(422, 'Validation failed', undefined, { name: ['The name must contain only lowercase letters, numbers and dashes.'] });
+      }
+      server.name = input.name.trim();
+    }
+    if (input.ssh_key !== undefined) server.ssh_key = input.ssh_key?.trim() ? input.ssh_key.trim() : null;
+    if (input.tags !== undefined) server.tags = [...input.tags];
+    if (input.snapshot_frequency !== undefined) server.snapshot_frequency = input.snapshot_frequency;
+    if (input.snapshot_retention_days !== undefined) server.snapshot_retention_days = input.snapshot_retention_days;
+    server.updated_at = nowIso();
+    return Promise.resolve({ ...server, operations_count: serverOperationsOf(id).length });
+  }
+
+  async deleteServer(id: string): Promise<void> {
+    requireUser();
+    const server = serverById(id);
+    for (const op of serverOperationsOf(id)) {
+      serverOperations.splice(serverOperations.indexOf(op), 1);
+    }
+    for (const snap of serverSnapshots.filter((s) => s.server_id === id)) {
+      serverSnapshots.splice(serverSnapshots.indexOf(snap), 1);
+    }
+    servers.splice(servers.indexOf(server), 1);
+    return Promise.resolve();
+  }
+
+  async listServerOperations(serverId: string): Promise<ServerOperationDto[]> {
+    requireUser();
+    serverById(serverId);
+    return Promise.resolve(serverOperationsOf(serverId).map((o) => ({ ...o })));
+  }
+
+  async listServerSnapshots(serverId: string): Promise<ServerSnapshotDto[]> {
+    requireUser();
+    serverById(serverId);
+    return Promise.resolve(
+      serverSnapshots
+        .filter((s) => s.server_id === serverId)
+        .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '')),
+    );
+  }
+
+  async createServerSnapshot(serverId: string, label?: string): Promise<ServerSnapshotDto> {
+    requireUser();
+    const server = serverById(serverId);
+    if (server.name.includes('fail')) {
+      const now = nowIso();
+      serverOperations.push({
+        id: uid('server-op'),
+        server_id: server.id,
+        type: 'snapshot',
+        status: 'failed',
+        started_at: now,
+        completed_at: now,
+        result: null,
+        error: 'Operation failed: the server name contains the deterministic failure trigger "fail".',
+        created_at: now,
+        updated_at: now,
+      });
+      throw new ApiError(503, 'Provider error', 'Snapshot failed: the server name contains the deterministic failure trigger "fail".');
+    }
+
+    const now = nowIso();
+    const snapshot: ServerSnapshotDto = {
+      id: uid('snap'),
+      server_id: server.id,
+      provider_snapshot_id: `sbox-snap-${mockFingerprint(server.name + now).slice(7, 15).toLowerCase()}`,
+      label: label?.trim() || `snapshot-${now.slice(0, 19).replace(/[^0-9]/g, '').slice(0, 14)}`,
+      status: 'available',
+      size_bytes: null,
+      created_at: now,
+    };
+    serverSnapshots.push(snapshot);
+    server.last_snapshot_at = now;
+    server.updated_at = now;
+
+    serverOperations.push({
+      id: uid('server-op'),
+      server_id: server.id,
+      type: 'snapshot',
+      status: 'succeeded',
+      started_at: now,
+      completed_at: now,
+      result: snapshot.provider_snapshot_id,
+      error: null,
+      created_at: now,
+      updated_at: now,
+    });
+
+    pushNotification('cloud', 'success', 'Snapshot created', `${server.name}: ${snapshot.label}`, '/cloud');
+    addActivityEvent({ type: 'backup', severity: 'success', title: 'Snapshot created', description: `${server.name}: ${snapshot.label}`, actor: 'Demo Owner' });
+
+    return Promise.resolve({ ...snapshot });
+  }
+
+  async deleteServerSnapshot(serverId: string, snapshotId: string): Promise<void> {
+    requireUser();
+    const snapshot = serverSnapshots.find((s) => s.id === snapshotId && s.server_id === serverId);
+    if (!snapshot) throw new ApiError(404, 'Not found', 'Snapshot not found.');
+    serverSnapshots.splice(serverSnapshots.indexOf(snapshot), 1);
+    return Promise.resolve();
+  }
+
+  async listServerMetricsHistory(serverId: string, limit = 60): Promise<ServerMetricsDto[]> {
+    requireUser();
+    serverById(serverId);
+    // Deterministic backfill of the last `limit` buckets, oldest first,
+    // mirroring the backend's persisted history + synthetic generator.
+    const count = Math.max(1, Math.min(240, Math.floor(limit)));
+    const samples: ServerMetricsDto[] = [];
+    for (let offset = -(count - 1); offset <= 0; offset += 1) {
+      samples.push(mockMetricsSample(serverId, offset));
+    }
+    return Promise.resolve(samples);
+  }
+
+  subscribeServerMetrics(serverId: string, handler: (metrics: ServerMetricsDto) => void): () => void {
+    const server = serverById(serverId);
+    const emit = (metrics: ServerMetricsDto) => {
+      handler(metrics);
+      checkMetricsThresholds(server, metrics);
+    };
+    emit(mockMetricsSample(serverId));
+    const timer = setInterval(() => emit(mockMetricsSample(serverId)), 5000);
+    return () => clearInterval(timer);
+  }
+
+  async startServer(serverId: string): Promise<ServerOperationDto> {
+    requireUser();
+    return runServerOperation(serverById(serverId), 'start', 'running');
+  }
+
+  async stopServer(serverId: string): Promise<ServerOperationDto> {
+    requireUser();
+    return runServerOperation(serverById(serverId), 'stop', 'stopped');
+  }
+
+  async rebootServer(serverId: string): Promise<ServerOperationDto> {
+    requireUser();
+    return runServerOperation(serverById(serverId), 'reboot', 'running');
+  }
+
+  async rebuildServer(serverId: string, image: string): Promise<ServerOperationDto> {
+    requireUser();
+    const server = serverById(serverId);
+    const now = nowIso();
+    const failed = server.name.includes('fail');
+    const operation: ServerOperationDto = {
+      id: uid('server-op'),
+      server_id: server.id,
+      type: 'rebuild',
+      status: failed ? 'failed' : 'succeeded',
+      started_at: now,
+      completed_at: now,
+      result: failed ? null : server.ipv4,
+      error: failed ? 'Rebuild failed: the server name contains the deterministic failure trigger "fail".' : null,
+      created_at: now,
+      updated_at: now,
+    };
+    serverOperations.push(operation);
+    if (!failed) {
+      server.image = image || 'ubuntu-24.04';
+      server.status = 'running';
+    }
+    server.updated_at = now;
+    return Promise.resolve({ ...operation });
   }
 
   async listBillingProviders(): Promise<PaymentProviderDto[]> {

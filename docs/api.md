@@ -20,7 +20,7 @@
 
 ```json
 {
-  "type": "https://omnex.dev/errors/validation",
+  "type": "https://omnex.cloud/errors/validation",
   "title": "Validation failed",
   "status": 422,
   "detail": "One or more fields are invalid.",

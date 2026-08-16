@@ -103,6 +103,66 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | OMNEX Cloud (compute)
+    |--------------------------------------------------------------------------
+    |
+    | Provider names resolve through ServerProviderRegistry. The sandbox is a
+    | deterministic in-memory platform; Hetzner/DigitalOcean activate once
+    | their tokens are set (config/hetzner.php, config/digitalocean.php); the
+    | custom provider activates once its endpoint is set (config/customcloud.php).
+    |
+    | `regions`/`plans`/`images` are the whitelist offered to users. Provider
+    | defaults are applied by each provider's config when a request omits them.
+    |
+    */
+
+    'cloud' => [
+        'provider' => env('OMNEX_CLOUD_PROVIDER', 'sandbox'),
+        'default_region' => env('OMNEX_CLOUD_DEFAULT_REGION', 'fsn1'),
+        'default_plan' => env('OMNEX_CLOUD_DEFAULT_PLAN', 'cpx11'),
+        'default_image' => env('OMNEX_CLOUD_DEFAULT_IMAGE', 'ubuntu-24.04'),
+        'regions' => ['fsn1', 'nbg1', 'hel1', 'nyc1', 'sfo3', 'ams3'],
+        'plans' => ['cpx11', 'cpx21', 'cpx31', 'cpx41'],
+        'images' => ['ubuntu-24.04', 'debian-12', 'rocky-9'],
+        // Real-time metrics stream (SSE). Interval is also overridable per
+        // request via ?interval=; the connection closes after max seconds
+        // and the frontend reconnects automatically.
+        'metrics_sse_interval' => (int) env('OMNEX_CLOUD_METRICS_SSE_INTERVAL', 5),
+        'metrics_sse_max_seconds' => (int) env('OMNEX_CLOUD_METRICS_SSE_MAX_SECONDS', 120),
+        // Max samples returned by GET /cloud/{server}/metrics/history.
+        'metrics_history_limit' => (int) env('OMNEX_CLOUD_METRICS_HISTORY_LIMIT', 60),
+
+        // Threshold alerts: when a sampled usage percentage crosses its limit
+        // an OMNEX notification (type `server.alert`) is sent to every member
+        // with `cloud.read`. `alert_cooldown_seconds` is the minimum time
+        // between two alerts of the same metric on the same server.
+        'alerts' => [
+            'cpu' => (int) env('OMNEX_CLOUD_ALERT_CPU_PERCENT', 90),
+            'memory' => (int) env('OMNEX_CLOUD_ALERT_MEMORY_PERCENT', 90),
+            'disk' => (int) env('OMNEX_CLOUD_ALERT_DISK_PERCENT', 90),
+            'cooldown_seconds' => (int) env('OMNEX_CLOUD_ALERT_COOLDOWN_SECONDS', 3600),
+        ],
+
+        // Scheduled snapshots/backups: default retention (days) and the
+        // scheduler cadence (the command itself decides per server).
+        'snapshots' => [
+            'default_retention_days' => (int) env('OMNEX_CLOUD_SNAPSHOT_RETENTION_DAYS', 7),
+            'default_frequency' => env('OMNEX_CLOUD_SNAPSHOT_FREQUENCY', 'disabled'),
+        ],
+
+        // Private-key vault: when a key pair is generated (or a private key
+        // is stored), the private half is encrypted at rest with AES-256-GCM.
+        // The passphrase is never stored — only the salt and a verifier for
+        // the derived key — so the key can only be recovered by someone who
+        // knows the passphrase (SshKeyService::unlock).
+        'ssh_vault' => [
+            'cipher' => env('OMNEX_CLOUD_SSH_VAULT_CIPHER', 'aes-256-gcm'),
+            'pbkdf2_iterations' => (int) env('OMNEX_CLOUD_SSH_VAULT_PBKDF2_ITERATIONS', 210000),
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Notifications
     |--------------------------------------------------------------------------
     |

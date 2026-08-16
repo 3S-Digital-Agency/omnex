@@ -449,6 +449,151 @@ export interface SiteUpdateInput {
   environment_variables?: Record<string, string>;
 }
 
+export interface CloudProviderDto {
+  name: string;
+  label: string;
+  configured: boolean;
+}
+
+export interface CloudProviderVerifyDto extends CloudProviderDto {
+  verified: {
+    ok: boolean;
+    detail?: string | null;
+  };
+}
+
+export type ServerStatus = 'provisioning' | 'running' | 'stopped' | 'failed';
+export type ServerOperationType = 'provision' | 'start' | 'stop' | 'reboot' | 'rebuild' | 'delete' | 'snapshot';
+export type ServerOperationStatus = 'running' | 'succeeded' | 'failed';
+export type SnapshotFrequency = 'disabled' | 'daily' | 'weekly';
+
+export interface ServerDto {
+  id: string;
+  name: string;
+  region: string;
+  plan: string;
+  image: string;
+  provider: string;
+  status: string;
+  ipv4: string | null;
+  ipv6: string | null;
+  ssh_key: string | null;
+  ssh_key_id: string | null;
+  tags: string[];
+  snapshot_frequency?: SnapshotFrequency;
+  snapshot_retention_days?: number;
+  last_snapshot_at?: string | null;
+  operations_count?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ServerSnapshotDto {
+  id: string;
+  server_id: string;
+  provider_snapshot_id: string;
+  label: string;
+  status: string;
+  size_bytes: number | null;
+  created_at?: string | null;
+}
+
+export interface ServerOperationDto {
+  id: string;
+  server_id: string;
+  type: string;
+  status: string;
+  started_at: string | null;
+  completed_at: string | null;
+  result: string | null;
+  error: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ServerMetricsDto {
+  server_id: string;
+  cpu: number;
+  memory_used: number;
+  memory_total: number;
+  disk_used: number;
+  disk_total: number;
+  sampled_at: string;
+}
+
+export interface ServerCreateInput {
+  name: string;
+  region?: string;
+  plan?: string;
+  image?: string;
+  ssh_key?: string;
+  ssh_key_id?: string;
+  tags?: string[];
+  provider?: string;
+  snapshot_frequency?: SnapshotFrequency;
+  snapshot_retention_days?: number;
+}
+
+export interface SshKeyDto {
+  id: string;
+  name: string;
+  fingerprint: string;
+  public_key: string;
+  // Whether a private key is sealed in the encrypted vault (recoverable with
+  // the vault password). The ciphertext itself is never exposed by the API.
+  has_private_key: boolean;
+  vault_enabled_at?: string | null;
+  // Number of servers referencing this saved key. A key in use cannot be
+  // deleted until it is removed from those servers.
+  servers_count: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SshKeyCreateInput {
+  name: string;
+  public_key: string;
+}
+
+export interface SshKeyUpdateInput {
+  name: string;
+}
+
+export interface SshKeyGenerateInput {
+  name: string;
+  type?: 'ed25519' | 'rsa';
+  // Optional passphrase that seals the private key into the encrypted vault
+  // (recoverable later via unlockSshKey). Without it the private key is never
+  // stored server-side.
+  vault_password?: string;
+}
+
+export interface SshKeyGenerateResponse {
+  data: SshKeyDto;
+  // Returned exactly once by the server. Never persisted server-side unless
+  // a vault password was used, in which case it stays encrypted at rest.
+  private_key: string;
+}
+
+export interface SshKeyUnlockResponse {
+  data: SshKeyDto;
+  // Recovered exactly once; never logged or persisted by the server.
+  private_key: string;
+}
+
+export interface SshKeyInstallResponse {
+  status: 'installed' | 'unsupported';
+  detail?: string | null;
+}
+
+export interface ServerUpdateInput {
+  name?: string;
+  ssh_key?: string | null;
+  tags?: string[];
+  snapshot_frequency?: SnapshotFrequency;
+  snapshot_retention_days?: number;
+}
+
 export interface PaymentProviderDto {
   name: string;
   label: string;

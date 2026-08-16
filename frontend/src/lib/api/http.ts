@@ -50,6 +50,21 @@ import type {
   RoleDto,
   SecurityFindingDto,
   SecurityScoreDto,
+  CloudProviderDto,
+  CloudProviderVerifyDto,
+  ServerCreateInput,
+  ServerDto,
+  ServerMetricsDto,
+  ServerOperationDto,
+  ServerSnapshotDto,
+  ServerUpdateInput,
+  SshKeyCreateInput,
+  SshKeyDto,
+  SshKeyGenerateInput,
+  SshKeyGenerateResponse,
+  SshKeyInstallResponse,
+  SshKeyUnlockResponse,
+  SshKeyUpdateInput,
   SiteCreateInput,
   SiteDeploymentDto,
   SiteDto,
@@ -643,6 +658,177 @@ export class HttpApiClient implements ApiClient {
 
   rollbackSite(siteId: string, deploymentId: string): Promise<SiteDeploymentDto> {
     return this.request(`/sites/${siteId}/deployments/${deploymentId}/rollback`, { method: 'POST' });
+  }
+
+  async listCloudProviders(): Promise<CloudProviderDto[]> {
+    const res = await this.request<{ data: CloudProviderDto[] }>('/cloud/providers');
+    return res.data;
+  }
+
+  async verifyCloudProviders(provider?: string): Promise<CloudProviderVerifyDto[]> {
+    const query = provider ? `?provider=${encodeURIComponent(provider)}` : '';
+    const res = await this.request<{ data: CloudProviderVerifyDto[] }>(`/cloud/providers/verify${query}`);
+    return res.data;
+  }
+
+  async listSshKeys(): Promise<SshKeyDto[]> {
+    const res = await this.request<{ data: SshKeyDto[] }>('/cloud/ssh-keys');
+    return res.data;
+  }
+
+  createSshKey(input: SshKeyCreateInput): Promise<SshKeyDto> {
+    return this.request('/cloud/ssh-keys', { method: 'POST', body: input });
+  }
+
+  generateSshKey(input: SshKeyGenerateInput): Promise<SshKeyGenerateResponse> {
+    return this.request('/cloud/ssh-keys/generate', { method: 'POST', body: input });
+  }
+
+  unlockSshKey(id: string, vaultPassword: string): Promise<SshKeyUnlockResponse> {
+    return this.request(`/cloud/ssh-keys/${id}/unlock`, { method: 'POST', body: { vault_password: vaultPassword } });
+  }
+
+  updateSshKey(id: string, input: SshKeyUpdateInput): Promise<SshKeyDto> {
+    return this.request(`/cloud/ssh-keys/${id}`, { method: 'PATCH', body: input });
+  }
+
+  deleteSshKey(id: string): Promise<void> {
+    return this.request(`/cloud/ssh-keys/${id}`, { method: 'DELETE' });
+  }
+
+  installServerSshKey(serverId: string, sshKeyId: string): Promise<SshKeyInstallResponse> {
+    return this.request(`/cloud/${serverId}/ssh-key`, { method: 'POST', body: { ssh_key_id: sshKeyId } });
+  }
+
+  async listServers(): Promise<ServerDto[]> {
+    const res = await this.request<{ data: ServerDto[] }>('/cloud');
+    return res.data;
+  }
+
+  getServer(id: string): Promise<ServerDto> {
+    return this.request(`/cloud/${id}`);
+  }
+
+  createServer(input: ServerCreateInput): Promise<ServerDto> {
+    return this.request('/cloud', { method: 'POST', body: input });
+  }
+
+  updateServer(id: string, input: ServerUpdateInput): Promise<ServerDto> {
+    return this.request(`/cloud/${id}`, { method: 'PATCH', body: input });
+  }
+
+  deleteServer(id: string): Promise<void> {
+    return this.request(`/cloud/${id}`, { method: 'DELETE' });
+  }
+
+  async listServerOperations(serverId: string): Promise<ServerOperationDto[]> {
+    const res = await this.request<{ data: ServerOperationDto[] }>(`/cloud/${serverId}/operations`);
+    return res.data;
+  }
+
+  async listServerSnapshots(serverId: string): Promise<ServerSnapshotDto[]> {
+    const res = await this.request<{ data: ServerSnapshotDto[] }>(`/cloud/${serverId}/snapshots`);
+    return res.data;
+  }
+
+  createServerSnapshot(serverId: string, label?: string): Promise<ServerSnapshotDto> {
+    return this.request(`/cloud/${serverId}/snapshots`, { method: 'POST', body: { label } });
+  }
+
+  deleteServerSnapshot(serverId: string, snapshotId: string): Promise<void> {
+    return this.request(`/cloud/${serverId}/snapshots/${snapshotId}`, { method: 'DELETE' });
+  }
+
+  startServer(serverId: string): Promise<ServerOperationDto> {
+    return this.request(`/cloud/${serverId}/start`, { method: 'POST' });
+  }
+
+  async listServerMetricsHistory(serverId: string, limit = 60): Promise<ServerMetricsDto[]> {
+    const res = await this.request<{ data: ServerMetricsDto[] }>(`/cloud/${serverId}/metrics/history?limit=${limit}`);
+    return res.data;
+  }
+
+  subscribeServerMetrics(serverId: string, handler: (metrics: ServerMetricsDto) => void): () => void {
+    const controller = new AbortController();
+    let stopped = false;
+    let reconnect: ReturnType<typeof setTimeout> | undefined;
+
+    async function connect() {
+      const headers: Record<string, string> = {
+        Accept: 'text/event-stream',
+        'Cache-Control': 'no-cache',
+      };
+      const token = session.getToken();
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const org = session.getOrganizationId();
+      if (org) headers['X-Organization'] = org;
+
+      try {
+        const response = await fetch(`${BASE}/cloud/${serverId}/metrics/stream`, {
+          headers,
+          signal: controller.signal,
+        });
+
+        if (!response.ok || !response.body) {
+          throw new Error(`SSE connection failed with HTTP ${response.status}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (!stopped) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const frames = buffer.split('\n\n');
+          buffer = frames.pop() ?? '';
+
+          for (const frame of frames) {
+            let event = 'message';
+            let data = '';
+            for (const line of frame.split('\n')) {
+              if (line.startsWith('event:')) event = line.slice(6).trim();
+              else if (line.startsWith('data:')) data += line.slice(5).trim();
+            }
+            if (event === 'server.metrics' && data) {
+              try {
+                handler(JSON.parse(data) as ServerMetricsDto);
+              } catch {
+                // Ignore malformed frames.
+              }
+            }
+          }
+        }
+      } catch (error) {
+        if ((error as Error)?.name === 'AbortError') return;
+      }
+
+      if (!stopped) {
+        reconnect = setTimeout(connect, 3000);
+      }
+    }
+
+    void connect();
+
+    return () => {
+      stopped = true;
+      controller.abort();
+      if (reconnect) clearTimeout(reconnect);
+    };
+  }
+
+  stopServer(serverId: string): Promise<ServerOperationDto> {
+    return this.request(`/cloud/${serverId}/stop`, { method: 'POST' });
+  }
+
+  rebootServer(serverId: string): Promise<ServerOperationDto> {
+    return this.request(`/cloud/${serverId}/reboot`, { method: 'POST' });
+  }
+
+  rebuildServer(serverId: string, image: string): Promise<ServerOperationDto> {
+    return this.request(`/cloud/${serverId}/rebuild`, { method: 'POST', body: { image } });
   }
 
   async listBillingProviders(): Promise<PaymentProviderDto[]> {

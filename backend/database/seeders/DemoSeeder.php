@@ -18,12 +18,12 @@ class DemoSeeder extends Seeder
     public function run(): void
     {
         $owner = User::firstOrCreate(
-            ['email' => 'demo@omnex.dev'],
+            ['email' => 'demo@omnex.cloud'],
             ['name' => 'Demo Owner', 'password' => 'password', 'email_verified_at' => now(), 'status' => 'active']
         );
 
         $developer = User::firstOrCreate(
-            ['email' => 'dev@omnex.dev'],
+            ['email' => 'dev@omnex.cloud'],
             ['name' => 'Dev User', 'password' => 'password', 'email_verified_at' => now(), 'status' => 'active']
         );
 
@@ -70,7 +70,7 @@ class DemoSeeder extends Seeder
 
     private function seedDemoDomains(Organization $organization): void
     {
-        $this->seedDomain($organization, 'omnex.dev', [
+        $this->seedDomain($organization, 'omnex.cloud', [
             ['type' => 'A', 'name' => '@', 'content' => '192.0.2.10', 'ttl' => 3600],
             ['type' => 'CNAME', 'name' => 'www', 'content' => '@', 'ttl' => 3600],
             ['type' => 'TXT', 'name' => '@', 'content' => 'v=spf1 include:spf.omnex.io ~all', 'ttl' => 3600],

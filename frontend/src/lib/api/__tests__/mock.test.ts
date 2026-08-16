@@ -1,21 +1,21 @@
-import { MockApiClient } from '../mock';
-import type { ActivityItem } from '../types';
+import { ALERT_THRESHOLDS, MockApiClient } from '../mock';
+import type { ActivityItem, ServerMetricsDto } from '../types';
 
 describe('MockApiClient', () => {
   it('logs in with the seeded demo account', async () => {
     const api = new MockApiClient();
-    const res = await api.login({ email: 'demo@omnex.dev', password: 'password' });
+    const res = await api.login({ email: 'demo@omnex.cloud', password: 'password' });
     expect('token' in res).toBe(true);
   });
 
   it('rejects wrong credentials', async () => {
     const api = new MockApiClient();
-    await expect(api.login({ email: 'demo@omnex.dev', password: 'nope' })).rejects.toThrow();
+    await expect(api.login({ email: 'demo@omnex.cloud', password: 'nope' })).rejects.toThrow();
   });
 
   it('injects the user locale in the login response', async () => {
     const api = new MockApiClient();
-    const res = await api.login({ email: 'demo@omnex.dev', password: 'password' });
+    const res = await api.login({ email: 'demo@omnex.cloud', password: 'password' });
     expect('token' in res).toBe(true);
     if ('token' in res) expect(res.user.locale).toBeNull();
   });
@@ -33,7 +33,7 @@ describe('MockApiClient', () => {
 
   it('scopes member listings to an organization', async () => {
     const api = new MockApiClient();
-    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+    await api.login({ email: 'demo@omnex.cloud', password: 'password' });
     const members = await api.listMembers('org-omnex-hq');
     expect(members.length).toBeGreaterThan(0);
     expect(members.every((m) => m.organization?.id === 'org-omnex-hq')).toBe(true);
@@ -41,12 +41,12 @@ describe('MockApiClient', () => {
 
   it('requires MFA verification when enabled', async () => {
     const api = new MockApiClient();
-    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+    await api.login({ email: 'demo@omnex.cloud', password: 'password' });
     await api.setupMfa();
     await api.confirmMfa('123456');
 
     await api.logout();
-    const res = await api.login({ email: 'demo@omnex.dev', password: 'password' });
+    const res = await api.login({ email: 'demo@omnex.cloud', password: 'password' });
     expect('mfa_required' in res && res.mfa_required).toBe(true);
   });
 
@@ -199,7 +199,7 @@ describe('MockApiClient', () => {
 
   it('links and unlinks a social account', async () => {
     const api = new MockApiClient();
-    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+    await api.login({ email: 'demo@omnex.cloud', password: 'password' });
 
     await api.socialRedirect('google', true);
     let accounts = await api.listSocialAccounts();
@@ -262,7 +262,7 @@ describe('MockApiClient', () => {
 
   it('scores, dismisses and reopens a security finding', async () => {
     const api = new MockApiClient();
-    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+    await api.login({ email: 'demo@omnex.cloud', password: 'password' });
 
     const report = await api.getSecurityScore();
     expect(report.score).toBeGreaterThanOrEqual(0);
@@ -282,7 +282,7 @@ describe('MockApiClient', () => {
 
   it('rejects dismissing an unknown security finding', async () => {
     const api = new MockApiClient();
-    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+    await api.login({ email: 'demo@omnex.cloud', password: 'password' });
     await expect(api.dismissSecurityFinding('sec-does-not-exist')).rejects.toMatchObject({ status: 404 });
   });
 
@@ -366,9 +366,392 @@ describe('MockApiClient', () => {
     expect((await api.getSite(site.id)).status).toBe('ready');
   });
 
+  it('creates a server, runs power operations and records the trail', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Cloud Tester',
+      email: 'cloud@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    expect(await api.listServers()).toHaveLength(0);
+
+    const server = await api.createServer({
+      name: 'web-01',
+      region: 'fsn1',
+      plan: 'cpx11',
+      image: 'ubuntu-24.04',
+      ssh_key: 'ssh-ed25519 AAAA',
+      tags: ['web', 'staging'],
+    });
+    expect(server.status).toBe('running');
+    expect(server.ipv4).toMatch(/^10\./);
+    expect(server.operations_count).toBe(1);
+
+    const operations = await api.listServerOperations(server.id);
+    expect(operations).toHaveLength(1);
+    expect(operations[0].type).toBe('provision');
+    expect(operations[0].status).toBe('succeeded');
+
+    const stopped = await api.stopServer(server.id);
+    expect(stopped.status).toBe('succeeded');
+    expect((await api.getServer(server.id)).status).toBe('stopped');
+
+    await api.startServer(server.id);
+    await api.rebootServer(server.id);
+
+    const rebuilt = await api.rebuildServer(server.id, 'debian-12');
+    expect(rebuilt.status).toBe('succeeded');
+    expect((await api.getServer(server.id)).image).toBe('debian-12');
+    expect(await api.listServerOperations(server.id)).toHaveLength(5);
+
+    await api.updateServer(server.id, { name: 'web-02', tags: ['prod'] });
+    expect((await api.getServer(server.id)).name).toBe('web-02');
+    expect((await api.getServer(server.id)).tags).toEqual(['prod']);
+
+    await api.deleteServer(server.id);
+    expect(await api.listServers()).toHaveLength(0);
+  });
+
+  it('records a failed operation for servers whose name contains fail', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Cloud Failure Tester',
+      email: 'cloud-fail@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    const server = await api.createServer({
+      name: 'fail-box',
+      region: 'fsn1',
+      plan: 'cpx11',
+      image: 'ubuntu-24.04',
+    });
+
+    const stopped = await api.stopServer(server.id);
+    expect(stopped.status).toBe('failed');
+    expect(stopped.error).toContain('fail');
+    expect((await api.getServer(server.id)).status).toBe('running');
+  });
+
+  it('streams server metrics samples with sane ranges', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Cloud Metrics Tester',
+      email: 'cloud-metrics@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    const server = await api.createServer({
+      name: 'metrics-01',
+      region: 'fsn1',
+      plan: 'cpx11',
+      image: 'ubuntu-24.04',
+    });
+
+    const samples: ServerMetricsDto[] = [];
+    const unsubscribe = api.subscribeServerMetrics(server.id, (metrics) => samples.push(metrics));
+
+    expect(samples).toHaveLength(1); // immediate first sample
+    const first = samples[0];
+    expect(first.server_id).toBe(server.id);
+    expect(first.cpu).toBeGreaterThanOrEqual(5);
+    expect(first.cpu).toBeLessThanOrEqual(95);
+    expect(first.memory_used).toBeLessThanOrEqual(first.memory_total);
+    expect(first.disk_used).toBeLessThanOrEqual(first.disk_total);
+    expect(first.memory_total).toBe(4 * 1024 * 1024 * 1024);
+    expect(first.disk_total).toBe(80 * 1024 * 1024 * 1024);
+
+    unsubscribe();
+  });
+
+  it('raises a server.alert notification when a metric sample crosses the threshold', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Cloud Alert Tester',
+      email: 'cloud-alert@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    const server = await api.createServer({
+      name: 'alert-01',
+      region: 'fsn1',
+      plan: 'cpx11',
+      image: 'ubuntu-24.04',
+    });
+
+    // The synthetic cpu never exceeds 85%, so force a breach deterministically.
+    ALERT_THRESHOLDS.cpu = 1;
+    const unsubscribe = api.subscribeServerMetrics(server.id, () => {});
+    unsubscribe();
+
+    const notifications = await api.listNotificationsPage({ type: 'server.alert' });
+    const alert = notifications.data.find((n) => n.title.includes(server.name));
+    expect(alert).toBeDefined();
+    expect(alert!.severity).toBe('warning');
+    expect(alert!.route).toBe('/cloud');
+    expect(alert!.body).toContain('cpu');
+  });
+
+  it('creates, lists, schedules and deletes server snapshots', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Cloud Snapshot Tester',
+      email: 'cloud-snapshot@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    const server = await api.createServer({
+      name: 'snap-01',
+      region: 'fsn1',
+      plan: 'cpx11',
+      image: 'ubuntu-24.04',
+    });
+
+    // Schedule settings round-trip through update.
+    const updated = await api.updateServer(server.id, { snapshot_frequency: 'daily', snapshot_retention_days: 14 });
+    expect(updated.snapshot_frequency).toBe('daily');
+    expect(updated.snapshot_retention_days).toBe(14);
+
+    const created = await api.createServerSnapshot(server.id, 'pre-deploy');
+    expect(created.server_id).toBe(server.id);
+    expect(created.label).toBe('pre-deploy');
+    expect(created.status).toBe('available');
+
+    const list = await api.listServerSnapshots(server.id);
+    expect(list).toHaveLength(1);
+    expect(list[0].id).toBe(created.id);
+
+    // The snapshot operation lands in the operations trail.
+    const ops = await api.listServerOperations(server.id);
+    expect(ops.some((op) => op.type === 'snapshot' && op.status === 'succeeded')).toBe(true);
+
+    await api.deleteServerSnapshot(server.id, created.id);
+    expect(await api.listServerSnapshots(server.id)).toHaveLength(0);
+  });
+
+  it('verifies cloud providers and reports configured state', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Cloud Verify Tester',
+      email: 'cloud-verify@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    // Only the sandbox is configured by default → only it verifies ok.
+    const verified = await api.verifyCloudProviders();
+    expect(verified.find((p) => p.name === 'sandbox')?.verified.ok).toBe(true);
+    expect(verified.find((p) => p.name === 'hetzner')?.verified.ok).toBe(false);
+
+    // Single-provider query.
+    const single = await api.verifyCloudProviders('hetzner');
+    expect(single).toHaveLength(1);
+    expect(single[0].name).toBe('hetzner');
+  });
+
+  it('creates, lists, renames and deletes SSH keys', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Cloud SSH Tester',
+      email: 'cloud-ssh@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    const key = await api.createSshKey({
+      name: 'Laptop',
+      public_key: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP7bJ2FZQnXr6gJkYxQnMlpHJ2vQ0mWtXyRfZk1aB2c test',
+    });
+    expect(key.fingerprint.startsWith('SHA256:')).toBe(true);
+    expect(key.public_key).not.toContain('test'); // comment stripped
+
+    await expect(
+      api.createSshKey({ name: 'Copy', public_key: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP7bJ2FZQnXr6gJkYxQnMlpHJ2vQ0mWtXyRfZk1aB2c' }),
+    ).rejects.toMatchObject({ status: 422 });
+
+    await api.updateSshKey(key.id, { name: 'Work laptop' });
+    expect((await api.listSshKeys())[0].name).toBe('Work laptop');
+
+    await api.deleteSshKey(key.id);
+    expect(await api.listSshKeys()).toHaveLength(0);
+  });
+
+  it('generates a key pair and returns the private key once', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Cloud Gen Tester',
+      email: 'cloud-gen@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    const result = await api.generateSshKey({ name: 'Deploy bot', type: 'ed25519' });
+    expect(result.data.public_key.startsWith('ssh-ed25519 ')).toBe(true);
+    expect(result.data.fingerprint.startsWith('SHA256:')).toBe(true);
+    expect(result.private_key).toContain('BEGIN OPENSSH PRIVATE KEY');
+
+    // The public half is registered in the list…
+    const keys = await api.listSshKeys();
+    expect(keys.some((key) => key.id === result.data.id)).toBe(true);
+
+    // …but the private key is not retrievable again through the API.
+    const rsa = await api.generateSshKey({ name: 'Backup host', type: 'rsa' });
+    expect(rsa.data.public_key.startsWith('ssh-rsa ')).toBe(true);
+  });
+
+  it('associates a saved SSH key with a server at creation', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Cloud SSH Server Tester',
+      email: 'cloud-ssh-server@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    const key = await api.createSshKey({
+      name: 'Deploy key',
+      public_key: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP7bJ2FZQnXr6gJkYxQnMlpHJ2vQ0mWtXyRfZk1aB2c',
+    });
+
+    const server = await api.createServer({
+      name: 'keyed-01',
+      region: 'fsn1',
+      plan: 'cpx11',
+      image: 'ubuntu-24.04',
+      ssh_key_id: key.id,
+    });
+
+    expect(server.ssh_key_id).toBe(key.id);
+    expect(server.ssh_key).toBe(key.public_key);
+  });
+
+  it('seals a generated private key in the vault and unlocks it with the password', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Cloud Vault Tester',
+      email: 'cloud-vault@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    const result = await api.generateSshKey({ name: 'Sealed', vault_password: 'vault-pass-123' });
+    expect(result.data.has_private_key).toBe(true);
+    expect(result.data.vault_enabled_at).toBeTruthy();
+
+    // A wrong password is rejected.
+    await expect(api.unlockSshKey(result.data.id, 'wrong-password')).rejects.toMatchObject({ status: 422 });
+
+    // The correct password recovers the same private key.
+    const unlocked = await api.unlockSshKey(result.data.id, 'vault-pass-123');
+    expect(unlocked.private_key).toBe(result.private_key);
+
+    // The listing never exposes the ciphertext or the private key.
+    const keys = await api.listSshKeys();
+    const listed = keys.find((key) => key.id === result.data.id);
+    expect(listed?.has_private_key).toBe(true);
+    expect('private_key' in listed!).toBe(false);
+    expect('encrypted_private_key' in listed!).toBe(false);
+  });
+
+  it('reports server usage of a key and blocks deleting it while in use', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Cloud InUse Tester',
+      email: 'cloud-inuse@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    const key = await api.createSshKey({
+      name: 'Deploy key',
+      public_key: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIInUseTestUniqueBody',
+    });
+    expect(key.servers_count).toBe(0);
+
+    await api.createServer({
+      name: 'inuse-01',
+      region: 'fsn1',
+      plan: 'cpx11',
+      image: 'ubuntu-24.04',
+      ssh_key_id: key.id,
+    });
+
+    // The listing reflects the usage count and deletion is rejected.
+    const keys = await api.listSshKeys();
+    expect(keys.find((k) => k.id === key.id)?.servers_count).toBe(1);
+    await expect(api.deleteSshKey(key.id)).rejects.toMatchObject({ status: 422 });
+    // The in-use key survives the rejected delete.
+    expect((await api.listSshKeys()).find((k) => k.id === key.id)).toBeTruthy();
+  });
+
+  it('installs a saved key on a server through the provider', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Cloud Install Tester',
+      email: 'cloud-install@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    const key = await api.createSshKey({
+      name: 'Install key',
+      public_key: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDifferentBodyForInstallTest',
+    });
+    const server = await api.createServer({
+      name: 'target-01',
+      region: 'fsn1',
+      plan: 'cpx11',
+      image: 'ubuntu-24.04',
+    });
+    expect(server.ssh_key).toBeNull();
+
+    const result = await api.installServerSshKey(server.id, key.id);
+    expect(result.status).toBe('installed');
+
+    // The server now references the key and the operation is recorded.
+    const updated = await api.getServer(server.id);
+    expect(updated.ssh_key_id).toBe(key.id);
+    expect(updated.ssh_key).toBe(key.public_key);
+
+    const ops = await api.listServerOperations(server.id);
+    expect(ops.some((op) => op.type === 'install_key' && op.status === 'succeeded')).toBe(true);
+  });
+
+  it('serves a deterministic metrics history for the sparkline', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Cloud History Tester',
+      email: 'cloud-history@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    const server = await api.createServer({
+      name: 'history-01',
+      region: 'fsn1',
+      plan: 'cpx11',
+      image: 'ubuntu-24.04',
+    });
+
+    const history = await api.listServerMetricsHistory(server.id, 12);
+    expect(history).toHaveLength(12);
+    expect(history[0].server_id).toBe(server.id);
+    // Oldest first, monotonic timestamps.
+    const timestamps = history.map((s) => s.sampled_at);
+    expect([...timestamps].sort()).toEqual(timestamps);
+    expect(history[0].cpu).toBeGreaterThanOrEqual(5);
+    expect(history[11].cpu).toBeLessThanOrEqual(95);
+  });
+
   it('lists notifications newest first with severity and unread count', async () => {
     const api = new MockApiClient();
-    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+    await api.login({ email: 'demo@omnex.cloud', password: 'password' });
 
     const list = await api.listNotifications();
     expect(list.data.length).toBeGreaterThan(0);
@@ -385,7 +768,7 @@ describe('MockApiClient', () => {
 
   it('paginates and filters the notification page', async () => {
     const api = new MockApiClient();
-    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+    await api.login({ email: 'demo@omnex.cloud', password: 'password' });
 
     const first = await api.listNotificationsPage({ page: 1, perPage: 3 });
     expect(first.data).toHaveLength(3);
@@ -412,7 +795,7 @@ describe('MockApiClient', () => {
 
   it('marks a single notification read and decrements the counter', async () => {
     const api = new MockApiClient();
-    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+    await api.login({ email: 'demo@omnex.cloud', password: 'password' });
 
     const before = await api.listNotifications();
     const target = before.data.find((n) => !n.read_at);
@@ -427,7 +810,7 @@ describe('MockApiClient', () => {
 
   it('marks all notifications read', async () => {
     const api = new MockApiClient();
-    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+    await api.login({ email: 'demo@omnex.cloud', password: 'password' });
 
     expect((await api.listNotifications()).unread).toBeGreaterThan(0);
 
@@ -468,7 +851,7 @@ describe('MockApiClient', () => {
 
   it('pushes activity events to subscribers in real time', async () => {
     const api = new MockApiClient();
-    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+    await api.login({ email: 'demo@omnex.cloud', password: 'password' });
 
     const received: ActivityItem[] = [];
     const unsubscribe = api.subscribeActivity((item) => received.push(item));
@@ -490,7 +873,7 @@ describe('MockApiClient', () => {
 
   it('lists billing plans and subscribes with a paid invoice', async () => {
     const api = new MockApiClient();
-    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+    await api.login({ email: 'demo@omnex.cloud', password: 'password' });
 
     const plans = await api.listBillingPlans();
     expect(plans.map((p) => p.slug)).toEqual(['free', 'starter', 'pro', 'business']);
@@ -512,7 +895,7 @@ describe('MockApiClient', () => {
 
   it('rejects a duplicate billing subscription', async () => {
     const api = new MockApiClient();
-    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+    await api.login({ email: 'demo@omnex.cloud', password: 'password' });
 
     await api.subscribeToPlan('starter');
     await expect(api.subscribeToPlan('starter')).rejects.toMatchObject({
@@ -523,7 +906,7 @@ describe('MockApiClient', () => {
 
   it('applies a coupon and credits to billing', async () => {
     const api = new MockApiClient();
-    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+    await api.login({ email: 'demo@omnex.cloud', password: 'password' });
 
     const coupon = await api.validateCoupon('launch25');
     expect(coupon.code).toBe('LAUNCH25');
@@ -549,7 +932,7 @@ describe('MockApiClient', () => {
 
   it('changes plan with proration credit', async () => {
     const api = new MockApiClient();
-    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+    await api.login({ email: 'demo@omnex.cloud', password: 'password' });
 
     const existing = await api.getSubscription();
     if (existing) await api.cancelSubscription(existing.id);
@@ -564,7 +947,7 @@ describe('MockApiClient', () => {
 
   it('administers coupons (create, toggle, usage)', async () => {
     const api = new MockApiClient();
-    await api.login({ email: 'demo@omnex.dev', password: 'password' });
+    await api.login({ email: 'demo@omnex.cloud', password: 'password' });
 
     const initial = await api.listCoupons();
     expect(initial.map((c) => c.code)).toEqual(['CREDIT10', 'LAUNCH25']);

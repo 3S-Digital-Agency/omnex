@@ -66,7 +66,7 @@ export const modules: ModuleDefinition[] = [
     description: 'VPS, containers, databases and networking — provider-agnostic.',
     phase: 'Phase 8',
     capabilities: ['VPS provisioning', 'SSH keys & firewall', 'Snapshots & backups', 'Metrics'],
-    live: false,
+    live: true,
   },
   {
     id: 'storage',

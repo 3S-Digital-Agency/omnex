@@ -30,7 +30,7 @@ final class SandboxSocialProvider implements SocialAuthProviderInterface
 
     public function redirectUrl(string $state): string
     {
-        $code = urlencode('demo@omnex.dev');
+        $code = urlencode('demo@omnex.cloud');
 
         return url("/api/v1/auth/sandbox/callback?code={$code}&state={$state}");
     }

@@ -15,7 +15,7 @@ use Illuminate\Support\Str;
 final class SandboxDomainProvider implements DomainProviderInterface
 {
     private const RESERVED = [
-        'omnex.dev',
+        'omnex.cloud',
         'omnex.io',
         'nexus.com',
         'cloud.com',

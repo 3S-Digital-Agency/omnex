@@ -128,7 +128,7 @@ transactions       (id, organization_id →, invoice_id →, provider_ref,
                     amount, currency, status, kind)
 ```
 
-### Cloud (Phase 8) / Deploy (Phase 9) / Automate (Phase 12)
+### Cloud (Phase 8) / Deploy (Phase 10) / Automate (Phase 13)
 
 ```
 servers            (id, organization_id →, provider_id →, provider_ref, name,
@@ -160,7 +160,7 @@ uptime_checks      (id, organization_id →, url, interval, status, last_at)
 - Index every FK. Index tenant+scope columns as composite:
   `(organization_id, created_at)` for list pages.
 - `audit_logs` and `notifications` are append-heavy: partition by month when
-  volume justifies it (Phase 14), start with a covering index.
+  volume justifies it (Phase 15), start with a covering index.
 - DNS/domain lookups: unique index on `(organization_id, name)` where name must
   be unique per tenant.
 - No N+1: list endpoints return paginated DTOs built with eager loading;

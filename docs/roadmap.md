@@ -32,7 +32,9 @@
 - **Phase 7 — Security: PARTIALLY DELIVERED** (findings engine + Security
   Score live). Remaining: MFA enforcement policy, session management,
   SSL/vulnerability monitoring, backup status.
-- **Phase 8+ — Cloud, Deploy, Mail, AI, Automate, Marketplace: PLANNED.**
+- **Phase 8 — Cloud: IMPLEMENTED** (VPS via `ServerProviderInterface` — sandbox/Hetzner/DO/custom —, clés SSH + coffre, métriques SSE + historique, alertes de seuil, snapshots planifiés avec rétention, validation de tokens).
+- **Phase 9 — Marketing & Commercial Website: PLANNED** (site public vitrine, pages services, tarifs, preuve sociale, SEO, analytics, CTA).
+- **Phase 10+ — Deploy, Mail, AI, Automate, Marketplace, Scale, Launch: PLANNED.**
 
 ---
 
@@ -178,22 +180,167 @@ management, SSL/vulnerability monitoring, backup status.
 
 ---
 
-## Phase 8 — OMNEX Cloud
+## Phase 8 — OMNEX Cloud ✅
 
-`CloudProviderInterface`, **one provider first** (recommended: Hetzner or DO).
-VPS provisioning, lifecycle, metrics, SSH keys, firewall, snapshots, backups.
-Add further providers only after one is production-solid.
+Delivered: `ServerProviderInterface` with **sandbox** (deterministic) +
+**Hetzner** and **DigitalOcean** (real REST APIs, configured via their tokens)
++ **Custom** (HTTP/JSON compute gateway). VPS provisioning (region/plan/image
+whitelists), **start / stop / reboot / rebuild / delete**, full
+`server_operations` trail, audit + RBAC (`cloud.read` / `cloud.manage`),
+OMNEX Cloud UI (FR/EN) wired into the sidebar and dashboard, and a
+**real-time metrics stream** (SSE `server.metrics` samples — CPU / memory /
+disk — with a live dashboard card and a **persisted history**
+(`server_metric_samples` + `GET /cloud/{server}/metrics/history`) powering a
+live CPU sparkline; synthetic samples until each platform's time-series
+metrics API is wired) and a **reusable SSH key manager**
+(create/import with SHA256 fingerprints, rename/delete — **blocked while a
+key is in use by servers**, with a per-key usage counter — associate a saved
+key with a server at provisioning, **generate a key pair** ed25519/RSA 4096
+straight from the UI — private key downloaded once, never persisted
+server-side), an **encrypted private-key vault** (optional vault password
+seals the private half at rest with AES-256-GCM/PBKDF2, recovered later via
+`unlock` — the passphrase is never stored), and **secure key install onto
+servers through the provider** (`ServerProviderInterface::installSshKey`,
+only the public half is sent; sandbox/custom install for real,
+Hetzner/DigitalOcean report unsupported honestly), **provider token
+validation** (`omnex:cloud:verify-providers` + `GET /cloud/providers/verify` —
+read-only, no-cost checks of Hetzner/DO/custom tokens before provisioning),
+plus **threshold alerts**: when a sample
+crosses a usage limit (CPU/memory/disk, defaults 90%, per-metric cooldown) an
+OMNEX notification (`server.alert`) is sent to every member with `cloud.read`,
+and **scheduled snapshots & backups** behind `ServerProviderInterface`
+(`snapshot`/`listSnapshots`/`deleteSnapshot` on sandbox, Hetzner,
+DigitalOcean and the custom gateway): per-server `snapshot_frequency`
+(disabled/daily/weekly) + `snapshot_retention_days`, manual snapshots from the
+UI, `server_snapshots` table, and a daily scheduled `omnex:server-snapshots`
+command (`--dry-run` preview) that creates due snapshots and prunes expired
+ones on the platform and locally.
+
+Remaining: per-provider real time-series metrics, firewall, provider cost
+tracking. Add further providers only after one is production-solid.
 
 ---
 
-## Phase 9 — OMNEX Deploy (CI/CD)
+## Phase 9 — OMNEX Marketing & Commercial Website (Public-Facing Experience)
+
+**Goal:** turn OMNEX into not just an excellent SaaS application but also an
+excellent *commercial* website capable of selling the product and the services
+that come with it — marketing, acquisition and conversion, not just functional
+development.
+
+**Placement:** Phase 9 deliberately sits right after the core product is solid
+(Phase 8) and before the deep platform phases (Deploy, Mail, AI…), because the
+commercial site should drive early signups in parallel with product growth. It
+is a separate deliverable from the authenticated app: a **public, marketing-
+optimized site** (own routing, own pages, no login required) sharing the OMNEX
+design system and brand.
+
+### Objectives
+
+- Present the company, its value proposition and advantages at a glance.
+- Present each service (Domains, Sites, Cloud, Drive/Storage, Billing, Security,
+  Mail, AI, Automate…) on dedicated pages for SEO and conversion.
+- Structure every page to **sell**: generate leads and turn visitors into
+  customers (trial signup, paid plans, contact, quote requests).
+- Build trust with social proof: testimonials, customer reviews, case studies.
+- Compete visually with market leaders: premium, coherent brand identity.
+- Make the site easy to extend: new campaigns, services, promotions and
+  landing pages without re-architecting.
+
+### Scope
+
+**1. Marketing site (public)**
+- High-end **homepage**: hero + value proposition, advantages, product
+  highlights, live screenshots/animations, primary/secondary CTAs, social proof
+  strip, pricing teaser, final CTA band.
+- **Services overview** page + **dedicated page per service** (Domains, DNS,
+  Sites, Cloud, Drive, Security, Billing, plus future Mail/AI/Automate) — each
+  with benefits, use cases, features, pricing anchor and its own CTA.
+- **Pricing / plans** section: free/paid plans, per-service pricing, feature
+  comparison table, FAQ anchors; billing ties into the Phase 6 plans catalog.
+- **About / company** page: story, mission, team, commitment (sovereign cloud,
+  open standards, « Serveurs du Peuple » values).
+- **Contact & lead capture**: contact form, quote/estimate request form
+  (« Demander une soumission »), lead routing + notifications.
+- **Legal pages**: Terms, Privacy, GDPR, SLA.
+- **Blog / content hub**: posts, guides, comparisons, release notes.
+- **Testimonials & case studies**: review system, logos, quantified outcomes,
+  video/quote formats.
+- **FAQ**: per-product FAQ sections optimized for objections and featured
+  snippets (FAQPage structured data).
+
+**2. SEO strategy**
+- Technical SEO: clean URL structure, sitemap.xml, robots.txt, canonical tags,
+  Open Graph/Twitter cards, meta descriptions, headings hierarchy, internal
+  linking, Core Web Vitals (LCP/CLS/INP) budgets.
+- Structured data: Organization, Product/Service, FAQPage, BreadcrumbList,
+  Review/AggregateRating, LocalBusiness if applicable.
+- Keyword strategy: service terms, competitor comparison terms
+  (« vs Hetzner », « vs Netlify »…), long-tail questions; content calendar.
+- **Landing pages**: campaign-specific pages (offer, promo, feature launch,
+  comparison), each with tracking + dedicated CTA.
+
+**3. Conversion optimization (CRO)**
+- Strategic CTAs everywhere: Demander une soumission, Acheter, Nous contacter,
+  Commencer (essai gratuit), Réserver une démo, etc.
+- Conversion paths: visitor → trial signup → onboarding → paid plan;
+  form abandonment recovery; exit-intent offer where relevant.
+- A/B testing harness for hero, CTAs, pricing pages, landing pages.
+- UX: mobile-first, fast loads, clear hierarchy, minimal friction, honest
+  messaging (no dark patterns).
+
+**4. Analytics, tracking & remarketing**
+- Privacy-conscious analytics (self-hosted Matomo/Plausible class) + consent
+  management; optional GA4 via adapter.
+- Conversion tracking (signup, trial start, paid, quote request) with event
+  taxonomy aligned to the product's billing events.
+- Remarketing/retargeting pixel adapters (opt-in), UTM tracking end-to-end
+  (campaign → signup attribution stored on the organization).
+
+**5. Architecture & brand**
+- CMS/content layer with a **page/data model** (hero, sections, FAQ items,
+  testimonials, pricing tiers) so new pages/campaigns are content additions,
+  not code rewrites.
+- i18n EN/FR reusing the app's i18n system; locale-aware SEO (hreflang).
+- Brand: premium visual identity consistent with the OMNEX logo, typography,
+  color palette, spacing system; reusable marketing component kit.
+
+### Priorities (P0 → P2)
+
+- **P0 — Homepage + Pricing + CTA/conversion paths** (the selling core).
+- **P0 — Analytics + conversion tracking** (measure from day one).
+- **P1 — Per-service pages + SEO foundations** (sitemap, structured data, meta).
+- **P1 — Contact/quote forms + lead handling.**
+- **P1 — Testimonials + case studies + FAQ.**
+- **P2 — Blog/content hub + landing page engine.**
+- **P2 — Remarketing + A/B testing harness.**
+
+### Definition of Done
+
+- A visitor can go from homepage → service page → pricing → **sign up for a
+  free trial** without leaving the marketing site, and the signup is tracked
+  end-to-end (UTM → organization attribution).
+- Every service has a dedicated public page with unique meta, structured data
+  and its own CTA.
+- Pricing page matches the Phase 6 plans catalog (single source of truth).
+- A quote request submitted from the site reaches the team (notification +
+  lead record) within one minute.
+- Lighthouse/performance budget green on homepage and service pages
+  (Core Web Vitals targets met); sitemap + robots + hreflang valid.
+- All public pages pass the same security scan (no auth bypass, no data leak,
+  CSP in place); the marketing site shares the brand kit but stays fully
+  separated from the authenticated app's routing and data.
+
+---
+
+## Phase 10 — OMNEX Deploy (CI/CD)
 
 GitHub first (then GitLab/Bitbucket): build → test → security scan → staging →
 health check → production → monitoring; automatic rollback on failure.
 
 ---
 
-## Phase 10 — OMNEX Mail
+## Phase 11 — OMNEX Mail
 
 Domain mail config, mailboxes, aliases, forwarding, quotas, spam, SPF/DKIM/
 DMARC auto-config, provider abstraction. Specialized email provider, no custom
@@ -201,7 +348,7 @@ SMTP infrastructure.
 
 ---
 
-## Phase 11 — OMNEX AI
+## Phase 12 — OMNEX AI
 
 AI Core with **permission-scoped access** (AI by permission, not by default).
 AI website builder (produces real deployable code), Cloud Copilot (diagnose →
@@ -210,33 +357,36 @@ Copilot, usage tracking.
 
 ---
 
-## Phase 12 — OMNEX Automate
+## Phase 13 — OMNEX Automate
 
 Workflow engine: trigger → condition → action → result. Schedules, webhooks,
 event-driven automation; sensitive actions require confirmation.
 
 ---
 
-## Phase 13 — OMNEX Marketplace
+## Phase 14 — OMNEX Marketplace
 
 Apps, plugins, themes, integrations, AI agents, templates. Extensible
 architecture; marketplace is a distribution layer, not a rewrite.
 
 ---
 
-## Phase 14 — Scale
+## Phase 15 — Scale
 
 Horizontal scaling, queue workers, read replicas, object storage, CDN,
 multi-region, HA, disaster recovery, infrastructure orchestration.
 
 ---
 
-## Phase 15 — Commercial launch
+## Phase 16 — Commercial launch
 
-Security: pentest, dependency audit, secrets audit, permission audit, tenant
-isolation test. Performance: load/stress, API + DB benchmarks. Reliability:
-backup restore, rollback, provider/db/storage failure drills. UX: onboarding,
-mobile, accessibility, error states.
+Go-to-market on top of the **Phase 9 marketing & commercial website**: launch
+campaigns (offers, landing pages, remarketing), first paid customers, case
+studies from early adopters. Security: pentest, dependency audit, secrets
+audit, permission audit, tenant isolation test. Performance: load/stress, API
++ DB benchmarks (incl. marketing-site Core Web Vitals). Reliability: backup
+restore, rollback, provider/db/storage failure drills. UX: onboarding, mobile,
+accessibility, error states — on both the app and the public site.
 
 ---
 

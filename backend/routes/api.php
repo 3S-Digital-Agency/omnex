@@ -12,8 +12,10 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SecurityController;
+use App\Http\Controllers\ServerController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\SocialAuthController;
+use App\Http\Controllers\SshKeyController;
 use App\Http\Controllers\StorageController;
 use Illuminate\Support\Facades\Route;
 
@@ -156,5 +158,32 @@ Route::prefix('v1')->group(function () {
         Route::post('/sites/{site}/deployments', [SiteController::class, 'deploy']);
         Route::get('/sites/{site}/deployments/{deployment}', [SiteController::class, 'showDeployment']);
         Route::post('/sites/{site}/deployments/{deployment}/rollback', [SiteController::class, 'rollback']);
+
+        // OMNEX Cloud (Phase 8). Static routes precede the {server} route so
+        // they are not captured as a server id (e.g. /cloud/ssh-keys).
+        Route::get('/cloud/providers', [ServerController::class, 'providers']);
+        Route::get('/cloud/providers/verify', [ServerController::class, 'verifyProviders']);
+        Route::get('/cloud', [ServerController::class, 'index']);
+        Route::post('/cloud', [ServerController::class, 'store']);
+        Route::get('/cloud/ssh-keys', [SshKeyController::class, 'index']);
+        Route::post('/cloud/ssh-keys/generate', [SshKeyController::class, 'generate']);
+        Route::post('/cloud/ssh-keys', [SshKeyController::class, 'store']);
+        Route::patch('/cloud/ssh-keys/{sshKey}', [SshKeyController::class, 'update']);
+        Route::delete('/cloud/ssh-keys/{sshKey}', [SshKeyController::class, 'destroy']);
+        Route::post('/cloud/ssh-keys/{sshKey}/unlock', [SshKeyController::class, 'unlock']);
+        Route::get('/cloud/{server}', [ServerController::class, 'show']);
+        Route::patch('/cloud/{server}', [ServerController::class, 'update']);
+        Route::delete('/cloud/{server}', [ServerController::class, 'destroy']);
+        Route::post('/cloud/{server}/ssh-key', [ServerController::class, 'installSshKey']);
+        Route::get('/cloud/{server}/operations', [ServerController::class, 'operations']);
+        Route::get('/cloud/{server}/snapshots', [ServerController::class, 'snapshots']);
+        Route::post('/cloud/{server}/snapshots', [ServerController::class, 'storeSnapshot']);
+        Route::delete('/cloud/{server}/snapshots/{snapshot}', [ServerController::class, 'destroySnapshot']);
+        Route::get('/cloud/{server}/metrics/history', [ServerController::class, 'metricsHistory']);
+        Route::get('/cloud/{server}/metrics/stream', [ServerController::class, 'metricsStream']);
+        Route::post('/cloud/{server}/start', [ServerController::class, 'start']);
+        Route::post('/cloud/{server}/stop', [ServerController::class, 'stop']);
+        Route::post('/cloud/{server}/reboot', [ServerController::class, 'reboot']);
+        Route::post('/cloud/{server}/rebuild', [ServerController::class, 'rebuild']);
     });
 });

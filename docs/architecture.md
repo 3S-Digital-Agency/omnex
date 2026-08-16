@@ -213,7 +213,7 @@ Conventions:
 ## 9. Explicit non-goals (MVP)
 
 - No microservices, no separate auth/API-gateway service.
-- No multi-region, no read replicas (Phase 14).
+- No multi-region, no read replicas (Phase 15).
 - No per-tenant database/schema (see `database.md`).
 - No custom SMTP server (Email uses specialized providers).
 - No simulated domain availability in production (Domains integrate a real

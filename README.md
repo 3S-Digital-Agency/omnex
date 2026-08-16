@@ -26,7 +26,9 @@ API.
 | 5 | OMNEX Sites — Git deploys, rollback, encrypted env vars | ✅ Delivered |
 | 6 | Billing — plans, subscriptions, invoices, Stripe + sandbox | ✅ Delivered |
 | 7 | Security — findings engine, score, dismiss/reopen | ✅ Delivered |
-| 8+ | Cloud, CI/CD, Mail, AI… | 🔜 Planned |
+| 8 | OMNEX Cloud — VPS engine (sandbox · Hetzner · DigitalOcean · Custom) | ✅ Delivered |
+| 9 | Marketing & Commercial Website — site public vitrine, services, tarifs, SEO, analytics, CTA | 🔜 Planned |
+| 10+ | CI/CD, Mail, AI… | 🔜 Planned |
 
 Phase 6 is delivered: `PaymentProviderInterface` with a deterministic **sandbox**
 and a **Stripe** adapter (hosted Checkout Sessions + HMAC-verified webhooks);
@@ -98,6 +100,61 @@ handling, audit + owner notifications, and the OMNEX Billing UI.
 - Environment variables are encrypted at rest and **never returned by the
   API** — only their key names are exposed (`sites.read` / `sites.manage`).
 
+### 🖧 OMNEX Cloud (Phase 8)
+- `ServerProviderInterface` with **sandbox** (deterministic) + **Hetzner** and
+  **DigitalOcean** (real REST APIs, activate once their tokens are set) +
+  **Custom** (HTTP/JSON compute gateway) providers, selectable per request.
+- Provision VPS servers (region / plan / image whitelists), manage power state
+  (**start / stop / reboot**), **rebuild** onto a new image, delete.
+- **Real-time metrics** (`GET /cloud/{server}/metrics/stream`, SSE): live CPU /
+  memory / disk samples streamed every `interval` seconds (deterministic
+  synthetic samples until each platform's time-series metrics API is wired).
+  Each sample is **persisted** (`server_metric_samples`) and served by
+  `GET /cloud/{server}/metrics/history` — the dashboard card draws a live
+  CPU sparkline from the last 60 samples.
+- **Threshold alerts**: when a sample crosses a usage limit (CPU / memory /
+  disk, defaults 90%, per-metric cooldown) an OMNEX notification
+  (`server.alert`, severity `warning`, clickable to `/cloud`) is sent to every
+  member with `cloud.read` — throttled so a sustained overload does not spam
+  the feed (`omnex.cloud.alerts.*` config).
+- **Scheduled snapshots & backups**: every provider exposes
+  `snapshot` / `listSnapshots` / `deleteSnapshot` (Hetzner images,
+  DigitalOcean snapshots, custom gateway). Manual snapshots from the UI, plus
+  an automatic schedule per server (`snapshot_frequency` disabled/daily/weekly)
+  with a **retention policy** (`snapshot_retention_days`) enforced by the
+  scheduled `omnex:server-snapshots` command (`--dry-run` preview, registered
+  in the Laravel scheduler): expired snapshots are pruned on the platform and
+  in `server_snapshots`.
+- **Provider token validation**: `omnex:cloud:verify-providers` (artisan) or
+  `GET /cloud/providers/verify` — every provider proves its configured token
+  with a **read-only, free** API call (Hetzner `GET /servers`, DigitalOcean
+  `GET /account`, custom gateway `ping`), so real tokens are validated before
+  anything is provisioned or billed. The create-server dialog only lists
+  **configured** providers (tokens set in `backend/.env`).
+- **Reusable SSH keys** (`/cloud/ssh-keys`): create/import OpenSSH keys with
+  computed SHA256 fingerprints (duplicates rejected per tenant), rename/delete,
+  and associate a saved key with a server at provisioning (`ssh_key_id` — the
+  key body is snapshotted, so deleting a key never breaks an existing server).
+  **Generate a key pair** directly from the UI (ed25519 or RSA 4096, real
+  `ssh-keygen` with a PHP/OpenSSL fallback): the public half is registered,
+  the private key is downloaded exactly once and **never persisted or
+transmitted again** server-side. Keys show a **usage counter** ("used by N
+  servers") and **cannot be deleted while in use** — the API rejects the
+  deletion with a 422 until the key is removed from its servers.
+- **Encrypted private-key vault**: generate a pair with an optional **vault
+  password** and the private half is sealed at rest (AES-256-GCM, PBKDF2 key
+  derivation — the passphrase itself is never stored, only a verifier), then
+  recovered later via `/cloud/ssh-keys/{key}/unlock` with that password; a
+  wrong password is rejected before any decryption, and the plaintext is
+  never logged. **Secure copy to servers**: a saved key can be installed on
+  an existing server through its provider (`POST /cloud/{server}/ssh-key`,
+  `ServerProviderInterface::installSshKey`) — only the **public** half is
+  sent; sandbox + custom install for real, Hetzner/DigitalOcean report
+  `unsupported` honestly (their platforms apply keys at provisioning/rebuild).
+- Every power action leaves a `server_operations` trail (type, status,
+  timestamps, error) — OMNEX is the system of record (`cloud.read` /
+  `cloud.manage`, audit on every mutation).
+
 ### 💳 OMNEX Billing (Phase 6)
 - `PaymentProviderInterface` with **sandbox** (deterministic) + **Stripe**
   (hosted Checkout Sessions, webhook signature verified with HMAC-SHA256).
@@ -154,7 +211,7 @@ pnpm install
 pnpm dev          # http://localhost:5173
 ```
 
-Demo account: `demo@omnex.dev` / `password`. In mock mode, in-memory state
+Demo account: `demo@omnex.cloud` / `password`. In mock mode, in-memory state
 resets on reload.
 
 ### 2. Run the real stack (Laravel + PostgreSQL + Redis)
@@ -182,7 +239,7 @@ pnpm install
 pnpm dev
 ```
 
-Demo accounts (seeded): `demo@omnex.dev` and `dev@omnex.dev`, both `password`.
+Demo accounts (seeded): `demo@omnex.cloud` and `dev@omnex.cloud`, both `password`.
 
 Scheduled tasks (domain-expiration warnings, billing renewals) run through the
 Laravel scheduler — in dev start `php artisan schedule:work`; in production add
@@ -209,6 +266,7 @@ code**. Swap a registrar, DNS or storage backend without touching module code:
 | `StorageProviderInterface` | sandbox · S3-compatible (R2 / MinIO / OVH) |
 | `SocialAuthProviderInterface` | sandbox · Google · Microsoft · Apple · Facebook · Amazon · Serveurs du Peuple |
 | `DnsPropagationCheckerInterface` | sandbox (deterministic) |
+| `ServerProviderInterface` | sandbox · Hetzner · DigitalOcean · Custom |
 
 ---
 
@@ -233,9 +291,9 @@ cross-tenant attack test checklist.
 | Layer | Status |
 |---|---|
 | Frontend typecheck (`pnpm typecheck`) | ✅ green |
-| Frontend tests (`pnpm test`) | ✅ 38/38 |
+| Frontend tests (`pnpm test`) | ✅ 54/54 |
 | Frontend build (`pnpm build`) | ✅ green |
-| Backend (`php artisan test`) | ✅ 166 passed + 1 skipped (626 assertions) |
+| Backend (`php artisan test`) | ✅ 273 passed + 1 skipped (1099 assertions) |
 
 The Laravel backend is validated against a local portable PHP + PostgreSQL
 setup (see `infra/dev-env.sh`); `php artisan test` runs the full Pest suite.

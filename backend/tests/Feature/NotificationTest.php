@@ -57,7 +57,7 @@ it('lists notifications newest first with severity and route', function () {
         $user->id,
         'domain.expiring',
         'Domain expiring',
-        'omnex.dev expires soon.',
+        'omnex.cloud expires soon.',
         ['domain_id' => 'dom-1', 'route' => '/domains/dom-1'],
         $organization->id,
         'warning',

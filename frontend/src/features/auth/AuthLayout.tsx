@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { brand } from '../../lib/brand';
 
 export function AuthLayout({
@@ -17,7 +18,9 @@ export function AuthLayout({
       <div className="w-full max-w-sm">
         {!brandCard ? (
           <div className="mb-6 flex flex-col items-center text-center">
-            <img src="/logo.png" alt={`${brand.name} logo`} className="mb-5 h-auto w-56 rounded-2xl" />
+            <Link to="/" aria-label={`${brand.name} — home`}>
+              <img src="/logo.png" alt={`${brand.name} logo`} className="mb-5 h-auto w-56 rounded-2xl" />
+            </Link>
             <h1 className="text-2xl font-bold tracking-wide text-white">{brand.name}</h1>
             <p className="text-sm text-zinc-500">{brand.tagline}</p>
           </div>
@@ -25,7 +28,9 @@ export function AuthLayout({
         <div className="rounded-xl border border-edge bg-panel p-6 shadow-xl">
           {brandCard ? (
             <div className="mb-6 flex flex-col items-center text-center">
-              <img src="/logo.png" alt={`${brand.name} logo`} className="h-auto w-48 rounded-2xl" />
+              <Link to="/" aria-label={`${brand.name} — home`}>
+                <img src="/logo.png" alt={`${brand.name} logo`} className="h-auto w-48 rounded-2xl" />
+              </Link>
             </div>
           ) : (
             <>

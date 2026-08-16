@@ -41,7 +41,7 @@ function activityContext(): array
 it('broadcasts an activity event when an audit log is recorded', function () {
     [$user, $organization] = activityContext();
 
-    AuditLogger::record('domain.registered', 'domain', 'dom-1', null, ['name' => 'omnex.dev']);
+    AuditLogger::record('domain.registered', 'domain', 'dom-1', null, ['name' => 'omnex.cloud']);
 
     $events = [];
     app(StreamBroker::class)->listen(StreamChannels::activity($organization->id), function (array $event) use (&$events) {
@@ -52,7 +52,7 @@ it('broadcasts an activity event when an audit log is recorded', function () {
         ->and($events[0]['type'])->toBe('domain')
         ->and($events[0]['severity'])->toBe('success')
         ->and($events[0]['title'])->toBe('Domain registered')
-        ->and($events[0]['description'])->toBe('omnex.dev')
+        ->and($events[0]['description'])->toBe('omnex.cloud')
         ->and($events[0]['id'])->toBeInt();
 });
 

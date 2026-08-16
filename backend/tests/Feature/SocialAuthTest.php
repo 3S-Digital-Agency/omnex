@@ -109,5 +109,5 @@ it('rejects an unknown provider', function () {
 });
 
 it('rejects an invalid or expired state', function () {
-    $this->get('/api/v1/auth/sandbox/callback?code=demo@omnex.dev&state=forged')->assertStatus(422);
+    $this->get('/api/v1/auth/sandbox/callback?code=demo@omnex.cloud&state=forged')->assertStatus(422);
 });
