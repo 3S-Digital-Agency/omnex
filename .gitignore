@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+vendor/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+build/
+coverage/
+
+# Laravel runtime
+backend/storage/logs/*
+backend/storage/framework/cache/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/storage/app/private/*
+backend/storage/app/public/*
+backend/bootstrap/cache/*
+!backend/storage/**/.gitignore
+!backend/bootstrap/cache/.gitignore
+
+# Keys & secrets
+*.key
+*.pem
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+.freebuff/

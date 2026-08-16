@@ -1,0 +1,991 @@
+openapi: 3.1.0
+info:
+  title: NEXUS Cloud OS API
+  version: 1.0.0
+  description: |
+    NEXUS Cloud OS API — authentication (incl. TOTP MFA), organizations,
+    members, invitations, RBAC roles, audit, notifications, and the
+    Domain + DNS engines (Phase 3) with provider abstraction.
+    Base path: /api/v1
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local Laravel API
+security:
+  - bearerAuth: []
+tags:
+  - name: auth
+  - name: organizations
+  - name: audit
+  - name: activity
+  - name: notifications
+  - name: domains
+  - name: dns
+
+paths:
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Register a new account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password, password_confirmation]
+              properties:
+                name: { type: string }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                password_confirmation: { type: string }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthSession' }
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Authenticate
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: Session or MFA challenge
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/AuthSession'
+                  - type: object
+                    required: [mfa_required, mfa_token]
+                    properties:
+                      mfa_required: { type: boolean, enum: [true] }
+                      mfa_token: { type: string }
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/mfa/verify:
+    post:
+      tags: [auth]
+      summary: Complete an MFA challenge
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mfa_token]
+              properties:
+                mfa_token: { type: string }
+                code: { type: string }
+                recovery_code: { type: string }
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthSession' }
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Revoke the current token
+      responses:
+        '200':
+          description: Logged out
+
+  /auth/mfa/setup:
+    post:
+      tags: [auth]
+      summary: Begin MFA enrollment (returns TOTP secret + otpauth URI)
+      responses:
+        '200':
+          description: Enrollment started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  secret: { type: string }
+                  otpauth_uri: { type: string }
+
+  /auth/mfa/confirm:
+    post:
+      tags: [auth]
+      summary: Confirm MFA enrollment and enable it
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+      responses:
+        '200':
+          description: Enabled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recovery_codes:
+                    type: array
+                    items: { type: string }
+
+  /auth/mfa/disable:
+    post:
+      tags: [auth]
+      summary: Disable MFA (requires password)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string }
+      responses:
+        '200':
+          description: Disabled
+
+  /me:
+    get:
+      tags: [auth]
+      summary: Current user, memberships and active organization
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+                  memberships:
+                    type: array
+                    items: { $ref: '#/components/schemas/Membership' }
+                  active_organization: { $ref: '#/components/schemas/Organization' }
+                  permissions:
+                    type: array
+                    items: { type: string }
+                  pending_invitations:
+                    type: array
+                    items: { $ref: '#/components/schemas/Invitation' }
+
+  /organizations:
+    get:
+      tags: [organizations]
+      summary: List the caller's organizations
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Membership' }
+    post:
+      tags: [organizations]
+      summary: Create an organization (caller becomes owner)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Organization' }
+
+  /organizations/{organization}/members:
+    parameters:
+      - $ref: '#/components/parameters/Organization'
+    get:
+      tags: [organizations]
+      summary: List members of an organization
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Membership' }
+
+  /organizations/{organization}/members/{membership}/role:
+    parameters:
+      - $ref: '#/components/parameters/Organization'
+      - $ref: '#/components/parameters/Membership'
+    patch:
+      tags: [organizations]
+      summary: Change a member's role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role_id]
+              properties:
+                role_id: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Membership' }
+
+  /organizations/{organization}/members/{membership}:
+    parameters:
+      - $ref: '#/components/parameters/Organization'
+      - $ref: '#/components/parameters/Membership'
+    delete:
+      tags: [organizations]
+      summary: Remove a member
+      responses:
+        '200':
+          description: Removed
+
+  /organizations/{organization}/invitations:
+    parameters:
+      - $ref: '#/components/parameters/Organization'
+    get:
+      tags: [organizations]
+      summary: List pending invitations
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Invitation' }
+    post:
+      tags: [organizations]
+      summary: Invite a member by email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role_id]
+              properties:
+                email: { type: string, format: email }
+                role_id: { type: string, format: uuid }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Invitation' }
+
+  /organizations/{organization}/invitations/{invitation}:
+    parameters:
+      - $ref: '#/components/parameters/Organization'
+      - $ref: '#/components/parameters/Invitation'
+    delete:
+      tags: [organizations]
+      summary: Cancel an invitation
+      responses:
+        '200':
+          description: Cancelled
+
+  /invitations/{invitation}/accept:
+    parameters:
+      - $ref: '#/components/parameters/Invitation'
+    post:
+      tags: [organizations]
+      summary: Accept an invitation for the authenticated user
+      responses:
+        '200':
+          description: Accepted
+
+  /roles:
+    get:
+      tags: [organizations]
+      summary: List system roles and their permissions
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Role' }
+
+  /audit:
+    get:
+      tags: [audit]
+      summary: List audit log entries for the active organization
+      parameters:
+        - name: per_page
+          in: query
+          schema: { type: integer, default: 25 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/AuditLog' }
+                  meta:
+                    type: object
+                    properties:
+                      current_page: { type: integer }
+                      per_page: { type: integer }
+                      total: { type: integer }
+                      last_page: { type: integer }
+
+  /activity:
+    get:
+      tags: [activity]
+      summary: Live activity feed (incremental cursor)
+      parameters:
+        - name: since
+          in: query
+          description: Return only events with an id greater than this cursor.
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/ActivityItem' }
+                  latest_id: { type: integer }
+
+  /notifications:
+    get:
+      tags: [notifications]
+      summary: List notifications for the current user
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Notification' }
+
+  /notifications/{notification}/read:
+    parameters:
+      - $ref: '#/components/parameters/Notification'
+    post:
+      tags: [notifications]
+      summary: Mark a notification as read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Notification' }
+
+  /domains:
+    get:
+      tags: [domains]
+      summary: List domains for the active organization
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Domain' }
+    post:
+      tags: [domains]
+      summary: Register a domain (provisions a DNS zone)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [domain]
+              properties:
+                domain: { type: string }
+                years: { type: integer, minimum: 1, maximum: 10 }
+      responses:
+        '201':
+          description: Registered
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Domain' }
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /domains/search:
+    get:
+      tags: [domains]
+      summary: Search domain availability across TLDs
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema: { type: string }
+        - name: tlds[]
+          in: query
+          schema:
+            type: array
+            items: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/DomainSearchResult' }
+
+  /domains/check:
+    get:
+      tags: [domains]
+      summary: Check a single domain's availability
+      parameters:
+        - name: domain
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DomainCheckResult' }
+
+  /domains/transfer:
+    post:
+      tags: [domains]
+      summary: Transfer an existing domain into NEXUS
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [domain, auth_code]
+              properties:
+                domain: { type: string }
+                auth_code: { type: string, minLength: 6 }
+      responses:
+        '201':
+          description: Transferred
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Domain' }
+
+  /domains/{domain}:
+    parameters:
+      - $ref: '#/components/parameters/Domain'
+    get:
+      tags: [domains]
+      summary: Get a domain
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Domain' }
+    patch:
+      tags: [domains]
+      summary: Update domain settings (auto-renew, privacy, lock, nameservers, contacts)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                auto_renew: { type: boolean }
+                privacy_protection: { type: boolean }
+                transfer_lock: { type: boolean }
+                nameservers:
+                  type: array
+                  minItems: 2
+                  items: { type: string }
+                contacts: { type: object }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Domain' }
+
+  /domains/{domain}/renew:
+    parameters:
+      - $ref: '#/components/parameters/Domain'
+    post:
+      tags: [domains]
+      summary: Renew a domain
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                years: { type: integer, minimum: 1, maximum: 10 }
+      responses:
+        '200':
+          description: Renewed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Domain' }
+
+  /domains/{domain}/dns:
+    parameters:
+      - $ref: '#/components/parameters/Domain'
+    get:
+      tags: [dns]
+      summary: List the zone and its DNS records
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  zone:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      provider: { type: string }
+                      status: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/DnsRecord' }
+
+  /domains/{domain}/dns/records:
+    parameters:
+      - $ref: '#/components/parameters/Domain'
+    post:
+      tags: [dns]
+      summary: Create a DNS record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DnsRecordInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DnsRecord' }
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /domains/{domain}/dns/records/{record}:
+    parameters:
+      - $ref: '#/components/parameters/Domain'
+      - $ref: '#/components/parameters/DnsRecord'
+    patch:
+      tags: [dns]
+      summary: Update a DNS record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DnsRecordInput' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DnsRecord' }
+    delete:
+      tags: [dns]
+      summary: Delete a DNS record
+      responses:
+        '200':
+          description: Deleted
+
+  /domains/{domain}/dns/history:
+    parameters:
+      - $ref: '#/components/parameters/Domain'
+    get:
+      tags: [dns]
+      summary: List DNS change history
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/DnsHistory' }
+
+  /domains/{domain}/dns/history/{history}/rollback:
+    parameters:
+      - $ref: '#/components/parameters/Domain'
+      - $ref: '#/components/parameters/DnsHistory'
+    post:
+      tags: [dns]
+      summary: Roll back a DNS change
+      responses:
+        '200':
+          description: Rolled back
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/DnsRecord' }
+
+  /domains/{domain}/dns/export:
+    parameters:
+      - $ref: '#/components/parameters/Domain'
+    get:
+      tags: [dns]
+      summary: Export the zone as a BIND zone file
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  zone_file: { type: string }
+
+  /domains/{domain}/dns/import:
+    parameters:
+      - $ref: '#/components/parameters/Domain'
+    post:
+      tags: [dns]
+      summary: Import a BIND zone file (replaces the zone)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [zone_file]
+              properties:
+                zone_file: { type: string }
+      responses:
+        '200':
+          description: Imported
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/DnsRecord' }
+
+  /domains/{domain}/dns/templates/{template}:
+    parameters:
+      - $ref: '#/components/parameters/Domain'
+      - name: template
+        in: path
+        required: true
+        schema: { type: string, enum: [website, email] }
+    post:
+      tags: [dns]
+      summary: Apply a DNS record template
+      responses:
+        '201':
+          description: Applied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/DnsRecord' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    Organization:
+      name: organization
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Membership:
+      name: membership
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Invitation:
+      name: invitation
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Notification:
+      name: notification
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Domain:
+      name: domain
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    DnsRecord:
+      name: record
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    DnsHistory:
+      name: history
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    ValidationError:
+      description: Validation failed
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string }
+        mfa_enabled: { type: boolean }
+        locale: { type: string }
+        status: { type: string }
+        email_verified_at: { type: string, nullable: true }
+        last_login_at: { type: string, nullable: true }
+        created_at: { type: string }
+    Role:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        key: { type: string }
+        description: { type: string, nullable: true }
+        permissions:
+          type: array
+          items: { type: string }
+    Organization:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        slug: { type: string }
+        plan_tier: { type: string }
+        status: { type: string }
+        created_at: { type: string }
+    Membership:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string }
+        joined_at: { type: string, nullable: true }
+        role: { $ref: '#/components/schemas/Role' }
+        user: { $ref: '#/components/schemas/User' }
+        organization: { $ref: '#/components/schemas/Organization' }
+    Invitation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        status: { type: string }
+        expires_at: { type: string, nullable: true }
+        accepted_at: { type: string, nullable: true }
+        created_at: { type: string }
+        role: { $ref: '#/components/schemas/Role' }
+        organization: { $ref: '#/components/schemas/Organization' }
+    AuditLog:
+      type: object
+      properties:
+        id: { type: integer }
+        action: { type: string }
+        resource_type: { type: string, nullable: true }
+        resource_id: { type: string, nullable: true }
+        before: { nullable: true }
+        after: { nullable: true }
+        ip_address: { type: string, nullable: true }
+        result: { type: string }
+        created_at: { type: string }
+        user: { $ref: '#/components/schemas/User' }
+    ActivityItem:
+      type: object
+      properties:
+        id: { type: integer }
+        type: { type: string }
+        severity: { type: string, enum: [info, success, warning, danger] }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        actor: { type: string, nullable: true }
+        created_at: { type: string }
+    Notification:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string }
+        title: { type: string }
+        body: { type: string, nullable: true }
+        data: { nullable: true }
+        read_at: { type: string, nullable: true }
+        created_at: { type: string }
+    Domain:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        status: { type: string }
+        provider: { type: string }
+        registered_at: { type: string, nullable: true }
+        expires_at: { type: string, nullable: true }
+        auto_renew: { type: boolean }
+        privacy_protection: { type: boolean }
+        transfer_lock: { type: boolean }
+        nameservers:
+          type: array
+          items: { type: string }
+        contacts: { nullable: true }
+        created_at: { type: string }
+        zone_id: { type: string, format: uuid, nullable: true }
+    DomainSearchResult:
+      type: object
+      properties:
+        domain: { type: string }
+        tld: { type: string }
+        available: { type: boolean }
+        premium: { type: boolean }
+        price:
+          type: object
+          properties:
+            amount: { type: number }
+            currency: { type: string }
+            years: { type: integer }
+    DomainCheckResult:
+      type: object
+      properties:
+        domain: { type: string }
+        available: { type: boolean }
+        managed: { type: boolean }
+    DnsRecord:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        zone_id: { type: string, format: uuid }
+        type: { type: string }
+        name: { type: string }
+        content: { type: string }
+        ttl: { type: integer }
+        priority: { type: integer, nullable: true }
+        proxied: { type: boolean }
+        created_at: { type: string }
+        updated_at: { type: string }
+    DnsRecordInput:
+      type: object
+      required: [type, content]
+      properties:
+        type: { type: string, enum: [A, AAAA, CNAME, MX, TXT, NS, SRV, CAA] }
+        name: { type: string }
+        content: { type: string }
+        ttl: { type: integer, minimum: 0 }
+        priority: { type: integer, minimum: 0, nullable: true }
+        proxied: { type: boolean }
+    DnsHistory:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        zone_id: { type: string, format: uuid }
+        record_id: { type: string, format: uuid, nullable: true }
+        action: { type: string }
+        before: { nullable: true }
+        after: { nullable: true }
+        created_at: { type: string }
+        user: { $ref: '#/components/schemas/User' }
+    AuthSession:
+      type: object
+      required: [token, user, memberships, active_organization, permissions]
+      properties:
+        token: { type: string }
+        user: { $ref: '#/components/schemas/User' }
+        memberships:
+          type: array
+          items: { $ref: '#/components/schemas/Membership' }
+        active_organization: { $ref: '#/components/schemas/Organization' }
+        permissions:
+          type: array
+          items: { type: string }
+        pending_invitations:
+          type: array
+          items: { $ref: '#/components/schemas/Invitation' }
+    Problem:
+      type: object
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
