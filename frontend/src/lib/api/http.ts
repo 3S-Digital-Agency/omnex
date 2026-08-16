@@ -11,8 +11,15 @@ import type {
   DnssecStatus,
   DomainCheckResult,
   DomainDto,
+  DomainProviderDto,
   DomainSearchResult,
   DomainUpdateInput,
+  DriveDownloadDto,
+  DriveFileDto,
+  DriveFileUpdateInput,
+  DriveFolderDto,
+  DriveListing,
+  DriveVersionDto,
   InvitationDto,
   LoginInput,
   LoginResponse,
@@ -29,6 +36,7 @@ import type {
   SocialAccountDto,
   SocialProviderDto,
   SocialRedirectResponse,
+  StorageProviderDto,
   SwitchResponse,
   UpdateProfileInput,
   UserDto,
@@ -36,6 +44,15 @@ import type {
 } from './types';
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1';
+
+function toBase64(input: string): string {
+  const bytes = new TextEncoder().encode(input);
+  let binary = '';
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary);
+}
 
 export class HttpApiClient implements ApiClient {
   private async request<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
@@ -211,19 +228,30 @@ export class HttpApiClient implements ApiClient {
     return res.data;
   }
 
-  async searchDomains(query: string, tlds?: string[]): Promise<DomainSearchResult[]> {
+  async listDomainProviders(): Promise<DomainProviderDto[]> {
+    const res = await this.request<{ data: DomainProviderDto[] }>('/domains/providers');
+    return res.data;
+  }
+
+  async searchDomains(query: string, tlds?: string[], provider?: string): Promise<DomainSearchResult[]> {
     const params = new URLSearchParams({ query });
     tlds?.forEach((tld) => params.append('tlds[]', tld));
+    if (provider) params.append('provider', provider);
     const res = await this.request<{ data: DomainSearchResult[] }>(`/domains/search?${params.toString()}`);
     return res.data;
   }
 
-  checkDomain(domain: string): Promise<DomainCheckResult> {
-    return this.request(`/domains/check?domain=${encodeURIComponent(domain)}`);
+  checkDomain(domain: string, provider?: string): Promise<DomainCheckResult> {
+    const params = new URLSearchParams({ domain });
+    if (provider) params.append('provider', provider);
+    return this.request(`/domains/check?${params.toString()}`);
   }
 
-  registerDomain(domain: string, years?: number): Promise<DomainDto> {
-    return this.request('/domains', { method: 'POST', body: { domain, ...(years ? { years } : {}) } });
+  registerDomain(domain: string, years?: number, provider?: string): Promise<DomainDto> {
+    return this.request('/domains', {
+      method: 'POST',
+      body: { domain, ...(years ? { years } : {}), ...(provider ? { provider } : {}) },
+    });
   }
 
   getDomain(id: string): Promise<DomainDto> {
@@ -305,5 +333,77 @@ export class HttpApiClient implements ApiClient {
 
   checkDnsPropagation(domainId: string): Promise<PropagationStatusDto> {
     return this.request(`/domains/${domainId}/dns/propagation/check`, { method: 'POST' });
+  }
+
+  async listStorageProviders(): Promise<StorageProviderDto[]> {
+    const res = await this.request<{ data: StorageProviderDto[] }>('/storage/providers');
+    return res.data;
+  }
+
+  listDrive(folderId?: string): Promise<DriveListing> {
+    return this.request(folderId ? `/storage/folders/${folderId}` : '/storage');
+  }
+
+  async listDriveTrash(): Promise<DriveFileDto[]> {
+    const res = await this.request<{ data: DriveFileDto[] }>('/storage/trash');
+    return res.data;
+  }
+
+  createFolder(parentId: string | null, name: string): Promise<DriveFolderDto> {
+    return this.request('/storage/folders', {
+      method: 'POST',
+      body: { name, ...(parentId ? { parent_id: parentId } : {}) },
+    });
+  }
+
+  renameFolder(folderId: string, name: string): Promise<DriveFolderDto> {
+    return this.request(`/storage/folders/${folderId}`, { method: 'PATCH', body: { name } });
+  }
+
+  deleteFolder(folderId: string): Promise<void> {
+    return this.request(`/storage/folders/${folderId}`, { method: 'DELETE' });
+  }
+
+  uploadFile(folderId: string | null, name: string, contents: string, mimeType = 'text/plain'): Promise<DriveFileDto> {
+    return this.request('/storage/files', {
+      method: 'POST',
+      body: { name, contents: toBase64(contents), mime_type: mimeType, ...(folderId ? { folder_id: folderId } : {}) },
+    });
+  }
+
+  downloadFile(fileId: string): Promise<DriveDownloadDto> {
+    return this.request(`/storage/files/${fileId}/download`);
+  }
+
+  updateFile(fileId: string, input: DriveFileUpdateInput): Promise<DriveFileDto> {
+    return this.request(`/storage/files/${fileId}`, {
+      method: 'PATCH',
+      body: {
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.contents !== undefined ? { contents: toBase64(input.contents) } : {}),
+        ...(input.mime_type !== undefined ? { mime_type: input.mime_type } : {}),
+      },
+    });
+  }
+
+  trashFile(fileId: string): Promise<DriveFileDto> {
+    return this.request(`/storage/files/${fileId}`, { method: 'DELETE' });
+  }
+
+  restoreFile(fileId: string): Promise<DriveFileDto> {
+    return this.request(`/storage/files/${fileId}/restore`, { method: 'POST' });
+  }
+
+  deleteFile(fileId: string): Promise<void> {
+    return this.request(`/storage/trash/${fileId}`, { method: 'DELETE' });
+  }
+
+  async listFileVersions(fileId: string): Promise<DriveVersionDto[]> {
+    const res = await this.request<{ data: DriveVersionDto[] }>(`/storage/files/${fileId}/versions`);
+    return res.data;
+  }
+
+  restoreFileVersion(fileId: string, versionId: string): Promise<DriveFileDto> {
+    return this.request(`/storage/files/${fileId}/versions/${versionId}/restore`, { method: 'POST' });
   }
 }

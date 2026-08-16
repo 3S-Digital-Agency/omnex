@@ -104,12 +104,12 @@ deployments        (id, site_id →, environment_id →, commit, status, logs,
 ### Storage / Drive (Phase 4)
 
 ```
-drives             (id, organization_id →, provider_id →, bucket, quota_bytes)
-drive_entries      (id, drive_id →, parent_id →, name, kind[file|folder],
-                    mime, size, storage_key, version, checksum, trashed_at)
-drive_versions     (id, entry_id →, storage_key, size, checksum, created_by)
-drive_shares       (id, entry_id →, shared_with_type, shared_with_id,
-                    permission, expires_at)
+drive_folders      (id, organization_id →, parent_id →, name, timestamps)
+drive_files        (id, organization_id →, folder_id →, name, storage_key,
+                    mime_type, size, checksum, version, status,
+                    trashed_at, timestamps)
+drive_versions     (id, organization_id →, file_id →, version, storage_key,
+                    size, checksum, timestamps)
 ```
 
 ### Billing (Phase 6)

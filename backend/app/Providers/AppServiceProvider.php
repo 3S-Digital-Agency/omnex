@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Contracts\DnsPropagationCheckerInterface;
 use App\Events\DnsRecordChanged;
 use App\Events\DnssecChanged;
 use App\Events\DomainExpiring;
@@ -10,17 +11,18 @@ use App\Events\DomainRenewed;
 use App\Events\DomainTransferred;
 use App\Events\DomainUpdated;
 use App\Listeners\DomainEventAuditor;
-use App\Contracts\DnsPropagationCheckerInterface;
 use App\Listeners\NotifyExpiringDomain;
 use App\Models\User;
 use App\Support\Domains\DnsPropagationService;
 use App\Support\Domains\DnsProviderRegistry;
 use App\Support\Domains\DnsService;
-use App\Support\Domains\Providers\SandboxDnsPropagationChecker;
 use App\Support\Domains\DomainProviderRegistry;
 use App\Support\Domains\DomainService;
+use App\Support\Domains\Providers\SandboxDnsPropagationChecker;
 use App\Support\SocialAuth\SocialAuthRegistry;
 use App\Support\SocialAuth\SocialAuthService;
+use App\Support\Storage\StorageProviderRegistry;
+use App\Support\Storage\StorageService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
@@ -39,6 +41,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(DnsService::class);
         $this->app->singleton(SocialAuthRegistry::class, fn () => new SocialAuthRegistry);
         $this->app->singleton(SocialAuthService::class);
+        $this->app->singleton(StorageProviderRegistry::class, fn () => new StorageProviderRegistry);
+        $this->app->singleton(StorageService::class);
     }
 
     public function boot(): void

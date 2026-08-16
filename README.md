@@ -22,13 +22,14 @@ API.
 | 1 | Foundation — IAM, organizations, RBAC, audit, MFA, social login | ✅ Delivered |
 | 2 | Command Center — dashboard, activity, Ctrl+K, i18n (EN/FR) | ✅ Delivered |
 | 3 | Domain + DNS engine — registry, DNS, DNSSEC, propagation | ✅ Delivered |
-| 4 | OMNEX Drive — storage abstraction (S3-compatible) | 🚧 In progress |
+| 4 | OMNEX Drive — storage abstraction (S3-compatible) | ✅ Delivered |
 | 5+ | Sites, Billing, Security, Cloud, CI/CD, Mail, AI… | 🔜 Planned |
 
-Phase 4 is scaffolded: `StorageProviderInterface` with a deterministic
+Phase 4 is delivered: `StorageProviderInterface` with a deterministic
 **sandbox** and a real **S3** provider (AWS SigV4 over Guzzle — AWS S3,
-Cloudflare R2, MinIO, OVH), plus the drive data model (folders, files,
-versions, trash, quotas). The service layer, API and UI wiring come next.
+Cloudflare R2, MinIO, OVH), plus the full drive lifecycle (folders, files,
+versions, trash, quotas, signed URLs) behind `StorageService`, a REST API
+and the OMNEX Drive UI.
 
 ---
 
@@ -51,16 +52,21 @@ versions, trash, quotas). The service layer, API and UI wiring come next.
 
 ### 🌐 Domain + DNS engine (Phase 3)
 - Search / availability / register / renew / transfer behind
-  `DomainProviderInterface` (sandbox registrar; Namecheap adapter in progress).
+  `DomainProviderInterface` — **multi-provider**: sandbox, **Namecheap**
+  (XML API), **OVHcloud** (signature auth + cart flow) and a generic
+  **Custom** JSON HTTP registrar, selectable per request.
 - Full DNS record CRUD (A, AAAA, CNAME, MX, TXT, NS, SRV, CAA) with
   validation, templates, BIND zone-file import/export, immutable history +
   reversible rollback.
 - **DNSSEC** (enable/disable + DS records) and **per-nameserver propagation
   monitoring**, both behind provider abstractions.
 
-### 💾 OMNEX Drive (Phase 4 — in progress)
-- `StorageProviderInterface` with sandbox + S3-compatible providers.
-- Folders, files, versioning, trash/restore, quotas, signed URLs.
+### 💾 OMNEX Drive (Phase 4)
+- `StorageProviderInterface` with sandbox + S3-compatible providers
+  (AWS SigV4 over Guzzle — R2 / MinIO / OVH Object Storage).
+- Folders, files, versioning, trash/restore, per-organization quota,
+  signed download/upload URLs, audit trail, RBAC (`storage.read` /
+  `storage.manage`).
 - Rule: **no Nextcloud/ownCloud/Seafile by default** — OMNEX owns its storage
   abstraction and its own cloud UI.
 
@@ -139,7 +145,7 @@ code**. Swap a registrar, DNS or storage backend without touching module code:
 
 | Interface | Providers |
 |---|---|
-| `DomainProviderInterface` | sandbox · Namecheap (in progress) |
+| `DomainProviderInterface` | sandbox · Namecheap · OVHcloud · Custom |
 | `DnsProviderInterface` | sandbox (real provider via the same port) |
 | `StorageProviderInterface` | sandbox · S3-compatible (R2 / MinIO / OVH) |
 | `SocialAuthProviderInterface` | sandbox · Google · Microsoft · Apple · Facebook · Amazon |
@@ -168,9 +174,9 @@ cross-tenant attack test checklist.
 | Layer | Status |
 |---|---|
 | Frontend typecheck (`pnpm typecheck`) | ✅ green |
-| Frontend tests (`pnpm test`) | ✅ 20/20 |
+| Frontend tests (`pnpm test`) | ✅ 24/24 |
 | Frontend build (`pnpm build`) | ✅ green |
-| Backend (`php artisan test`) | ✅ 62/62 (207 assertions) |
+| Backend (`php artisan test`) | ✅ 105/105 (361 assertions) |
 
 The Laravel backend is validated against a local portable PHP + PostgreSQL
 setup (see `infra/dev-env.sh`); `php artisan test` runs the full Pest suite.

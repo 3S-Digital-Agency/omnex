@@ -29,6 +29,8 @@ class RoleSeeder extends Seeder
                     'domains.manage',
                     'dns.read',
                     'dns.manage',
+                    'storage.read',
+                    'storage.manage',
                 ],
             ],
             'developer' => [
@@ -40,6 +42,7 @@ class RoleSeeder extends Seeder
                     'notifications.read',
                     'domains.read',
                     'dns.read',
+                    'storage.read',
                 ],
             ],
             'viewer' => [
@@ -50,6 +53,7 @@ class RoleSeeder extends Seeder
                     'notifications.read',
                     'domains.read',
                     'dns.read',
+                    'storage.read',
                 ],
             ],
         ];

@@ -5,13 +5,14 @@ import { Link } from 'react-router-dom';
 import { Globe, Plus, Search } from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
 import { api } from '../../lib/api';
-import type { DomainSearchResult } from '../../lib/api/types';
+import type { DomainProviderDto, DomainSearchResult } from '../../lib/api/types';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { Dialog } from '../../components/ui/Dialog';
 import { Field } from '../../components/ui/Field';
 import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
 import { EmptyState, Spinner } from '../../components/ui/Spinner';
 import { useToast } from '../../components/ui/Toast';
 import { errorMessage } from '../../lib/errors';
@@ -19,6 +20,10 @@ import { useI18n } from '../../lib/i18n';
 import { cn, formatDate } from '../../lib/utils';
 
 const TLDS = ['com', 'io', 'dev', 'net', 'org'];
+
+function providerLabel(name: string, providers?: DomainProviderDto[]): string {
+  return providers?.find((p) => p.name === name)?.label ?? name;
+}
 
 export function DomainsPage() {
   const { activeOrganization, hasPermission } = useAuth();
@@ -31,6 +36,12 @@ export function DomainsPage() {
   const domains = useQuery({
     queryKey: ['domains', activeOrganization?.id],
     queryFn: () => api.listDomains(),
+    enabled: !!activeOrganization?.id,
+  });
+
+  const providers = useQuery({
+    queryKey: ['domain-providers'],
+    queryFn: () => api.listDomainProviders(),
     enabled: !!activeOrganization?.id,
   });
 
@@ -80,6 +91,7 @@ export function DomainsPage() {
                   <div className="mt-3 flex items-center gap-4 text-xs text-zinc-500">
                     <span>{domain.auto_renew ? t('domains.autoRenewOn') : t('domains.autoRenewOff')}</span>
                     <span>{domain.privacy_protection ? t('domains.privacyOn') : t('domains.privacyOff')}</span>
+                    <span className="ml-auto uppercase tracking-wide">{providerLabel(domain.provider, providers.data)}</span>
                   </div>
                 </Link>
               ))}
@@ -118,17 +130,24 @@ function RegisterDomainDialog({
   const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [selectedTlds, setSelectedTlds] = useState<string[]>(['com', 'io', 'dev']);
+  const [provider, setProvider] = useState('');
   const [results, setResults] = useState<DomainSearchResult[] | null>(null);
   const [registerError, setRegisterError] = useState<string | null>(null);
 
+  const providers = useQuery({
+    queryKey: ['domain-providers'],
+    queryFn: () => api.listDomainProviders(),
+    enabled: open,
+  });
+
   const search = useMutation({
-    mutationFn: () => api.searchDomains(query, selectedTlds),
+    mutationFn: () => api.searchDomains(query, selectedTlds, provider || undefined),
     onSuccess: (data) => setResults(data),
     onError: (err) => setRegisterError(errorMessage(err)),
   });
 
   const register = useMutation({
-    mutationFn: (domain: string) => api.registerDomain(domain),
+    mutationFn: (domain: string) => api.registerDomain(domain, 1, provider || undefined),
     onSuccess: onRegistered,
     onError: (err) => setRegisterError(errorMessage(err)),
   });
@@ -162,6 +181,22 @@ function RegisterDomainDialog({
             placeholder="omnex"
             required
           />
+        </Field>
+
+        <Field label={t('domains.registrar')} htmlFor="domain-provider">
+          <Select
+            id="domain-provider"
+            value={provider}
+            onChange={(e) => setProvider(e.target.value)}
+          >
+            <option value="">{t('domains.defaultRegistrar')}</option>
+            {providers.data?.map((p) => (
+              <option key={p.name} value={p.name} disabled={!p.configured}>
+                {p.label}
+                {p.configured ? '' : ` — ${t('domains.notConfigured')}`}
+              </option>
+            ))}
+          </Select>
         </Field>
 
         <div>

@@ -8,8 +8,15 @@ import type {
   DnssecStatus,
   DomainCheckResult,
   DomainDto,
+  DomainProviderDto,
   DomainSearchResult,
   DomainUpdateInput,
+  DriveDownloadDto,
+  DriveFileDto,
+  DriveFileUpdateInput,
+  DriveFolderDto,
+  DriveListing,
+  DriveVersionDto,
   InvitationDto,
   LoginInput,
   LoginResponse,
@@ -26,6 +33,7 @@ import type {
   SocialAccountDto,
   SocialProviderDto,
   SocialRedirectResponse,
+  StorageProviderDto,
   SwitchResponse,
   UpdateProfileInput,
   UserDto,
@@ -84,9 +92,10 @@ export interface ApiClient {
   markNotificationRead(id: string): Promise<void>;
 
   listDomains(): Promise<DomainDto[]>;
-  searchDomains(query: string, tlds?: string[]): Promise<DomainSearchResult[]>;
-  checkDomain(domain: string): Promise<DomainCheckResult>;
-  registerDomain(domain: string, years?: number): Promise<DomainDto>;
+  listDomainProviders(): Promise<DomainProviderDto[]>;
+  searchDomains(query: string, tlds?: string[], provider?: string): Promise<DomainSearchResult[]>;
+  checkDomain(domain: string, provider?: string): Promise<DomainCheckResult>;
+  registerDomain(domain: string, years?: number, provider?: string): Promise<DomainDto>;
   getDomain(id: string): Promise<DomainDto>;
   renewDomain(id: string, years?: number): Promise<DomainDto>;
   updateDomain(id: string, input: DomainUpdateInput): Promise<DomainDto>;
@@ -107,4 +116,19 @@ export interface ApiClient {
 
   getDnsPropagation(domainId: string): Promise<PropagationStatusDto>;
   checkDnsPropagation(domainId: string): Promise<PropagationStatusDto>;
+
+  listStorageProviders(): Promise<StorageProviderDto[]>;
+  listDrive(folderId?: string): Promise<DriveListing>;
+  listDriveTrash(): Promise<DriveFileDto[]>;
+  createFolder(parentId: string | null, name: string): Promise<DriveFolderDto>;
+  renameFolder(folderId: string, name: string): Promise<DriveFolderDto>;
+  deleteFolder(folderId: string): Promise<void>;
+  uploadFile(folderId: string | null, name: string, contents: string, mimeType?: string): Promise<DriveFileDto>;
+  downloadFile(fileId: string): Promise<DriveDownloadDto>;
+  updateFile(fileId: string, input: DriveFileUpdateInput): Promise<DriveFileDto>;
+  trashFile(fileId: string): Promise<DriveFileDto>;
+  restoreFile(fileId: string): Promise<DriveFileDto>;
+  deleteFile(fileId: string): Promise<void>;
+  listFileVersions(fileId: string): Promise<DriveVersionDto[]>;
+  restoreFileVersion(fileId: string, versionId: string): Promise<DriveFileDto>;
 }

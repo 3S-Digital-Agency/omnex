@@ -13,8 +13,15 @@ import type {
   DnssecStatus,
   DomainCheckResult,
   DomainDto,
+  DomainProviderDto,
   DomainSearchResult,
   DomainUpdateInput,
+  DriveDownloadDto,
+  DriveFileDto,
+  DriveFileUpdateInput,
+  DriveFolderDto,
+  DriveListing,
+  DriveVersionDto,
   InvitationDto,
   LoginInput,
   LoginResponse,
@@ -33,6 +40,7 @@ import type {
   SocialAccountDto,
   SocialProviderDto,
   SocialRedirectResponse,
+  StorageProviderDto,
   SwitchResponse,
   UpdateProfileInput,
   UserDto,
@@ -80,6 +88,8 @@ const ALL_PERMISSIONS = [
   'domains.manage',
   'dns.read',
   'dns.manage',
+  'storage.read',
+  'storage.manage',
 ];
 
 const roles: RoleDto[] = [
@@ -89,21 +99,21 @@ const roles: RoleDto[] = [
     name: 'Admin',
     key: 'admin',
     description: 'Manage members and settings.',
-    permissions: ['organizations.read', 'organizations.invite', 'members.manage', 'audit.read', 'notifications.read', 'domains.read', 'domains.manage', 'dns.read', 'dns.manage'],
+    permissions: ['organizations.read', 'organizations.invite', 'members.manage', 'audit.read', 'notifications.read', 'domains.read', 'domains.manage', 'dns.read', 'dns.manage', 'storage.read', 'storage.manage'],
   },
   {
     id: 'role-developer',
     name: 'Developer',
     key: 'developer',
     description: 'Read access to the organization and audit log.',
-    permissions: ['organizations.read', 'audit.read', 'notifications.read', 'domains.read', 'dns.read'],
+    permissions: ['organizations.read', 'audit.read', 'notifications.read', 'domains.read', 'dns.read', 'storage.read'],
   },
   {
     id: 'role-viewer',
     name: 'Viewer',
     key: 'viewer',
     description: 'Read-only access.',
-    permissions: ['organizations.read', 'notifications.read', 'domains.read', 'dns.read'],
+    permissions: ['organizations.read', 'notifications.read', 'domains.read', 'dns.read', 'storage.read'],
   },
 ];
 
@@ -249,6 +259,24 @@ function crc32(value: string): number {
 const domainAvailable = (domain: string): boolean =>
   !RESERVED_DOMAINS.includes(domain.toLowerCase()) && crc32(domain.toLowerCase()) % 5 !== 0;
 
+const DOMAIN_PROVIDERS: DomainProviderDto[] = [
+  { name: 'sandbox', label: 'Sandbox', configured: true },
+  { name: 'namecheap', label: 'Namecheap', configured: false },
+  { name: 'ovh', label: 'OVH', configured: false },
+  { name: 'custom', label: 'Custom', configured: false },
+];
+
+function requireProviderConfigured(provider?: string): void {
+  if (!provider) return;
+  const selected = DOMAIN_PROVIDERS.find((p) => p.name === provider);
+  if (!selected) {
+    throw new ApiError(422, 'Unknown provider', `Unknown domain provider [${provider}].`);
+  }
+  if (!selected.configured) {
+    throw new ApiError(422, 'Not configured', `The [${selected.label}] registrar is not configured.`);
+  }
+}
+
 const domains: DomainDto[] = [
   {
     id: 'dom-omnex-dev',
@@ -289,6 +317,30 @@ const dnsRecords: DnsRecordDto[] = [
 ];
 
 const dnsHistory: DnsHistoryDto[] = [];
+
+interface MockDriveVersion extends DriveVersionDto {
+  content: string;
+}
+
+const DRIVE_QUOTA_LIMIT = 10 * 1024 * 1024 * 1024; // 10 GiB
+
+const driveFolders: DriveFolderDto[] = [];
+const driveFiles: DriveFileDto[] = [];
+const driveVersions: MockDriveVersion[] = [];
+
+function driveQuotaUsed(): number {
+  return driveVersions.reduce((sum, v) => sum + v.size, 0);
+}
+
+function driveFileById(fileId: string): DriveFileDto {
+  const file = driveFiles.find((f) => f.id === fileId);
+  if (!file) throw new ApiError(404, 'Not found', 'File not found.');
+  return file;
+}
+
+function driveVersionsOf(fileId: string): MockDriveVersion[] {
+  return driveVersions.filter((v) => v.file_id === fileId).sort((a, b) => b.version - a.version);
+}
 
 const DNS_TEMPLATES: Record<string, DnsRecordInput[]> = {
   website: [
@@ -865,8 +917,14 @@ export class MockApiClient implements ApiClient {
     return Promise.resolve([...domains]);
   }
 
-  async searchDomains(query: string, tlds?: string[]): Promise<DomainSearchResult[]> {
+  async listDomainProviders(): Promise<DomainProviderDto[]> {
     requireUser();
+    return Promise.resolve([...DOMAIN_PROVIDERS]);
+  }
+
+  async searchDomains(query: string, tlds?: string[], provider?: string): Promise<DomainSearchResult[]> {
+    requireUser();
+    requireProviderConfigured(provider);
     const base = query.trim().toLowerCase().replace(/\s+/g, '-');
     const list = tlds && tlds.length > 0 ? tlds : ['com', 'io', 'dev', 'net', 'org'];
 
@@ -880,19 +938,27 @@ export class MockApiClient implements ApiClient {
           available: domainAvailable(domain),
           premium: ['io', 'co', 'app', 'cloud'].includes(lower),
           price: { amount: DOMAIN_PRICES[lower] ?? 14.99, currency: 'USD', years: 1 },
+          ...(provider ? { provider } : {}),
         };
       }),
     );
   }
 
-  async checkDomain(domain: string): Promise<DomainCheckResult> {
+  async checkDomain(domain: string, provider?: string): Promise<DomainCheckResult> {
     requireUser();
+    requireProviderConfigured(provider);
     const name = domain.trim().toLowerCase();
-    return Promise.resolve({ domain: name, available: domainAvailable(name), managed: domains.some((d) => d.name === name) });
+    return Promise.resolve({
+      domain: name,
+      available: domainAvailable(name),
+      managed: domains.some((d) => d.name === name),
+      ...(provider ? { provider } : {}),
+    });
   }
 
-  async registerDomain(domain: string, years = 1): Promise<DomainDto> {
+  async registerDomain(domain: string, years = 1, provider = 'sandbox'): Promise<DomainDto> {
     requireUser();
+    requireProviderConfigured(provider);
     const name = domain.trim().toLowerCase();
 
     if (domains.some((d) => d.name === name)) {
@@ -910,7 +976,7 @@ export class MockApiClient implements ApiClient {
       id: uid('dom'),
       name,
       status: 'active',
-      provider: 'sandbox',
+      provider,
       registered_at: registered,
       expires_at: expires,
       auto_renew: true,
@@ -1175,5 +1241,208 @@ export class MockApiClient implements ApiClient {
     const checks = computePropagationChecks(domain);
     propagationByZone.set(domain.zone_id ?? '', checks);
     return Promise.resolve(buildPropagationStatus(domain, checks));
+  }
+
+  async listStorageProviders(): Promise<StorageProviderDto[]> {
+    requireUser();
+    return Promise.resolve([
+      { name: 'sandbox', label: 'Sandbox', configured: true },
+      { name: 's3', label: 'S3', configured: false },
+    ]);
+  }
+
+  async listDrive(folderId?: string): Promise<DriveListing> {
+    requireUser();
+    const folder = folderId ? driveFolders.find((f) => f.id === folderId) ?? null : null;
+
+    return Promise.resolve({
+      folder,
+      folders: driveFolders
+        .filter((f) => (f.parent_id ?? null) === (folderId ?? null))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+      files: driveFiles
+        .filter((f) => (f.folder_id ?? null) === (folderId ?? null) && !f.trashed_at)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+      quota: { used: driveQuotaUsed(), limit: DRIVE_QUOTA_LIMIT },
+    });
+  }
+
+  async listDriveTrash(): Promise<DriveFileDto[]> {
+    requireUser();
+    return Promise.resolve(driveFiles.filter((f) => f.trashed_at));
+  }
+
+  async createFolder(parentId: string | null, name: string): Promise<DriveFolderDto> {
+    requireUser();
+    if (parentId && !driveFolders.some((f) => f.id === parentId)) {
+      throw new ApiError(404, 'Not found', 'Folder not found.');
+    }
+
+    const folder: DriveFolderDto = {
+      id: uid('drv-dir'),
+      parent_id: parentId,
+      name,
+      created_at: nowIso(),
+      updated_at: nowIso(),
+    };
+    driveFolders.push(folder);
+    return Promise.resolve(folder);
+  }
+
+  async renameFolder(folderId: string, name: string): Promise<DriveFolderDto> {
+    requireUser();
+    const folder = driveFolders.find((f) => f.id === folderId);
+    if (!folder) throw new ApiError(404, 'Not found', 'Folder not found.');
+    folder.name = name;
+    folder.updated_at = nowIso();
+    return Promise.resolve({ ...folder });
+  }
+
+  async deleteFolder(folderId: string): Promise<void> {
+    requireUser();
+    const folder = driveFolders.find((f) => f.id === folderId);
+    if (!folder) throw new ApiError(404, 'Not found', 'Folder not found.');
+
+    const hasChildren = driveFolders.some((f) => f.parent_id === folderId);
+    const hasFiles = driveFiles.some((f) => f.folder_id === folderId && !f.trashed_at);
+    if (hasChildren || hasFiles) {
+      throw new ApiError(422, 'Validation failed', undefined, { folder: ['Only empty folders can be deleted.'] });
+    }
+
+    driveFolders.splice(driveFolders.indexOf(folder), 1);
+    return Promise.resolve();
+  }
+
+  async uploadFile(folderId: string | null, name: string, contents: string, mimeType = 'text/plain'): Promise<DriveFileDto> {
+    requireUser();
+    if (folderId && !driveFolders.some((f) => f.id === folderId)) {
+      throw new ApiError(404, 'Not found', 'Folder not found.');
+    }
+
+    const fileId = uid('drv-file');
+    const file: DriveFileDto = {
+      id: fileId,
+      folder_id: folderId,
+      name,
+      mime_type: mimeType,
+      size: contents.length,
+      checksum: null,
+      version: 1,
+      status: 'active',
+      trashed_at: null,
+      created_at: nowIso(),
+      updated_at: nowIso(),
+    };
+    driveFiles.push(file);
+
+    driveVersions.push({
+      id: uid('drv-ver'),
+      file_id: fileId,
+      version: 1,
+      size: contents.length,
+      checksum: null,
+      created_at: nowIso(),
+      content: contents,
+    });
+
+    return Promise.resolve({ ...file });
+  }
+
+  async downloadFile(fileId: string): Promise<DriveDownloadDto> {
+    requireUser();
+    const file = driveFileById(fileId);
+    return Promise.resolve({
+      url: `https://storage.sandbox.omnex.test/${encodeURIComponent(fileId)}?dl=${encodeURIComponent(file.name)}`,
+      name: file.name,
+      mime_type: file.mime_type,
+      size: file.size,
+    });
+  }
+
+  async updateFile(fileId: string, input: DriveFileUpdateInput): Promise<DriveFileDto> {
+    requireUser();
+    const file = driveFileById(fileId);
+
+    if (input.name !== undefined) file.name = input.name;
+
+    if (input.contents !== undefined) {
+      const next = file.version + 1;
+      driveVersions.push({
+        id: uid('drv-ver'),
+        file_id: fileId,
+        version: next,
+        size: input.contents.length,
+        checksum: null,
+        created_at: nowIso(),
+        content: input.contents,
+      });
+      file.version = next;
+      file.size = input.contents.length;
+      if (input.mime_type !== undefined) file.mime_type = input.mime_type;
+    } else if (input.mime_type !== undefined) {
+      file.mime_type = input.mime_type;
+    }
+
+    file.updated_at = nowIso();
+    return Promise.resolve({ ...file });
+  }
+
+  async trashFile(fileId: string): Promise<DriveFileDto> {
+    requireUser();
+    const file = driveFileById(fileId);
+    if (file.trashed_at) throw new ApiError(422, 'Validation failed', undefined, { file: ['The file is already in the trash.'] });
+    file.status = 'trashed';
+    file.trashed_at = nowIso();
+    return Promise.resolve({ ...file });
+  }
+
+  async restoreFile(fileId: string): Promise<DriveFileDto> {
+    requireUser();
+    const file = driveFileById(fileId);
+    if (!file.trashed_at) throw new ApiError(422, 'Validation failed', undefined, { file: ['The file is not in the trash.'] });
+    file.status = 'active';
+    file.trashed_at = null;
+    return Promise.resolve({ ...file });
+  }
+
+  async deleteFile(fileId: string): Promise<void> {
+    requireUser();
+    const file = driveFileById(fileId);
+    const versions = driveVersionsOf(fileId);
+    for (const version of versions) {
+      driveVersions.splice(driveVersions.indexOf(version), 1);
+    }
+    driveFiles.splice(driveFiles.indexOf(file), 1);
+    return Promise.resolve();
+  }
+
+  async listFileVersions(fileId: string): Promise<DriveVersionDto[]> {
+    requireUser();
+    driveFileById(fileId);
+    return Promise.resolve(
+      driveVersionsOf(fileId).map(({ content: _content, ...version }) => version),
+    );
+  }
+
+  async restoreFileVersion(fileId: string, versionId: string): Promise<DriveFileDto> {
+    requireUser();
+    const file = driveFileById(fileId);
+    const source = driveVersions.find((v) => v.id === versionId && v.file_id === fileId);
+    if (!source) throw new ApiError(404, 'Not found', 'Version not found.');
+
+    const next = file.version + 1;
+    driveVersions.push({
+      id: uid('drv-ver'),
+      file_id: fileId,
+      version: next,
+      size: source.size,
+      checksum: source.checksum,
+      created_at: nowIso(),
+      content: source.content,
+    });
+    file.version = next;
+    file.size = source.size;
+    file.updated_at = nowIso();
+    return Promise.resolve({ ...file });
   }
 }

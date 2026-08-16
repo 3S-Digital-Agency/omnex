@@ -3,8 +3,8 @@
 namespace App\Support\Storage;
 
 use App\Contracts\StorageProviderInterface;
-use App\Support\Storage\Providers\SandboxStorageProvider;
 use App\Support\Storage\Providers\S3StorageProvider;
+use App\Support\Storage\Providers\SandboxStorageProvider;
 use InvalidArgumentException;
 
 final class StorageProviderRegistry
@@ -37,5 +37,20 @@ final class StorageProviderRegistry
     public function names(): array
     {
         return array_keys($this->providers);
+    }
+
+    /**
+     * @return array<int, array{name: string, label: string, configured: bool}>
+     */
+    public function all(): array
+    {
+        return array_map(
+            fn (StorageProviderInterface $provider) => [
+                'name' => $provider->name(),
+                'label' => $provider->label(),
+                'configured' => $provider->isConfigured(),
+            ],
+            array_values($this->providers),
+        );
     }
 }

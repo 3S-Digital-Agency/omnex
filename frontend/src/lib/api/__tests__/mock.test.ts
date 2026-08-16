@@ -68,6 +68,94 @@ describe('MockApiClient', () => {
     expect(domains.map((d) => d.name)).toContain('my-unique-brand.com');
   });
 
+  it('lists domain providers and threads the selected registrar', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Provider Tester',
+      email: 'provider-tester@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    const providers = await api.listDomainProviders();
+    expect(providers.map((p) => p.name)).toEqual(['sandbox', 'namecheap', 'ovh', 'custom']);
+    expect(providers.find((p) => p.name === 'sandbox')?.configured).toBe(true);
+    expect(providers.find((p) => p.name === 'ovh')?.configured).toBe(false);
+
+    const results = await api.searchDomains('provider-brand', ['com'], 'sandbox');
+    expect(results[0]?.provider).toBe('sandbox');
+
+    const domain = await api.registerDomain('provider-brand.com', 1, 'sandbox');
+    expect(domain.provider).toBe('sandbox');
+  });
+
+  it('rejects a registration against an unconfigured registrar', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Provider Reject Tester',
+      email: 'provider-reject@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    await expect(api.registerDomain('reject-brand.com', 1, 'ovh')).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('lists, uploads, versions and trashes a file', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Drive Tester',
+      email: 'drive-tester@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    expect((await api.listDrive()).files).toHaveLength(0);
+
+    const folder = await api.createFolder(null, 'Projects');
+    const file = await api.uploadFile(folder.id, 'notes.txt', 'hello');
+    expect(file.version).toBe(1);
+    expect(file.size).toBe(5);
+
+    const listing = await api.listDrive(folder.id);
+    expect(listing.files.map((f) => f.name)).toContain('notes.txt');
+
+    const updated = await api.updateFile(file.id, { contents: 'hello v2' });
+    expect(updated.version).toBe(2);
+    expect((await api.listFileVersions(file.id))).toHaveLength(2);
+
+    const trashed = await api.trashFile(file.id);
+    expect(trashed.status).toBe('trashed');
+    expect((await api.listDriveTrash())).toHaveLength(1);
+
+    expect((await api.restoreFile(file.id)).status).toBe('active');
+
+    await api.trashFile(file.id);
+    await api.deleteFile(file.id);
+    expect((await api.listDriveTrash())).toHaveLength(0);
+  });
+
+  it('restores an older version of a file', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Drive Version Tester',
+      email: 'drive-version-tester@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    const file = await api.uploadFile(null, 'doc.txt', 'one');
+    await api.updateFile(file.id, { contents: 'two' });
+
+    const versions = await api.listFileVersions(file.id);
+    const v1 = versions.find((v) => v.version === 1);
+    expect(v1).toBeDefined();
+
+    const restored = await api.restoreFileVersion(file.id, v1!.id);
+    expect(restored.version).toBe(3);
+    expect(restored.size).toBe(3);
+  });
+
   it('creates and rolls back a DNS record', async () => {
     const api = new MockApiClient();
     await api.register({

@@ -64,7 +64,7 @@ export const modules: ModuleDefinition[] = [
     description: 'Your own Cloud Storage on S3-compatible providers.',
     phase: 'Phase 4',
     capabilities: ['Upload & download', 'Folders & sharing', 'Versioning & trash', 'Search & previews'],
-    live: false,
+    live: true,
   },
   {
     id: 'security',

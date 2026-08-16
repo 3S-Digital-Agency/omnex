@@ -24,6 +24,11 @@ final class S3StorageProvider implements StorageProviderInterface
         return 's3';
     }
 
+    public function label(): string
+    {
+        return 'S3';
+    }
+
     public function isConfigured(): bool
     {
         $c = $this->config();

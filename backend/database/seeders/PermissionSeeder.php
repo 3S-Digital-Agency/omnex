@@ -20,6 +20,8 @@ class PermissionSeeder extends Seeder
             'domains.manage' => 'Register, renew, transfer and configure domains.',
             'dns.read' => 'View DNS zones and records.',
             'dns.manage' => 'Create, update and roll back DNS records.',
+            'storage.read' => 'List and download Drive folders and files.',
+            'storage.manage' => 'Upload, version, trash and delete Drive files and folders.',
         ];
 
         foreach ($permissions as $key => $description) {

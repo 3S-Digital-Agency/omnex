@@ -60,4 +60,28 @@ return [
         'expiration_warning_days' => (int) env('NEXUS_DOMAIN_EXPIRATION_WARNING_DAYS', 30),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | OMNEX Drive (object storage)
+    |--------------------------------------------------------------------------
+    |
+    | Provider names resolve through StorageProviderRegistry. The sandbox is
+    | an in-memory store for local/test environments; the S3-compatible
+    | provider activates only once its credentials are set.
+    |
+    */
+
+    'storage' => [
+        'provider' => env('NEXUS_STORAGE_PROVIDER', 'sandbox'),
+        'default_quota_bytes' => (int) env('NEXUS_STORAGE_QUOTA_BYTES', 10 * 1024 * 1024 * 1024),
+        'signed_url_ttl' => (int) env('NEXUS_STORAGE_SIGNED_URL_TTL', 300),
+        's3' => [
+            'endpoint' => env('NEXUS_STORAGE_S3_ENDPOINT', ''),
+            'region' => env('NEXUS_STORAGE_S3_REGION', 'us-east-1'),
+            'bucket' => env('NEXUS_STORAGE_S3_BUCKET', ''),
+            'key' => env('NEXUS_STORAGE_S3_KEY', ''),
+            'secret' => env('NEXUS_STORAGE_S3_SECRET', ''),
+        ],
+    ],
+
 ];

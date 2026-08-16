@@ -11,6 +11,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SocialAuthController;
+use App\Http\Controllers\StorageController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -64,8 +65,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/notifications', [NotificationController::class, 'index']);
         Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead']);
 
-        // Domain engine (Phase 3). Search/check/transfer are registered before
-        // the {domain} route so they are not captured as a domain id.
+        // Domain engine (Phase 3). Static routes are registered before the
+        // {domain} route so they are not captured as a domain id.
+        Route::get('/domains/providers', [DomainController::class, 'providers']);
         Route::get('/domains/search', [DomainController::class, 'search']);
         Route::get('/domains/check', [DomainController::class, 'check']);
         Route::post('/domains/transfer', [DomainController::class, 'transfer']);
@@ -90,5 +92,24 @@ Route::prefix('v1')->group(function () {
         Route::delete('/domains/{domain}/dns/records/{record}', [DnsController::class, 'destroy']);
         Route::post('/domains/{domain}/dns/history/{history}/rollback', [DnsController::class, 'rollback']);
         Route::post('/domains/{domain}/dns/templates/{template}', [DnsController::class, 'applyTemplate']);
+
+        // OMNEX Drive (Phase 4). Static routes precede the {folder}/{file}
+        // routes so they are not captured as a resource id.
+        Route::get('/storage/providers', [StorageController::class, 'providers']);
+        Route::get('/storage', [StorageController::class, 'index']);
+        Route::get('/storage/trash', [StorageController::class, 'trash']);
+        Route::post('/storage/folders', [StorageController::class, 'storeFolder']);
+        Route::post('/storage/files', [StorageController::class, 'storeFile']);
+        Route::get('/storage/folders/{folder}', [StorageController::class, 'folder']);
+        Route::patch('/storage/folders/{folder}', [StorageController::class, 'updateFolder']);
+        Route::delete('/storage/folders/{folder}', [StorageController::class, 'destroyFolder']);
+        Route::get('/storage/files/{file}', [StorageController::class, 'showFile']);
+        Route::get('/storage/files/{file}/download', [StorageController::class, 'downloadFile']);
+        Route::patch('/storage/files/{file}', [StorageController::class, 'updateFile']);
+        Route::delete('/storage/files/{file}', [StorageController::class, 'trashFile']);
+        Route::post('/storage/files/{file}/restore', [StorageController::class, 'restoreFile']);
+        Route::delete('/storage/trash/{file}', [StorageController::class, 'destroyFile']);
+        Route::get('/storage/files/{file}/versions', [StorageController::class, 'versions']);
+        Route::post('/storage/files/{file}/versions/{version}/restore', [StorageController::class, 'restoreVersion']);
     });
 });

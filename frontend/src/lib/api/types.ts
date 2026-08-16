@@ -190,18 +190,26 @@ export interface DomainDto {
   zone_id?: string | null;
 }
 
+export interface DomainProviderDto {
+  name: string;
+  label: string;
+  configured: boolean;
+}
+
 export interface DomainSearchResult {
   domain: string;
   tld: string;
   available: boolean;
   premium: boolean;
   price: { amount: number; currency: string; years: number };
+  provider?: string;
 }
 
 export interface DomainCheckResult {
   domain: string;
   available: boolean;
   managed?: boolean;
+  provider?: string;
 }
 
 export interface DomainUpdateInput {
@@ -295,4 +303,66 @@ export interface PropagationStatusDto {
   checked_at: string | null;
   data: PropagationCheckDto[];
   summary: PropagationSummary;
+}
+
+export interface StorageProviderDto {
+  name: string;
+  label: string;
+  configured: boolean;
+}
+
+export interface DriveFolderDto {
+  id: string;
+  parent_id: string | null;
+  name: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DriveFileDto {
+  id: string;
+  folder_id: string | null;
+  name: string;
+  mime_type: string;
+  size: number;
+  checksum?: string | null;
+  version: number;
+  status: string;
+  trashed_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DriveVersionDto {
+  id: string;
+  file_id: string;
+  version: number;
+  size: number;
+  checksum?: string | null;
+  created_at?: string;
+}
+
+export interface DriveQuota {
+  used: number;
+  limit: number;
+}
+
+export interface DriveListing {
+  folder: DriveFolderDto | null;
+  folders: DriveFolderDto[];
+  files: DriveFileDto[];
+  quota: DriveQuota;
+}
+
+export interface DriveDownloadDto {
+  url: string;
+  name: string;
+  mime_type: string;
+  size: number;
+}
+
+export interface DriveFileUpdateInput {
+  name?: string;
+  contents?: string;
+  mime_type?: string;
 }

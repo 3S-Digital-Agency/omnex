@@ -19,6 +19,11 @@ final class SandboxStorageProvider implements StorageProviderInterface
         return 'sandbox';
     }
 
+    public function label(): string
+    {
+        return 'Sandbox';
+    }
+
     public function isConfigured(): bool
     {
         return true;

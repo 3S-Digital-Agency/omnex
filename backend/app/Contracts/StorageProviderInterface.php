@@ -12,6 +12,8 @@ interface StorageProviderInterface
 {
     public function name(): string;
 
+    public function label(): string;
+
     /**
      * Whether the provider can actually talk to a real backend. Sandbox is
      * always configured; real providers activate only with credentials set.

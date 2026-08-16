@@ -14,6 +14,18 @@ interface DomainProviderInterface
     public function name(): string;
 
     /**
+     * Human-readable provider name (for the UI / provider selector).
+     */
+    public function label(): string;
+
+    /**
+     * Whether the provider has the credentials required to reach a real
+     * registry. The sandbox is always configured; real registrars activate
+     * only once their credentials are set.
+     */
+    public function isConfigured(): bool;
+
+    /**
      * Search availability across TLDs.
      *
      * @return array<int, array{

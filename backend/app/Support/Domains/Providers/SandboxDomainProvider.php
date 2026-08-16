@@ -43,6 +43,16 @@ final class SandboxDomainProvider implements DomainProviderInterface
         return 'sandbox';
     }
 
+    public function label(): string
+    {
+        return 'Sandbox';
+    }
+
+    public function isConfigured(): bool
+    {
+        return true;
+    }
+
     public function search(string $query, array $tlds = []): array
     {
         $query = Str::slug($query);
