@@ -4,9 +4,10 @@ import { brand } from '../../lib/brand';
 import { useI18n } from '../../lib/i18n';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { track } from '../../lib/analytics';
 import { serviceById } from './servicePages';
 import { useDocumentMeta } from './useDocumentMeta';
-import { breadcrumbJsonLd, faqJsonLd, serviceJsonLd, useJsonLd } from './seo';
+import { breadcrumbJsonLd, faqJsonLd, serviceJsonLd, useHreflang, useJsonLd } from './seo';
 
 const faqs = ['marketing.faq.1', 'marketing.faq.2', 'marketing.faq.3', 'marketing.faq.4', 'marketing.faq.5'];
 
@@ -22,6 +23,8 @@ export function MarketingServicePage() {
   );
 
   if (!service) return <Navigate to="/" replace />;
+
+  useHreflang(`/marketing/${service.id}`, locale);
 
   const content = service[locale === 'fr' ? 'fr' : 'en'];
   const Icon = service.icon;
@@ -50,17 +53,17 @@ export function MarketingServicePage() {
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-zinc-400">{content.intro}</p>
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link to="/login">
+            <Link to="/login" onClick={() => track('cta_clicked', { cta: 'service_hero', service: service.id })}>
               <Button size="lg">
                 {content.ctaLabel}
                 <ArrowRight className="h-5 w-5" />
               </Button>
             </Link>
-            <a href="#contact">
+            <Link to="/contact" onClick={() => track('quote_requested', { service: service.id })}>
               <Button variant="outline" size="lg">
                 {t('marketing.cta.quote')}
               </Button>
-            </a>
+            </Link>
           </div>
         </div>
       </section>
@@ -133,17 +136,17 @@ export function MarketingServicePage() {
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-lg text-zinc-400">{t('marketing.ctaBand.subtitle')}</p>
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link to="/login">
+            <Link to="/login" onClick={() => track('cta_clicked', { cta: 'service_final', service: service.id })}>
               <Button size="lg">
                 {content.ctaLabel}
                 <ArrowRight className="h-5 w-5" />
               </Button>
             </Link>
-            <a href="#contact">
+            <Link to="/contact" onClick={() => track('demo_requested', { service: service.id })}>
               <Button variant="outline" size="lg">
                 {t('marketing.cta.demo')}
               </Button>
-            </a>
+            </Link>
           </div>
         </div>
       </section>

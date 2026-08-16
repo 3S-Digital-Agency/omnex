@@ -16,7 +16,8 @@ import {
 import { useI18n } from '../../lib/i18n';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { faqJsonLd, organizationJsonLd, useJsonLd, webSiteJsonLd } from './seo';
+import { track } from '../../lib/analytics';
+import { faqJsonLd, organizationJsonLd, useHreflang, useJsonLd, webSiteJsonLd } from './seo';
 import { useDocumentMeta } from './useDocumentMeta';
 
 const services = [
@@ -72,8 +73,9 @@ function PlanCell({ value, t }: { value: string; t: (key: string, params?: Recor
 }
 
 export function MarketingHomePage() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
 
+  useHreflang('/', locale);
   useDocumentMeta(
     `OMNEX — ${t('marketing.hero.title')}`,
     t('marketing.hero.subtitle'),
@@ -102,7 +104,7 @@ export function MarketingHomePage() {
             {t('marketing.hero.subtitle')}
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link to="/login">
+            <Link to="/login" onClick={() => track('cta_clicked', { cta: 'hero_start' })}>
               <Button size="lg" className="w-full sm:w-auto">
                 {t('marketing.hero.cta')}
                 <ArrowRight className="h-5 w-5" />
@@ -269,7 +271,7 @@ export function MarketingHomePage() {
               t('marketing.pricing.feature4'),
             ]}
             cta={t('marketing.pricing.contact')}
-            to="#contact"
+            to="/contact"
             highlighted={false}
           />
         </div>
@@ -371,17 +373,17 @@ export function MarketingHomePage() {
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-lg text-zinc-400">{t('marketing.ctaBand.subtitle')}</p>
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link to="/login">
+            <Link to="/login" onClick={() => track('cta_clicked', { cta: 'final_trial' })}>
               <Button size="lg">
                 {t('marketing.cta.trial')}
                 <ArrowRight className="h-5 w-5" />
               </Button>
             </Link>
-            <a href="#contact">
+            <Link to="/contact">
               <Button variant="outline" size="lg">
                 {t('marketing.cta.sales')}
               </Button>
-            </a>
+            </Link>
           </div>
         </div>
       </section>

@@ -35,8 +35,11 @@ use App\Support\Streams\InProcessStreamBroker;
 use App\Support\Streams\RedisStreamBroker;
 use App\Support\Streams\StreamBroker;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -78,6 +81,13 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Public contact-lead endpoint: per-IP throttle (anti-spam). The
+        // limiter is keyed on IP so a bot farm cannot flood the inbox.
+        RateLimiter::for('leads', function (Request $request) {
+            return Limit::perMinute((int) config('omnex.leads.rate_limit_max', 5))
+                ->by($request->ip() ?? 'unknown');
+        });
+
         // Default-deny authorization. A permission key (e.g. "organizations.manage")
         // is checked first via the user's active-organization role. If it is not
         // granted, the gate falls through to model policies. If neither grants

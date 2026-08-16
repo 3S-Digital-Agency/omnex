@@ -4,6 +4,7 @@ use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\AuditController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BillingController;
+use App\Http\Controllers\ContactLeadController;
 use App\Http\Controllers\DnsController;
 use App\Http\Controllers\DomainController;
 use App\Http\Controllers\InvitationController;
@@ -36,6 +37,17 @@ Route::prefix('v1')->group(function () {
     // Billing webhook is public: the payment provider calls back without an
     // OMNEX session. The tenant is resolved from the webhook event itself.
     Route::post('/billing/webhooks/{provider}', [BillingController::class, 'webhook']);
+
+    // Marketing-site contact leads are public: a visitor submits without an
+    // account, and the owning team is notified instead of a tenant. The
+    // throttle (per-IP) is part of the anti-spam stack.
+    Route::post('/public/leads', [ContactLeadController::class, 'store'])
+        ->middleware('throttle:leads');
+
+    // Lead back-office for platform owners.
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/public/leads', [ContactLeadController::class, 'index']);
+    });
 
     // Invitation acceptance requires auth but is not tenant-scoped (the target
     // organization is resolved from the token, not the active context).

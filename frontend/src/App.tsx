@@ -25,6 +25,7 @@ import { ModulePage } from './features/modules/ModulePage';
 import { MarketingLayout } from './features/marketing/MarketingLayout';
 import { MarketingHomePage } from './features/marketing/MarketingHomePage';
 import { MarketingServicePage } from './features/marketing/MarketingServicePage';
+import { ContactPage } from './features/marketing/ContactPage';
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { status, activeOrganization } = useAuth();
@@ -73,6 +74,14 @@ export function App() {
         element={
           <MarketingLayout>
             <MarketingServicePage />
+          </MarketingLayout>
+        }
+      />
+      <Route
+        path="/contact"
+        element={
+          <MarketingLayout>
+            <ContactPage />
           </MarketingLayout>
         }
       />

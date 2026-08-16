@@ -62,6 +62,8 @@ import type {
   ServerOperationDto,
   ServerSnapshotDto,
   ServerUpdateInput,
+  ContactLeadDto,
+  ContactLeadInput,
   SshKeyCreateInput,
   SshKeyDto,
   SshKeyGenerateInput,
@@ -227,6 +229,8 @@ const auditLogs: AuditLogDto[] = [
   { id: 2, action: 'member.invited', resource_type: 'invitation', resource_id: 'inv-1', result: 'success', ip_address: '127.0.0.1', created_at: '2026-02-01T12:00:00Z' },
   { id: 3, action: 'user.logged_in', resource_type: 'user', resource_id: 'user-demo-owner', result: 'success', ip_address: '127.0.0.1', created_at: '2026-02-10T08:30:00Z' },
 ];
+
+const contactLeads: ContactLeadDto[] = [];
 
 const notifications: NotificationDto[] = [
   {
@@ -2898,5 +2902,47 @@ export class MockApiClient implements ApiClient {
     sub.canceled_at = nowIso();
     sub.updated_at = nowIso();
     return Promise.resolve({ ...sub });
+  }
+
+  async submitContactLead(input: ContactLeadInput): Promise<ContactLeadDto> {
+    // Public endpoint — no session required.
+    if (input.website) {
+      throw new ApiError(422, 'Validation failed', 'Honeypot triggered.');
+    }
+    if (!input.name?.trim()) throw new ApiError(422, 'Validation failed', undefined, { name: ['The name field is required.'] });
+    if (!input.subject?.trim()) throw new ApiError(422, 'Validation failed', undefined, { subject: ['The subject field is required.'] });
+    if (!input.message?.trim() || input.message.trim().length < 10) {
+      throw new ApiError(422, 'Validation failed', undefined, { message: ['The message must be at least 10 characters.'] });
+    }
+    if (!input.email?.trim() || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(input.email.trim())) {
+      throw new ApiError(422, 'Validation failed', undefined, { email: ['The email must be a valid email address.'] });
+    }
+
+    const lead: ContactLeadDto = {
+      id: uid('lead'),
+      name: input.name.trim(),
+      email: input.email.trim(),
+      company: input.company?.trim() || null,
+      subject: input.subject.trim(),
+      message: input.message.trim(),
+      source: input.source || 'marketing-site',
+      status: 'new',
+      created_at: nowIso(),
+    };
+    contactLeads.unshift(lead);
+
+    // Route the lead to the team: an internal notification for the owner.
+    notifications.unshift({
+      id: uid('notif'),
+      type: 'lead',
+      severity: 'info',
+      title: `New contact lead — ${lead.name}`,
+      body: lead.subject,
+      route: '/marketing/contact',
+      read_at: null,
+      created_at: nowIso(),
+    });
+
+    return Promise.resolve({ ...lead });
   }
 }

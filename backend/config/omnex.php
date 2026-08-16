@@ -40,6 +40,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Public contact leads (anti-spam)
+    |--------------------------------------------------------------------------
+    |
+    | `rate_limit_max` caps submissions per IP per minute. reCAPTCHA is
+    | optional: set OMNEX_RECAPTCHA_SECRET to enable it, and
+    | OMNEX_RECAPTCHA_SCORE_THRESHOLD to tune the score gate (0.0–1.0).
+    |
+    */
+
+    'leads' => [
+        'rate_limit_max' => (int) env('OMNEX_LEADS_RATE_LIMIT', 5),
+        'recaptcha_secret' => env('OMNEX_RECAPTCHA_SECRET'),
+        'recaptcha_score_threshold' => (float) env('OMNEX_RECAPTCHA_SCORE_THRESHOLD', 0.5),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Domain + DNS engines
     |--------------------------------------------------------------------------
     |

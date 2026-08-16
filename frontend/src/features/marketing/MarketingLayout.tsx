@@ -2,17 +2,20 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { brand } from '../../lib/brand';
-import { useI18n } from '../../lib/i18n';
+import { setPublicLocale, useI18n } from '../../lib/i18n';
 import { Button } from '../../components/ui/Button';
+import { cn } from '../../lib/utils';
+import { usePageviewTracking } from '../../lib/analytics';
 
 export function MarketingLayout({ children }: { children: ReactNode }) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
+  usePageviewTracking();
 
   const navLinks = [
     { to: '#services', label: t('marketing.nav.services') },
     { to: '#pricing', label: t('marketing.nav.pricing') },
     { to: '#faq', label: t('marketing.nav.faq') },
-    { to: '#contact', label: t('marketing.nav.contact') },
+    { to: '/contact', label: t('marketing.nav.contact') },
   ];
 
   return (
@@ -37,6 +40,26 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="flex items-center gap-3">
+            <div
+              className="flex items-center overflow-hidden rounded-md border border-white/10 bg-white/5 text-xs font-medium"
+              role="group"
+              aria-label="Language"
+            >
+              {(['en', 'fr'] as const).map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => setPublicLocale(code)}
+                  aria-pressed={locale === code}
+                  className={cn(
+                    'h-7 px-2.5 uppercase transition-colors',
+                    locale === code ? 'bg-white text-black' : 'text-zinc-400 hover:text-white',
+                  )}
+                >
+                  {code}
+                </button>
+              ))}
+            </div>
             <Link to="/login">
               <Button variant="ghost" size="sm">
                 {t('marketing.signIn')}
@@ -79,7 +102,7 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
               links={[
                 { to: '/login', label: t('marketing.getStarted') },
                 { to: '/login', label: t('marketing.footer.signIn') },
-                { to: '#contact', label: t('marketing.nav.contact') },
+                { to: '/contact', label: t('marketing.nav.contact') },
               ]}
             />
             <FooterColumn

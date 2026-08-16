@@ -52,6 +52,8 @@ import type {
   SecurityScoreDto,
   CloudProviderDto,
   CloudProviderVerifyDto,
+  ContactLeadDto,
+  ContactLeadInput,
   ServerCreateInput,
   ServerDto,
   ServerMetricsDto,
@@ -654,6 +656,14 @@ export class HttpApiClient implements ApiClient {
 
   deploySite(siteId: string): Promise<SiteDeploymentDto> {
     return this.request(`/sites/${siteId}/deployments`, { method: 'POST' });
+  }
+
+  async submitContactLead(input: ContactLeadInput): Promise<ContactLeadDto> {
+    const res = await this.request<{ data: ContactLeadDto }>('/public/leads', {
+      method: 'POST',
+      body: input,
+    });
+    return res.data;
   }
 
   rollbackSite(siteId: string, deploymentId: string): Promise<SiteDeploymentDto> {

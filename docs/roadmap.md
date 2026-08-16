@@ -228,6 +228,23 @@ excellent *commercial* website capable of selling the product and the services
 that come with it — marketing, acquisition and conversion, not just functional
 development.
 
+**Status: in delivery** — public homepage (hero, stats, services grid,
+features, pricing cards + full comparison table, testimonials, FAQ, CTA
+bands), dedicated SEO service pages (`/marketing/{service}` with unique meta,
+JSON-LD Service/BreadcrumbList/FAQPage, per-service CTAs), technical SEO
+(structured data, sitemap.xml, robots.txt, Open Graph/Twitter cards), and a
+**contact page with lead routing** (`/contact` — public form with honeypot
+anti-spam, per-IP rate limiting, optional reCAPTCHA v3, IP/UA recorded,
+`contact_leads` table, `POST /v1/public/leads`, platform-owner
+notifications), a **language selector** in the public header (EN/FR,
+instant switch, persisted preference, `hreflang` + `<html lang>` synced), and
+**privacy-conscious analytics + conversion tracking** (`lib/analytics.ts` —
+local event store with UTM capture/attribution, optional GA4 via
+`VITE_GA4_MEASUREMENT_ID` gated behind explicit consent, `pageview`,
+`cta_clicked`, `signup_started`, `lead_submitted`, `quote_requested`,
+`demo_requested`). Remaining: blog/content hub, landing page engine,
+remarketing pixels + A/B testing harness.
+
 **Placement:** Phase 9 deliberately sits right after the core product is solid
 (Phase 8) and before the deep platform phases (Deploy, Mail, AI…), because the
 commercial site should drive early signups in parallel with product growth. It

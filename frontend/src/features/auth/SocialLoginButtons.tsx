@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import type { SocialProviderDto } from '../../lib/api/types';
+import { track } from '../../lib/analytics';
 import { errorMessage } from '../../lib/errors';
 import { useI18n } from '../../lib/i18n';
 
@@ -92,6 +93,7 @@ export function SocialLoginButtons({ standalone = false }: { standalone?: boolea
   async function start(provider: string) {
     setBusy(provider);
     setError(null);
+    track('signup_started', { provider });
     try {
       const { url } = await api.socialRedirect(provider);
       if (!url) return;

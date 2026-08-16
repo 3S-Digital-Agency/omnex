@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useAuth } from '../app/AuthProvider';
 
 export interface LocaleOption {
@@ -794,6 +795,23 @@ const messages: Record<string, Record<string, string>> = {
     'marketing.compare.value.priority': 'Priority',
     'marketing.compare.value.none': '—',
     'marketing.service.capsTitle': '{name} capabilities',
+    'contact.title': 'Contact us',
+    'contact.subtitle': 'Tell us about your project — we usually reply within one business day.',
+    'contact.name': 'Full name',
+    'contact.email': 'Email',
+    'contact.company': 'Company (optional)',
+    'contact.subject': 'Subject',
+    'contact.message': 'Message',
+    'contact.messageHint': 'Tell us about your infrastructure, goals and timeline (at least 10 characters).',
+    'contact.submit': 'Send message',
+    'contact.submitting': 'Sending…',
+    'contact.success': 'Message sent — we will get back to you within one business day.',
+    'contact.error': 'Something went wrong. Please try again.',
+    'contact.alt.quote': 'Request a quote',
+    'contact.alt.sales': 'Talk to sales',
+    'contact.alt.demo': 'Book a demo',
+    'contact.direct': 'Prefer email?',
+    'contact.directHint': 'Write to us directly at',
     'marketing.testimonials.title': 'Trusted by teams that run the internet',
     'marketing.testimonial.1.quote': 'We manage dozens of domains, servers and sites from a single dashboard. OMNEX replaced five different consoles for our team.',
     'marketing.testimonial.1.name': 'Alain Lauzon',
@@ -1607,6 +1625,23 @@ const messages: Record<string, Record<string, string>> = {
     'marketing.compare.value.priority': 'Prioritaire',
     'marketing.compare.value.none': '—',
     'marketing.service.capsTitle': 'Capacités {name}',
+    'contact.title': 'Contactez-nous',
+    'contact.subtitle': 'Parlez-nous de votre projet — nous répondons généralement sous un jour ouvrable.',
+    'contact.name': 'Nom complet',
+    'contact.email': 'E-mail',
+    'contact.company': 'Entreprise (facultatif)',
+    'contact.subject': 'Sujet',
+    'contact.message': 'Message',
+    'contact.messageHint': 'Parlez-nous de votre infrastructure, de vos objectifs et de votre calendrier (au moins 10 caractères).',
+    'contact.submit': 'Envoyer le message',
+    'contact.submitting': 'Envoi…',
+    'contact.success': 'Message envoyé — nous vous répondrons sous un jour ouvrable.',
+    'contact.error': 'Une erreur est survenue. Veuillez réessayer.',
+    'contact.alt.quote': 'Demander une soumission',
+    'contact.alt.sales': 'Parler à un conseiller',
+    'contact.alt.demo': 'Réserver une démo',
+    'contact.direct': 'Vous préférez l’e-mail ?',
+    'contact.directHint': 'Écrivez-nous directement à',
     'marketing.testimonials.title': 'Ils font tourner l’internet et nous font confiance',
     'marketing.testimonial.1.quote': 'Nous gérons des dizaines de domaines, serveurs et sites depuis un seul tableau de bord. OMNEX a remplacé cinq consoles différentes pour notre équipe.',
     'marketing.testimonial.1.name': 'Alain Lauzon',
@@ -1684,9 +1719,33 @@ function resolveLanguageCandidates(languages?: readonly string[]): string[] {
 
 export type TranslateFn = (key: string, params?: Params) => string;
 
+const PUBLIC_LOCALE_KEY = 'omnex.locale';
+const PUBLIC_LOCALE_EVENT = 'omnex:locale';
+
+/** Read the public-site language preference (visitors, no account needed). */
+export function storedPublicLocale(): string | null {
+  if (typeof localStorage === 'undefined') return null;
+  const value = localStorage.getItem(PUBLIC_LOCALE_KEY);
+  return value === 'en' || value === 'fr' ? value : null;
+}
+
+/** Persist + broadcast a language change so every page re-renders instantly. */
+export function setPublicLocale(code: 'en' | 'fr'): void {
+  localStorage.setItem(PUBLIC_LOCALE_KEY, code);
+  window.dispatchEvent(new Event(PUBLIC_LOCALE_EVENT));
+}
+
 export function useI18n(): { locale: string; t: TranslateFn } {
   const { user } = useAuth();
-  const locale = user?.locale || detectBrowserLocale();
+  const [publicLocale, setPublicLocaleState] = useState<string | null>(storedPublicLocale);
+
+  useEffect(() => {
+    const onLocaleChange = () => setPublicLocaleState(storedPublicLocale());
+    window.addEventListener(PUBLIC_LOCALE_EVENT, onLocaleChange);
+    return () => window.removeEventListener(PUBLIC_LOCALE_EVENT, onLocaleChange);
+  }, []);
+
+  const locale = user?.locale || publicLocale || detectBrowserLocale();
 
   return {
     locale,

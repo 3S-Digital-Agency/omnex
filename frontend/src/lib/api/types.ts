@@ -755,3 +755,28 @@ export interface SecurityScoreDto {
   summary: SecurityScoreSummary;
   findings: SecurityFindingDto[];
 }
+
+export interface ContactLeadInput {
+  name: string;
+  email: string;
+  company?: string;
+  subject: string;
+  message: string;
+  source?: string;
+  /** Honeypot — hidden from real visitors and must stay empty. */
+  website?: string;
+  /** reCAPTCHA v3 token — required by the backend only when configured. */
+  recaptcha_token?: string;
+}
+
+export interface ContactLeadDto {
+  id: string;
+  name: string;
+  email: string;
+  company: string | null;
+  subject: string;
+  message: string;
+  source: string | null;
+  status: string;
+  created_at: string;
+}

@@ -49,6 +49,8 @@ import type {
   SecurityScoreDto,
   CloudProviderDto,
   CloudProviderVerifyDto,
+  ContactLeadDto,
+  ContactLeadInput,
   ServerCreateInput,
   ServerDto,
   ServerMetricsDto,
@@ -206,6 +208,8 @@ export interface ApiClient {
   getSiteDeployment(siteId: string, deploymentId: string): Promise<SiteDeploymentDto>;
   deploySite(siteId: string): Promise<SiteDeploymentDto>;
   rollbackSite(siteId: string, deploymentId: string): Promise<SiteDeploymentDto>;
+
+  submitContactLead(input: ContactLeadInput): Promise<ContactLeadDto>;
 
   listCloudProviders(): Promise<CloudProviderDto[]>;
   verifyCloudProviders(provider?: string): Promise<CloudProviderVerifyDto[]>;

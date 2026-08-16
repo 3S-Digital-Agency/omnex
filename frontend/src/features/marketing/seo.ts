@@ -2,6 +2,33 @@ import { useEffect } from 'react';
 
 const BASE_URL = 'https://omnex.cloud';
 
+/**
+ * Inject EN/FR hreflang alternates for a public page. The marketing site
+ * serves both languages from the same URL (content is chosen by the visitor's
+ * locale), so the alternates point at that URL with `x-default` as fallback.
+ * Also keeps <html lang> in sync with the active locale.
+ */
+export function useHreflang(path: string, locale: string) {
+  useEffect(() => {
+    const url = `${BASE_URL}${path}`;
+
+    for (const lang of ['en', 'fr', 'x-default'] as const) {
+      const id = `hreflang-${lang}`;
+      let el = document.getElementById(id) as HTMLLinkElement | null;
+      if (!el) {
+        el = document.createElement('link');
+        el.id = id;
+        el.setAttribute('rel', 'alternate');
+        el.setAttribute('hreflang', lang);
+        document.head.appendChild(el);
+      }
+      el.setAttribute('href', url);
+    }
+
+    document.documentElement.lang = locale === 'fr' ? 'fr' : 'en';
+  }, [path, locale]);
+}
+
 function upsertJsonLd(id: string, data: Record<string, unknown>) {
   let el = document.getElementById(id) as HTMLScriptElement | null;
   if (!el) {

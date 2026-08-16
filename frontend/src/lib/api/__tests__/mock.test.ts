@@ -979,4 +979,49 @@ describe('MockApiClient', () => {
 
     expect(await api.listCouponRedemptions(created.id)).toHaveLength(0);
   });
+
+  it('submits a public contact lead and routes it to the team', async () => {
+    const api = new MockApiClient();
+    await api.login({ email: 'demo@omnex.cloud', password: 'password' });
+    const before = (await api.listNotificationsPage({ perPage: 100 })).data.length;
+
+    const lead = await api.submitContactLead({
+      name: 'Jane Doe',
+      email: 'jane@example.com',
+      company: 'Acme',
+      subject: 'Quote request',
+      message: 'We need 5 VPS servers and managed DNS for a launch.',
+    });
+
+    expect(lead.id).toBeTruthy();
+    expect(lead.status).toBe('new');
+    expect(lead.email).toBe('jane@example.com');
+
+    const after = (await api.listNotificationsPage({ perPage: 100 })).data;
+    expect(after.length).toBe(before + 1);
+    expect(after[0].type).toBe('lead');
+    expect(after[0].title).toContain('Jane Doe');
+  });
+
+  it('rejects spam and invalid contact payloads', async () => {
+    const api = new MockApiClient();
+    await expect(
+      api.submitContactLead({
+        name: 'Bot',
+        email: 'bot@example.com',
+        subject: 'Spam',
+        message: 'This is a spam message.',
+        website: 'spam-link',
+      }),
+    ).rejects.toMatchObject({ status: 422 });
+
+    await expect(
+      api.submitContactLead({
+        name: 'Jane',
+        email: 'not-an-email',
+        subject: 'Hi',
+        message: 'A sufficiently long message here.',
+      }),
+    ).rejects.toMatchObject({ status: 422 });
+  });
 });
