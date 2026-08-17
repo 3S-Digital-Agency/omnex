@@ -313,6 +313,9 @@ OMNEX uses a **multi-license matrix** (see [`docs/licensing.md`](docs/licensing.
 | OMNEX™ brand | 🔐 Distinct brand policy |
 | Operated infrastructure / enterprise services | ⏳ To be defined (must allow commerce) |
 
-The full Apache 2.0 license text lives in [`LICENSE`](LICENSE). Contributions
-are governed by DCO or CLA (strategy to be decided); see the licensing policy
+The full Apache 2.0 license text lives in [`LICENSE`](LICENSE). Governance is
+defined by the public constitution in [`GOVERNANCE.md`](GOVERNANCE.md)
+(roles, decision-making, maintainers, DCO/CLA). The OMNEX™ brand is governed
+by the distinct [`BRAND_POLICY.md`](BRAND_POLICY.md). Contributions are
+governed by DCO or CLA (strategy to be decided); see the licensing policy
 for details.

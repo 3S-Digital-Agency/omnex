@@ -75,8 +75,9 @@ l'identique des dérivés.
 
 La gouvernance du projet (rôles, processus de décision, règles de vote,
 désignation des mainteneurs) est un **document constitutionnel public**
-séparé (`GOVERNANCE.md`), versionné et révisable par la communauté selon ses
-propres règles. Il ne fait pas partie du code sous licence Apache.
+séparé — [`GOVERNANCE.md`](../GOVERNANCE.md) —, versionné et révisable par
+la communauté selon ses propres règles (vote constitutionnel, quorum ⅔ des
+mainteneurs). Il ne fait pas partie du code sous licence Apache.
 
 ## 7. Contributions — DCO ou CLA
 
@@ -105,7 +106,7 @@ les licences de code. L'utilisation de la marque est régie par une
 - Le code peut être forké et modifié, mais un fork ne peut pas se présenter
   comme « OMNEX » officiel.
 
-Cette politique est détaillée dans `BRAND_POLICY.md` (à créer).
+Cette politique est détaillée dans [`BRAND_POLICY.md`](../BRAND_POLICY.md).
 
 ## 9. Infrastructure opérée & Enterprise services — à définir
 
@@ -128,5 +129,10 @@ Deux domaines restent volontairement **ouverts** :
 - `backend/composer.json` → `"license": "Apache-2.0"`.
 - `frontend/package.json` → `"license": "Apache-2.0"`.
 - `docs/licensing.md` : ce document, référence de la matrice.
-- À créer quand les décisions seront prises : `GOVERNANCE.md`,
-  `BRAND_POLICY.md`, fichiers `LICENSE` par SDK/bibliothèque.
+- `GOVERNANCE.md` : constitution publique de la gouvernance (rôles, votes,
+  mainteneurs, DCO/CLA).
+- `BRAND_POLICY.md` : politique d'utilisation de la marque OMNEX™.
+- `CONTRIBUTING.md` : guide de contribution (à compléter avec le mécanisme
+  DCO/CLA choisi).
+- Fichiers `LICENSE` par SDK/bibliothèque : à créer lors de la première
+  publication d'un SDK ou d'une bibliothèque autonome.
