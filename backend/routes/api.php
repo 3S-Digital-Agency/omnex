@@ -5,6 +5,7 @@ use App\Http\Controllers\AuditController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\ContactLeadController;
+use App\Http\Controllers\CrossDeviceController;
 use App\Http\Controllers\DnsController;
 use App\Http\Controllers\DomainController;
 use App\Http\Controllers\InvitationController;
@@ -33,6 +34,15 @@ Route::prefix('v1')->group(function () {
     // YubiKey, Touch ID / Face ID, Windows Hello or any FIDO2 authenticator.
     Route::get('/auth/passkey/options', [PasskeyController::class, 'options']);
     Route::post('/auth/passkey/verify', [PasskeyController::class, 'verify']);
+
+    // Cross-device sign-in (PC ↔ phone): the desktop shows a QR code, the
+    // phone scans it and authenticates with Face ID / Touch ID / a passkey.
+    Route::post('/auth/cross-device/start', [CrossDeviceController::class, 'start']);
+    Route::post('/auth/cross-device/approve', [CrossDeviceController::class, 'approve']);
+
+    // Unknown-device verification: confirm a brand-new iPhone / Android /
+    // passkey with the 6-digit code e-mailed to the account owner.
+    Route::post('/auth/device/verify', [PasskeyController::class, 'verifyDevice']);
 
     // Social login (OAuth / OpenID Connect). The callback is public: the
     // browser returns from the provider without an auth token. Intent

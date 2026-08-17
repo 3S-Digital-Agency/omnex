@@ -33,6 +33,12 @@ function base64UrlToArrayBuffer(value: string): ArrayBuffer {
   return bytes.buffer;
 }
 
+/** ArrayBuffer/Uint8Array → base64url (WebAuthn attestation/assertion encoding). */
+function base64UrlEncode(data: ArrayBuffer | Uint8Array): string {
+  const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 function TransportIcon({ transport }: { transport?: string | null }) {
   const { t } = useI18n();
   switch (transport) {
@@ -133,12 +139,12 @@ export function AuthenticatorsSection() {
             const response = pk.response as AuthenticatorAttestationResponse;
             credential = {
               id: pk.id,
-              raw_id: btoa(String.fromCharCode(...new Uint8Array(pk.rawId))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
+              raw_id: base64UrlEncode(pk.rawId),
               type: pk.type,
               response: {
-                client_data_json: btoa(String.fromCharCode(...new Uint8Array(response.clientDataJSON))),
-                authenticator_data: '',
-                signature: '',
+                client_data_json: base64UrlEncode(response.clientDataJSON),
+                attestation_object: base64UrlEncode(response.attestationObject),
+                transports: response.getTransports?.() ?? [],
               },
               client_extension_results: (pk.getClientExtensionResults?.() ?? {}) as Record<string, unknown>,
             };

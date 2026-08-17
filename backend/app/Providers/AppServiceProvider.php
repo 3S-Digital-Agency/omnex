@@ -14,6 +14,7 @@ use App\Events\DomainUpdated;
 use App\Listeners\DomainEventAuditor;
 use App\Listeners\NotifyExpiringDomain;
 use App\Models\User;
+use App\Support\Auth\WebAuthnService;
 use App\Support\Billing\BillingService;
 use App\Support\Billing\PaymentProviderRegistry;
 use App\Support\Cloud\ServerProviderRegistry;
@@ -68,6 +69,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(ServerService::class);
         $this->app->singleton(SshKeyService::class);
         $this->app->singleton(SecurityService::class);
+        $this->app->singleton(WebAuthnService::class);
+        $this->app->singleton(WebAuthnService::class);
         $this->app->singleton(PaymentProviderRegistry::class, fn () => new PaymentProviderRegistry);
         $this->app->singleton(BillingService::class);
         $this->app->singleton(StreamBroker::class, function () {

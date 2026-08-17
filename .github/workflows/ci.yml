@@ -7,6 +7,29 @@ on:
   workflow_dispatch:
 
 jobs:
+  dco:
+    name: DCO — commits Signed-off-by
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check Signed-off-by on commits
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            COMMITS=$(git log --format='%H' origin/main..HEAD)
+          else
+            COMMITS=$(git log --format='%H' -1)
+          fi
+          for c in $COMMITS; do
+            if ! git log -1 --format='%(trailers:key=Signed-off-by)' "$c" | grep -q 'Signed-off-by:'; then
+              echo "::error::Commit $c is missing Signed-off-by (DCO). Run: git rebase --signoff"
+              exit 1
+            fi
+          done
+          echo "DCO OK — all commits are signed."
   backend:
     name: Backend — Pest (PHP 8.3 / PostgreSQL 16)
     runs-on: ubuntu-latest

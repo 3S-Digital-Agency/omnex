@@ -2,8 +2,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 import { api } from '../lib/api';
 import { session } from '../lib/api/session';
+import { getDeviceId, getDevicePlatform } from '../lib/device';
 import type {
   AuthSession,
+  CrossDeviceApproveInput,
   InvitationDto,
   MembershipDto,
   OrganizationDto,
@@ -36,11 +38,23 @@ interface AuthContextValue extends AuthState {
   completeSocial: (code: string) => Promise<void>;
   /** Passkey sign-in: `assertion` from the WebAuthn ceremony, or null in sandbox mode. */
   signInWithPasskey: (assertion: PublicKeyCredential | null) => Promise<void>;
+  /** Cross-device sign-in: approve the QR pairing from the phone and apply the session. */
+  signInWithCrossDevice: (input: CrossDeviceApproveInput) => Promise<void>;
+  /** Complete the unknown-device verification with the e-mailed 6-digit code. */
+  verifyDevice: (verification_token: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
   switchOrganization: (orgId: string) => Promise<void>;
   acceptInvitation: (token: string) => Promise<void>;
   refresh: () => Promise<void>;
   hasPermission: (permission: string) => boolean;
+}
+
+/** Thrown when a passwordless sign-in needs the e-mailed device code. */
+export class DeviceVerificationRequired extends Error {
+  constructor(public readonly verificationToken: string) {
+    super('A new device requires verification.');
+    this.name = 'DeviceVerificationRequired';
+  }
 }
 
 const emptyState: AuthState = {
@@ -152,7 +166,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           client_extension_results: (assertion.getClientExtensionResults?.() ?? {}) as Record<string, unknown>,
         };
       }
-      const res = await api.verifyPasskey(credential);
+      const res = await api.verifyPasskey(credential, { device_id: getDeviceId(), platform: getDevicePlatform() });
+      if ('requires_device_verification' in res) {
+        throw new DeviceVerificationRequired(res.verification_token);
+      }
+      applySession(res);
+    },
+    [applySession],
+  );
+
+  const signInWithCrossDevice = useCallback(
+    async (input: CrossDeviceApproveInput) => {
+      const res = await api.approveCrossDevice(input);
+      if ('requires_device_verification' in res) {
+        throw new DeviceVerificationRequired(res.verification_token);
+      }
+      applySession(res);
+    },
+    [applySession],
+  );
+
+  const verifyDevice = useCallback(
+    async (verification_token: string, code: string) => {
+      const res = await api.verifyDevice(verification_token, code);
       applySession(res);
     },
     [applySession],
@@ -194,13 +230,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       verifyMfa,
       completeSocial,
       signInWithPasskey,
+      signInWithCrossDevice,
+      verifyDevice,
       logout,
       switchOrganization,
       acceptInvitation,
       refresh,
       hasPermission,
     }),
-    [state, login, register, verifyMfa, completeSocial, signInWithPasskey, logout, switchOrganization, acceptInvitation, refresh, hasPermission],
+    [state, login, register, verifyMfa, completeSocial, signInWithPasskey, signInWithCrossDevice, verifyDevice, logout, switchOrganization, acceptInvitation, refresh, hasPermission],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Server } from 'lucide-react';
 import { api } from '../../lib/api';
 import type { SocialProviderDto } from '../../lib/api/types';
 import { track } from '../../lib/analytics';
@@ -59,14 +60,7 @@ function ProviderIcon({ provider }: { provider: string }) {
         </svg>
       );
     case 'sdp':
-      return (
-        <img
-          src="/sdp.png"
-          alt=""
-          aria-hidden="true"
-          className="h-5 w-5 shrink-0"
-        />
-      );
+      return <Server className="h-4 w-4 shrink-0 text-white" aria-hidden="true" />;
     default:
       return null;
   }

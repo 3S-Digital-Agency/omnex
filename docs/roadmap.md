@@ -64,12 +64,31 @@ Scope:
   `/auth/passkey/options` + `/auth/passkey/verify` contract; sandbox
   fallback keeps the demo fully functional without a platform authenticator.
 - **FIDO2/WebAuthn authenticator management**: `authenticators` table
-  (credential id, public key, sign count, transport, last used), endpoints
-  for register/verify/revoke + **adaptive security levels** (standard /
-  enhanced / critical on `users.security_level`), and the **« My
-  authenticators »** settings UI (add a YubiKey / passkey / biometric
-  device, name it, see last-used & registration dates, revoke). Biometric
-  data never leaves the device — OMNEX stores only public keys.
+  (credential id, public key, sign count, transport, last used, full
+  `CredentialRecord`), endpoints for register/verify/revoke + **adaptive
+  security levels** (standard / enhanced / critical on
+  `users.security_level`), and the **« My authenticators »** settings UI
+  (add a YubiKey / passkey / biometric device, name it, see last-used &
+  registration dates, revoke). Biometric data never leaves the device —
+  OMNEX stores only public keys.
+- **Full WebAuthn cryptography** (`web-auth/webauthn-lib` v5): registration
+  validates the real attestation statement (packed / fido-u2f / none,
+  signature over `authData ‖ clientDataHash`, origin, single-use challenge),
+  stores the COSE credential public key in a serialized `CredentialRecord`,
+  and authentication verifies the ES256/RS256 assertion signature with
+  strictly-increasing sign-counter anti-replay. Tested end-to-end with real
+  ES256 attestations (`tests/Support/WebAuthnTestKit.php`).
+- **Cross-device sign-in (PC ↔ phone)**: QR-code pairing
+  (`/auth/cross-device/start` + `/approve`, single-use 5-min code) — the
+  phone authenticates with Face ID / Touch ID (iPhone), fingerprint / face
+  unlock (Android) or a passkey, and the signed WebAuthn assertion is
+  verified here; sandbox fallback keeps the demo  functional without a phone.
+  UI: scannable QR dialog with an iPhone/Android platform picker on the
+  login page.
+- **Unknown-device detection**: a brand-new iPhone / Android / passkey must
+  confirm the sign-in with a single-use 6-digit code e-mailed to the owner
+  (`NewDeviceSignIn` notification, `user_devices` table, `/auth/device/verify`)
+  before a session is issued; verified devices are remembered.
 - Organizations: create, memberships, invitations, teams, roles, permissions
   (custom RBAC on the model above).
 - Tenant isolation: global scope + RLS + namespace + tests.

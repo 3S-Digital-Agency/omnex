@@ -11,6 +11,8 @@ import type {
   CouponAdminDto,
   CouponCreateInput,
   CouponDto,
+  CrossDeviceApproveInput,
+  CrossDeviceStartDto,
   CouponRedemptionDto,
   CouponUpdateInput,
   CreditEntryDto,
@@ -42,6 +44,7 @@ import type {
   MembershipDto,
   MfaConfirmResponse,
   MfaSetupResponse,
+  PasswordlessResponse,
   NotificationDto,
   NotificationListDto,
   NotificationQuery,
@@ -184,8 +187,20 @@ export class HttpApiClient implements ApiClient {
     return this.request('/auth/passkey/options');
   }
 
-  verifyPasskey(credential: PasskeyCredentialDto | null): Promise<AuthSession> {
-    return this.request('/auth/passkey/verify', { method: 'POST', body: { credential } });
+  verifyPasskey(credential: PasskeyCredentialDto | null, device?: { device_id: string; platform?: string }): Promise<PasswordlessResponse> {
+    return this.request('/auth/passkey/verify', { method: 'POST', body: { credential, ...device } });
+  }
+
+  startCrossDevice(): Promise<CrossDeviceStartDto> {
+    return this.request('/auth/cross-device/start', { method: 'POST' });
+  }
+
+  approveCrossDevice(input: CrossDeviceApproveInput): Promise<PasswordlessResponse> {
+    return this.request('/auth/cross-device/approve', { method: 'POST', body: input });
+  }
+
+  verifyDevice(verification_token: string, code: string): Promise<AuthSession> {
+    return this.request('/auth/device/verify', { method: 'POST', body: { verification_token, code } });
   }
 
   async listAuthenticators(): Promise<AuthenticatorDto[]> {

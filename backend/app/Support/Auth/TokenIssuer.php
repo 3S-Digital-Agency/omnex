@@ -11,11 +11,11 @@ use Illuminate\Http\Request;
  */
 final class TokenIssuer
 {
-    public static function issue(User $user, ?Request $request = null): string
+    public static function issue(User $user, ?Request $request = null, ?string $tokenName = null): string
     {
         $request ??= request();
 
-        $token = $user->createToken('omnex-spa');
+        $token = $user->createToken($tokenName ?? 'omnex-spa');
         $token->accessToken->forceFill([
             'ip_address' => $request->ip(),
             'user_agent' => mb_substr((string) $request->userAgent(), 0, 500),

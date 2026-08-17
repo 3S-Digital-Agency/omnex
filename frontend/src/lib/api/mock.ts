@@ -90,9 +90,12 @@ import type {
   SocialProviderDto,
   AuthenticatorDto,
   SocialRedirectResponse,
+  CrossDeviceApproveInput,
+  CrossDeviceStartDto,
   PasskeyCredentialDto,
   PasskeyRegisterOptionsDto,
   PasskeyRequestOptionsDto,
+  PasswordlessResponse,
   SecurityLevel,
   StorageProviderDto,
   SubscriptionDto,
@@ -195,6 +198,11 @@ const roles: RoleDto[] = [
 ];
 
 const roleById = (id: string): RoleDto => roles.find((r) => r.id === id) ?? roles[0];
+
+/** Devices already verified per user (unknown-device detection sandbox). */
+const verifiedDevices = new Map<string, Set<string>>();
+/** Pending verification challenges: token → { userId, deviceId, code }. */
+const pendingDeviceChallenges = new Map<string, { userId: string; deviceId: string; code: string }>();
 
 const organizations: OrganizationDto[] = [
   { id: 'org-omnex-hq', name: 'OMNEX HQ', slug: 'omnex-hq', plan_tier: 'free', status: 'active', created_at: '2026-01-15T09:00:00Z' },
@@ -1975,6 +1983,38 @@ const pendingInvitationsFor = (email: string): InvitationDto[] =>
     .filter((inv) => inv.status === 'pending' && inv.email.toLowerCase() === email.toLowerCase())
     .map(toInvitationDto);
 
+/** Shared sandbox sign-in: set the session and build the response. */
+function signInSandbox(user: MockUser): AuthSession {
+  currentUserId = user.id;
+  session.setToken(`mock-token-${user.id}`);
+  const activeOrg = organizations.find((org) =>
+    memberships.some((m) => m.userId === user.id && m.organizationId === org.id),
+  ) ?? null;
+  session.setOrganizationId(activeOrg?.id ?? null);
+  return buildSession(user);
+}
+
+/**
+ * Unknown-device detection (sandbox): a brand-new device requires a 6-digit
+ * code (demo code 123456) before the session is issued.
+ */
+function mockDeviceCheck(
+  user: MockUser,
+  deviceId?: string,
+  platform?: string,
+): PasswordlessResponse | null {
+  if (!deviceId) return null;
+  const known = verifiedDevices.get(user.id) ?? new Set<string>();
+  if (known.has(deviceId)) return null;
+  const token = uid('devv');
+  pendingDeviceChallenges.set(token, { userId: user.id, deviceId, code: '123456' });
+  return {
+    requires_device_verification: true,
+    verification_token: token,
+    expires_in: 600,
+  };
+}
+
 function buildSession(user: MockUser): AuthSession {
   const userMemberships = memberships.filter((m) => m.userId === user.id);
   const org = activeOrganization() ?? organizations.find((o) => userMemberships.some((m) => m.organizationId === o.id)) ?? null;
@@ -2148,7 +2188,10 @@ export class MockApiClient implements ApiClient {
     return Promise.resolve({ challenge, rp_id: rpId, timeout: 60_000, allow_credentials: [] });
   }
 
-  async verifyPasskey(credential: PasskeyCredentialDto | null): Promise<AuthSession> {
+  async verifyPasskey(
+    credential: PasskeyCredentialDto | null,
+    device?: { device_id: string; platform?: string },
+  ): Promise<PasswordlessResponse> {
     if (credential && (!credential.id || !credential.response?.client_data_json)) {
       throw new ApiError(422, 'Validation failed', undefined, { credential: ['Invalid WebAuthn assertion.'] });
     }
@@ -2165,13 +2208,54 @@ export class MockApiClient implements ApiClient {
         userId: user.id,
       });
     }
-    currentUserId = user.id;
-    session.setToken(`mock-token-${user.id}`);
-    const activeOrg = organizations.find((org) =>
-      memberships.some((m) => m.userId === user.id && m.organizationId === org.id),
-    ) ?? null;
-    session.setOrganizationId(activeOrg?.id ?? null);
-    return Promise.resolve(buildSession(user));
+    const check = mockDeviceCheck(user, device?.device_id, device?.platform ?? 'passkey');
+    if (check) return Promise.resolve(check);
+    return Promise.resolve(signInSandbox(user));
+  }
+
+  async startCrossDevice(): Promise<CrossDeviceStartDto> {
+    const random = new Uint8Array(32);
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) crypto.getRandomValues(random);
+    const challenge = btoa(String.fromCharCode(...random)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const pairingCode = Array.from({ length: 8 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
+    return Promise.resolve({
+      pairing_code: pairingCode,
+      challenge,
+      rp_id: typeof window !== 'undefined' && window.location?.hostname ? window.location.hostname : 'localhost',
+      timeout: 60_000,
+      expires_in: 300,
+      qr_payload: `omnex://cross-device?code=${pairingCode}`,
+    });
+  }
+
+  async approveCrossDevice(input: CrossDeviceApproveInput): Promise<PasswordlessResponse> {
+    if (!input.pairing_code || input.pairing_code.length !== 8) {
+      throw new ApiError(410, 'Expired or invalid pairing code.', undefined, { pairing_code: ['Invalid pairing code.'] });
+    }
+    // Sandbox: any pairing authenticates the demo account (the real backend
+    // verifies the signed WebAuthn assertion from the phone instead).
+    const user = users.find((candidate) => candidate.id === 'user-demo-owner') ?? users[0];
+    if (!user) throw new ApiError(401, 'Unauthenticated');
+    const check = mockDeviceCheck(user, input.device_id, input.device ?? input.method ?? 'phone');
+    if (check) return Promise.resolve(check);
+    return Promise.resolve(signInSandbox(user));
+  }
+
+  async verifyDevice(verification_token: string, code: string): Promise<AuthSession> {
+    const challenge = pendingDeviceChallenges.get(verification_token);
+    if (!challenge) {
+      throw new ApiError(410, 'Invalid or expired verification code.');
+    }
+    if (challenge.code !== code) {
+      throw new ApiError(422, 'Invalid verification code.', undefined, { code: ['The code does not match.'] });
+    }
+    pendingDeviceChallenges.delete(verification_token);
+    const set = verifiedDevices.get(challenge.userId) ?? new Set<string>();
+    set.add(challenge.deviceId);
+    verifiedDevices.set(challenge.userId, set);
+    const user = users.find((candidate) => candidate.id === challenge.userId) ?? users[0];
+    if (!user) throw new ApiError(401, 'Unauthenticated');
+    return Promise.resolve(signInSandbox(user));
   }
 
   async listAuthenticators(): Promise<AuthenticatorDto[]> {

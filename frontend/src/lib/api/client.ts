@@ -8,6 +8,8 @@ import type {
   CouponAdminDto,
   CouponCreateInput,
   CouponDto,
+  CrossDeviceApproveInput,
+  CrossDeviceStartDto,
   CouponRedemptionDto,
   CouponUpdateInput,
   CreditEntryDto,
@@ -39,6 +41,7 @@ import type {
   MembershipDto,
   MfaConfirmResponse,
   MfaSetupResponse,
+  PasswordlessResponse,
   NotificationDto,
   NotificationListDto,
   NotificationQuery,
@@ -125,7 +128,14 @@ export interface ApiClient {
   /** Server-issued WebAuthn assertion options for a passkey sign-in. */
   passkeyRequestOptions(): Promise<PasskeyRequestOptionsDto>;
   /** Verify a WebAuthn assertion and complete the passkey sign-in. `null` = sandbox fallback. */
-  verifyPasskey(credential: PasskeyCredentialDto | null): Promise<AuthSession>;
+  verifyPasskey(credential: PasskeyCredentialDto | null, device?: { device_id: string; platform?: string }): Promise<PasswordlessResponse>;
+
+  /** Start a cross-device pairing (PC ↔ phone QR flow). */
+  startCrossDevice(): Promise<CrossDeviceStartDto>;
+  /** Approve the pairing from the phone (signed assertion or sandbox). */
+  approveCrossDevice(input: CrossDeviceApproveInput): Promise<PasswordlessResponse>;
+  /** Confirm a brand-new device with the 6-digit code e-mailed to the owner. */
+  verifyDevice(verification_token: string, code: string): Promise<AuthSession>;
 
   /** List the registered authenticators (YubiKey, passkeys, biometrics). */
   listAuthenticators(): Promise<AuthenticatorDto[]>;

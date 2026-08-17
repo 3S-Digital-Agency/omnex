@@ -31,6 +31,30 @@ export interface PasskeyRegisterOptionsDto {
   registration_token: string;
 }
 
+/** Server-issued cross-device pairing (PC ↔ iPhone QR flow). */
+export interface CrossDeviceStartDto {
+  pairing_code: string;
+  challenge: string;
+  rp_id: string;
+  timeout: number;
+  expires_in: number;
+  /** Payload to render as the QR code. */
+  qr_payload: string;
+}
+
+export type CrossDeviceMethod = 'face_id' | 'touch_id' | 'fingerprint' | 'face_unlock' | 'passkey' | 'biometric';
+
+export type CrossDevicePlatform = 'iphone' | 'android';
+
+export interface CrossDeviceApproveInput {
+  pairing_code: string;
+  credential?: PasskeyCredentialDto | null;
+  device?: string;
+  method?: CrossDeviceMethod;
+  /** Browser device id for unknown-device detection. */
+  device_id?: string;
+}
+
 export interface RoleDto {
   id: string;
   name: string;
@@ -139,6 +163,11 @@ export type LoginResponse =
   | AuthSession
   | { mfa_required: true; mfa_token: string };
 
+/** Passwordless sign-in may require unknown-device verification. */
+export type PasswordlessResponse =
+  | AuthSession
+  | { requires_device_verification: true; verification_token: string; expires_in: number };
+
 export interface RegisterInput {
   name: string;
   email: string;
@@ -187,7 +216,15 @@ export interface PasskeyCredentialDto {
   id: string;
   raw_id: string;
   type: string;
-  response: { client_data_json: string; authenticator_data: string; signature: string };
+  response: {
+    client_data_json: string;
+    /** Assertion (sign-in) fields. */
+    authenticator_data?: string;
+    signature?: string;
+    /** Attestation (registration) fields. */
+    attestation_object?: string;
+    transports?: string[];
+  };
   client_extension_results?: Record<string, unknown>;
 }
 

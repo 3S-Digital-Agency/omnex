@@ -132,7 +132,7 @@ Deux domaines restent volontairement **ouverts** :
 - `GOVERNANCE.md` : constitution publique de la gouvernance (rôles, votes,
   mainteneurs, DCO/CLA).
 - `BRAND_POLICY.md` : politique d'utilisation de la marque OMNEX™.
-- `CONTRIBUTING.md` : guide de contribution (à compléter avec le mécanisme
-  DCO/CLA choisi).
+- `CONTRIBUTING.md` : guide de contribution avec le **mécanisme DCO**
+  (`Signed-off-by`) et le parcours de PR.
 - Fichiers `LICENSE` par SDK/bibliothèque : à créer lors de la première
   publication d'un SDK ou d'une bibliothèque autonome.

@@ -5,75 +5,118 @@ namespace App\Http\Controllers;
 use App\Models\Authenticator;
 use App\Models\User;
 use App\Support\Audit\AuditLogger;
+use App\Support\Auth\AuthSessionResponse;
+use App\Support\Auth\DeviceVerificationService;
+use App\Support\Auth\WebAuthnService;
+use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
 
 class PasskeyController extends Controller
 {
-    private const CHALLENGE_TTL = 300;
+    public function __construct(private readonly WebAuthnService $webauthn) {}
 
     /**
      * Public — issue a WebAuthn assertion challenge for passkey sign-in.
      */
     public function options(Request $request): JsonResponse
     {
-        $challenge = Str::random(64);
-
-        return response()->json([
-            'challenge' => $challenge,
-            'rp_id' => $request->getHost(),
-            'timeout' => 60_000,
-            'allow_credentials' => [],
-        ]);
+        return response()->json($this->webauthn->assertionOptions($request));
     }
 
     /**
      * Public — verify a WebAuthn assertion and sign the user in (passkeys,
      * YubiKey, Touch ID / Face ID, Windows Hello — all through WebAuthn).
+     * The challenge is single-use (anti-replay), the signature is verified
+     * against the stored credential public key and the sign counter must be
+     * strictly increasing.
      */
     public function verify(Request $request): JsonResponse
     {
         $data = $request->validate([
             'credential.id' => ['required', 'string'],
+            'credential.raw_id' => ['nullable', 'string'],
+            'credential.type' => ['nullable', 'string'],
             'credential.response.client_data_json' => ['required', 'string'],
-            'credential.response.authenticator_data' => ['required', 'string'],
-            'credential.response.signature' => ['required', 'string'],
+            'credential.response.authenticator_data' => ['nullable', 'string'],
+            'credential.response.signature' => ['nullable', 'string'],
+            'device_id' => ['nullable', 'string', 'max:255'],
+            'platform' => ['nullable', 'string', 'max:40'],
         ]);
 
-        $credential = $data['credential'];
-        $authenticator = Authenticator::query()
-            ->where('credential_id', $credential['id'])
-            ->first();
-
-        if (! $authenticator) {
+        try {
+            $user = $this->webauthn->verifyAssertion($request, $data['credential']);
+        } catch (DomainException $e) {
             AuditLogger::record('auth.passkey_failed', 'authenticator', null, null, null, 'failure');
 
-            return response()->json(['message' => 'Unknown credential.'], 401);
+            return response()->json(['message' => $e->getMessage()], 401);
         }
 
-        $challenge = base64_decode($credential['response']['client_data_json'], true) ?: '';
-        $challengeHash = hash('sha256', $challenge);
-        if (! hash_equals($challengeHash, base64_decode($credential['response']['signature'], true) ?: '')) {
-            AuditLogger::record('auth.passkey_failed', 'authenticator', $authenticator->id, null, null, 'failure');
+        AuditLogger::record('auth.passkey_authenticated', 'authenticator');
 
-            return response()->json(['message' => 'Invalid assertion signature.'], 401);
+        // Unknown-device check: a brand-new passkey/phone must confirm the
+        // sign-in with an e-mailed code before a session is issued.
+        $deviceCheck = $this->deviceCheck($request, $user, $data['device_id'] ?? null, $data['platform'] ?? null);
+        if ($deviceCheck !== null) {
+            return $deviceCheck;
         }
 
-        $authenticator->forceFill([
-            'sign_count' => $authenticator->sign_count + 1,
-            'last_used_at' => now(),
-        ])->save();
+        return response()->json(AuthSessionResponse::make($user, 'omnex-passkey'));
+    }
 
-        $user = $authenticator->user;
-        $token = $user->createToken('omnex-passkey', ['*'])->plainTextToken;
+    /**
+     * Public — verify the 6-digit code sent by e-mail for an unknown device
+     * and complete the sign-in.
+     */
+    public function verifyDevice(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'verification_token' => ['required', 'string'],
+            'code' => ['required', 'string', 'size:6'],
+        ]);
 
-        AuditLogger::record('auth.passkey_authenticated', 'authenticator', $authenticator->id);
+        $verification = app(DeviceVerificationService::class);
+        $resolved = $verification->resolveChallenge($data['verification_token']);
+        if ($resolved === null) {
+            return response()->json(['message' => 'Invalid or expired verification code.'], 410);
+        }
+
+        try {
+            $user = $verification->complete($resolved, $data['code']);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        AuditLogger::record('auth.device_verified', 'user', $user->id, null, [
+            'device_id' => $resolved['device_id'],
+        ]);
+
+        return response()->json(AuthSessionResponse::make($user, 'omnex-device-verified'));
+    }
+
+    private function deviceCheck(Request $request, User $user, ?string $deviceId, ?string $platform): ?JsonResponse
+    {
+        if ($deviceId === null || $deviceId === '') {
+            return null;
+        }
+
+        $verification = app(DeviceVerificationService::class);
+        $device = $verification->touch($user, DeviceVerificationService::fingerprint($deviceId), $platform, 'passkey');
+
+        if ($verification->isKnown($device)) {
+            return null;
+        }
+
+        $token = $verification->beginVerification($user, $device);
+
+        AuditLogger::record('auth.unknown_device_detected', 'user', $user->id, null, [
+            'device_id' => $device->device_id,
+        ]);
 
         return response()->json([
-            'token' => $token,
-            'user' => $user,
+            'requires_device_verification' => true,
+            'verification_token' => $token,
+            'expires_in' => 600,
         ]);
     }
 
@@ -102,60 +145,39 @@ class PasskeyController extends Controller
      */
     public function registerOptions(Request $request): JsonResponse
     {
-        $user = $request->user();
-        $challenge = Str::random(64);
-        $token = Str::random(32);
-        Cache::put("passkey-register:{$token}", $challenge, self::CHALLENGE_TTL);
-
-        return response()->json([
-            'challenge' => $challenge,
-            'rp' => ['id' => $request->getHost(), 'name' => 'OMNEX'],
-            'user' => [
-                'id' => base64_encode((string) $user->id),
-                'name' => $user->email,
-                'display_name' => $user->name,
-            ],
-            'pub_key_cred_params' => [
-                ['type' => 'public-key', 'alg' => -7],
-                ['type' => 'public-key', 'alg' => -257],
-            ],
-            'timeout' => 60_000,
-            'registration_token' => $token,
-        ]);
+        return response()->json($this->webauthn->creationOptions($request, $request->user()));
     }
 
     /**
-     * Authenticated — store a newly created credential.
+     * Authenticated — verify the WebAuthn attestation (signature, origin,
+     * challenge, clientDataJSON) and store the credential public key.
      */
     public function register(Request $request): JsonResponse
     {
         $data = $request->validate([
             'registration_token' => ['required', 'string'],
             'credential.id' => ['required', 'string'],
-            'credential.raw_id' => ['required', 'string'],
+            'credential.raw_id' => ['nullable', 'string'],
+            'credential.type' => ['nullable', 'string'],
             'credential.response.client_data_json' => ['required', 'string'],
-            'credential.response.public_key' => ['nullable', 'string'],
+            'credential.response.attestation_object' => ['required', 'string'],
+            'credential.response.transports' => ['nullable', 'array'],
             'name' => ['nullable', 'string', 'max:100'],
             'transport' => ['nullable', 'string', 'max:20'],
         ]);
 
-        if (! Cache::pull("passkey-register:{$data['registration_token']}")) {
-            return response()->json(['message' => 'Registration challenge expired.'], 409);
+        try {
+            $authenticator = $this->webauthn->verifyAttestation(
+                $request,
+                $request->user(),
+                $data['registration_token'],
+                $data['credential'],
+                $data['name'] ?? null,
+                $data['transport'] ?? null,
+            );
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 409);
         }
-
-        if (Authenticator::query()->where('credential_id', $data['credential']['id'])->exists()) {
-            return response()->json(['message' => 'This credential is already registered.'], 409);
-        }
-
-        $authenticator = Authenticator::query()->create([
-            'user_id' => $request->user()->id,
-            'credential_id' => $data['credential']['id'],
-            'public_key' => $data['credential']['response']['public_key'] ?? 'sandbox',
-            'name' => $data['name'] ?? 'Security key',
-            'transport' => $data['transport'] ?? null,
-            'sign_count' => 0,
-            'last_used_at' => now(),
-        ]);
 
         AuditLogger::record('auth.authenticator_registered', 'authenticator', $authenticator->id);
 

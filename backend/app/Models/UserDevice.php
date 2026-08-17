@@ -2,30 +2,27 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Authenticator extends Model
+class UserDevice extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
         'user_id',
-        'credential_id',
-        'public_key',
-        'credential_data',
-        'sign_count',
-        'name',
-        'transport',
-        'last_used_at',
+        'device_id',
+        'platform',
+        'method',
+        'first_seen_at',
+        'last_seen_at',
+        'verified_at',
     ];
 
     protected function casts(): array
     {
         return [
-            'sign_count' => 'integer',
-            'last_used_at' => 'datetime',
+            'first_seen_at' => 'datetime',
+            'last_seen_at' => 'datetime',
+            'verified_at' => 'datetime',
         ];
     }
 

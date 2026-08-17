@@ -19,6 +19,14 @@ export OMNEX_DEV="${LOCALAPPDATA}/omnex-dev"
 export COMPOSER_HOME="${OMNEX_DEV}/composer-home"
 export PATH="${OMNEX_DEV}/php:${OMNEX_DEV}/pg/pgsql/bin:${PATH}"
 
+# The portable PHP's OpenSSL needs a config file (it ships without one). Without
+# it, openssl_pkey_new(OPENSSL_KEYTYPE_EC) fails — required by WebAuthn tests.
+_omnex_openssl_conf="${OMNEX_DEV}/php/openssl.cnf"
+if [ ! -f "${_omnex_openssl_conf}" ]; then
+  printf 'openssl_conf = openssl_init\n\n[openssl_init]\nproviders = provider_sect\n\n[provider_sect]\ndefault = default_sect\n\n[default_sect]\nactivate = 1\n' > "${_omnex_openssl_conf}"
+fi
+export OPENSSL_CONF="${_omnex_openssl_conf}"
+
 php() {
   "${OMNEX_DEV}/php/php.exe" "$@"
 }

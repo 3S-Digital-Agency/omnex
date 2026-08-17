@@ -45,21 +45,103 @@ describe('MockApiClient', () => {
     expect(options.challenge.length).toBeGreaterThan(16);
     expect(options.rp_id.length).toBeGreaterThan(0);
 
-    const session = await api.verifyPasskey({
-      id: 'cred-passkey-demo',
-      raw_id: 'cred-passkey-demo',
-      type: 'public-key',
-      response: {
-        client_data_json: 'eyJjaGFsbGVuZ2UiOiJ4In0',
-        authenticator_data: 'YWJj',
-        signature: 'c2ln',
+    const res = await api.verifyPasskey(
+      {
+        id: 'cred-passkey-demo',
+        raw_id: 'cred-passkey-demo',
+        type: 'public-key',
+        response: {
+          client_data_json: 'eyJjaGFsbGVuZ2UiOiJ4In0',
+          authenticator_data: 'YWJj',
+          signature: 'c2ln',
+        },
       },
-    });
-    expect(session.user.email).toBe('demo@omnex.cloud');
-    expect(session.token).toContain('mock-token');
+      { device_id: 'test-device-passkey', platform: 'mac' },
+    );
+    if ('requires_device_verification' in res) {
+      const session = await api.verifyDevice(res.verification_token, '123456');
+      expect(session.user.email).toBe('demo@omnex.cloud');
+      expect(session.token).toContain('mock-token');
+    } else {
+      expect(res.user.email).toBe('demo@omnex.cloud');
+      expect(res.token).toContain('mock-token');
+    }
 
     const accounts = await api.listSocialAccounts();
     expect(accounts.some((account) => account.provider === 'passkey')).toBe(true);
+  });
+
+  it('completes a cross-device iPhone pairing against the sandbox', async () => {
+    const api = new MockApiClient();
+    const start = await api.startCrossDevice();
+    expect(start.pairing_code).toHaveLength(8);
+    expect(start.qr_payload).toContain(`code=${start.pairing_code}`);
+    expect(start.challenge.length).toBeGreaterThan(16);
+
+    const res = await api.approveCrossDevice({
+      pairing_code: start.pairing_code,
+      device: 'iphone',
+      method: 'face_id',
+      device_id: 'test-device-iphone',
+    });
+    if ('requires_device_verification' in res) {
+      const session = await api.verifyDevice(res.verification_token, '123456');
+      expect(session.user.email).toBe('demo@omnex.cloud');
+      expect(session.token).toContain('mock-token');
+    } else {
+      expect(res.user.email).toBe('demo@omnex.cloud');
+      expect(res.token).toContain('mock-token');
+    }
+  });
+
+  it('completes a cross-device pairing from an Android phone (fingerprint)', async () => {
+    const api = new MockApiClient();
+    const start = await api.startCrossDevice();
+    const res = await api.approveCrossDevice({
+      pairing_code: start.pairing_code,
+      device: 'android',
+      method: 'fingerprint',
+      device_id: 'test-device-android',
+    });
+    if ('requires_device_verification' in res) {
+      const session = await api.verifyDevice(res.verification_token, '123456');
+      expect(session.user.email).toBe('demo@omnex.cloud');
+      expect(session.token).toContain('mock-token');
+    } else {
+      expect(res.user.email).toBe('demo@omnex.cloud');
+      expect(res.token).toContain('mock-token');
+    }
+  });
+
+  it('requires device verification on a new device and rejects a wrong code', async () => {
+    const api = new MockApiClient();
+    const start = await api.startCrossDevice();
+    const res = await api.approveCrossDevice({
+      pairing_code: start.pairing_code,
+      device: 'iphone',
+      method: 'face_id',
+      device_id: 'brand-new-device',
+    });
+    expect('requires_device_verification' in res).toBe(true);
+    if ('requires_device_verification' in res) {
+      await expect(api.verifyDevice(res.verification_token, '000000')).rejects.toMatchObject({ status: 422 });
+    }
+
+    // Wrong code must not mark the device as known.
+    const start2 = await api.startCrossDevice();
+    const res2 = await api.approveCrossDevice({
+      pairing_code: start2.pairing_code,
+      device: 'iphone',
+      device_id: 'brand-new-device',
+    });
+    expect('requires_device_verification' in res2).toBe(true);
+  });
+
+  it('rejects an invalid cross-device pairing code', async () => {
+    const api = new MockApiClient();
+    await expect(
+      api.approveCrossDevice({ pairing_code: 'SHORT', device: 'iphone', method: 'face_id' }),
+    ).rejects.toMatchObject({ status: 410 });
   });
 
   it('lists, registers and revokes authenticators and updates the security level', async () => {
@@ -81,7 +163,7 @@ describe('MockApiClient', () => {
         id: 'cred-new-yubikey',
         raw_id: 'cred-new-yubikey',
         type: 'public-key',
-        response: { client_data_json: 'e30', authenticator_data: '', signature: '' },
+        response: { client_data_json: 'e30', attestation_object: 'o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YVk', transports: ['usb'] },
       },
       name: 'YubiKey Backup 2',
       transport: 'usb',

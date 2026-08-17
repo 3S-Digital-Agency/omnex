@@ -318,4 +318,5 @@ defined by the public constitution in [`GOVERNANCE.md`](GOVERNANCE.md)
 (roles, decision-making, maintainers, DCO/CLA). The OMNEX™ brand is governed
 by the distinct [`BRAND_POLICY.md`](BRAND_POLICY.md). Contributions are
 governed by DCO or CLA (strategy to be decided); see the licensing policy
-for details.
+for details. Want to help? Read [`CONTRIBUTING.md`](CONTRIBUTING.md)
+(contribution workflow, commit conventions, DCO sign-off).
