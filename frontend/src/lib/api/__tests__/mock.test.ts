@@ -1,5 +1,5 @@
 import { ALERT_THRESHOLDS, MockApiClient } from '../mock';
-import type { ActivityItem, ServerMetricsDto } from '../types';
+import type { ActivityItem, MfaPolicy, ServerMetricsDto } from '../types';
 
 describe('MockApiClient', () => {
   it('logs in with the seeded demo account', async () => {
@@ -37,6 +37,66 @@ describe('MockApiClient', () => {
     const members = await api.listMembers('org-omnex-hq');
     expect(members.length).toBeGreaterThan(0);
     expect(members.every((m) => m.organization?.id === 'org-omnex-hq')).toBe(true);
+  });
+
+  it('completes a passkey sign-in against the sandbox', async () => {
+    const api = new MockApiClient();
+    const options = await api.passkeyRequestOptions();
+    expect(options.challenge.length).toBeGreaterThan(16);
+    expect(options.rp_id.length).toBeGreaterThan(0);
+
+    const session = await api.verifyPasskey({
+      id: 'cred-passkey-demo',
+      raw_id: 'cred-passkey-demo',
+      type: 'public-key',
+      response: {
+        client_data_json: 'eyJjaGFsbGVuZ2UiOiJ4In0',
+        authenticator_data: 'YWJj',
+        signature: 'c2ln',
+      },
+    });
+    expect(session.user.email).toBe('demo@omnex.cloud');
+    expect(session.token).toContain('mock-token');
+
+    const accounts = await api.listSocialAccounts();
+    expect(accounts.some((account) => account.provider === 'passkey')).toBe(true);
+  });
+
+  it('lists, registers and revokes authenticators and updates the security level', async () => {
+    const api = new MockApiClient();
+    await api.login({ email: 'demo@omnex.cloud', password: 'password' });
+
+    const seeded = await api.listAuthenticators();
+    expect(seeded.length).toBeGreaterThanOrEqual(3);
+    expect(seeded[0]).toHaveProperty('name');
+    expect(seeded[0]).toHaveProperty('last_used_at');
+
+    const options = await api.passkeyRegisterOptions();
+    expect(options.registration_token).toBeTruthy();
+    expect(options.pub_key_cred_params.length).toBeGreaterThan(0);
+
+    const registered = await api.registerPasskey({
+      registration_token: options.registration_token,
+      credential: {
+        id: 'cred-new-yubikey',
+        raw_id: 'cred-new-yubikey',
+        type: 'public-key',
+        response: { client_data_json: 'e30', authenticator_data: '', signature: '' },
+      },
+      name: 'YubiKey Backup 2',
+      transport: 'usb',
+    });
+    expect(registered.name).toBe('YubiKey Backup 2');
+
+    const after = await api.listAuthenticators();
+    expect(after.length).toBe(seeded.length + 1);
+
+    await api.revokeAuthenticator(registered.id);
+    expect((await api.listAuthenticators()).length).toBe(seeded.length);
+
+    expect(await api.updateSecurityLevel('critical')).toBe('critical');
+    const me = await api.me();
+    expect(me.user.security_level).toBe('critical');
   });
 
   it('requires MFA verification when enabled', async () => {
@@ -111,7 +171,8 @@ describe('MockApiClient', () => {
       password_confirmation: 'password123',
     });
 
-    expect((await api.listDrive()).files).toHaveLength(0);
+    // Four demo files are seeded at the root for the Drive cockpit.
+    expect((await api.listDrive()).files).toHaveLength(4);
 
     const folder = await api.createFolder(null, 'Projects');
     const file = await api.uploadFile(folder.id, 'notes.txt', 'hello');
@@ -155,6 +216,25 @@ describe('MockApiClient', () => {
     const restored = await api.restoreFileVersion(file.id, v1!.id);
     expect(restored.version).toBe(3);
     expect(restored.size).toBe(3);
+  });
+
+  it('exposes a cumulative usage history with seeded bytes', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Drive History Tester',
+      email: 'drive-history-tester@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    const { samples } = await api.getDriveUsageHistory();
+    expect(samples).toHaveLength(30);
+    expect(samples[0]).toHaveProperty('date');
+    expect(samples[0]).toHaveProperty('bytes');
+    // Cumulative: never decreases, newest last.
+    const bytes = samples.map((s) => s.bytes);
+    expect(bytes).toEqual([...bytes].sort((a, b) => a - b));
+    expect(bytes[bytes.length - 1]).toBeGreaterThan(0);
   });
 
   it('creates and rolls back a DNS record', async () => {
@@ -310,7 +390,8 @@ describe('MockApiClient', () => {
       password_confirmation: 'password123',
     });
 
-    expect(await api.listSites()).toHaveLength(0);
+    // Two demo sites are seeded for the Sites cockpit.
+    expect(await api.listSites()).toHaveLength(2);
 
     const site = await api.createSite({
       name: 'Marketing',
@@ -339,7 +420,8 @@ describe('MockApiClient', () => {
     expect(deployments).toHaveLength(2);
 
     await api.deleteSite(site.id);
-    expect(await api.listSites()).toHaveLength(0);
+    // Back to the two seeded demo sites.
+    expect(await api.listSites()).toHaveLength(2);
   });
 
   it('keeps serving the previous deployment when a deploy fails', async () => {
@@ -375,7 +457,8 @@ describe('MockApiClient', () => {
       password_confirmation: 'password123',
     });
 
-    expect(await api.listServers()).toHaveLength(0);
+    // Two demo servers are seeded for the fleet cockpit.
+    expect(await api.listServers()).toHaveLength(2);
 
     const server = await api.createServer({
       name: 'web-01',
@@ -411,7 +494,8 @@ describe('MockApiClient', () => {
     expect((await api.getServer(server.id)).tags).toEqual(['prod']);
 
     await api.deleteServer(server.id);
-    expect(await api.listServers()).toHaveLength(0);
+    // Back to the two seeded demo servers.
+    expect(await api.listServers()).toHaveLength(2);
   });
 
   it('records a failed operation for servers whose name contains fail', async () => {
@@ -878,6 +962,9 @@ describe('MockApiClient', () => {
     const plans = await api.listBillingPlans();
     expect(plans.map((p) => p.slug)).toEqual(['free', 'starter', 'pro', 'business']);
 
+    // A demo Starter subscription is seeded for the billing cockpit.
+    const seeded = await api.getSubscription();
+    if (seeded) await api.cancelSubscription(seeded.id);
     expect(await api.getSubscription()).toBeNull();
 
     const result = await api.subscribeToPlan('pro');
@@ -888,7 +975,8 @@ describe('MockApiClient', () => {
     expect(current?.plan?.slug).toBe('pro');
 
     const invoices = await api.listInvoices();
-    expect(invoices).toHaveLength(1);
+    // Three seeded demo invoices + the fresh one.
+    expect(invoices.length).toBeGreaterThanOrEqual(4);
     expect(invoices[0].status).toBe('paid');
     expect(invoices[0].plan?.slug).toBe('pro');
   });
@@ -896,6 +984,9 @@ describe('MockApiClient', () => {
   it('rejects a duplicate billing subscription', async () => {
     const api = new MockApiClient();
     await api.login({ email: 'demo@omnex.cloud', password: 'password' });
+
+    const seeded = await api.getSubscription();
+    if (seeded) await api.cancelSubscription(seeded.id);
 
     await api.subscribeToPlan('starter');
     await expect(api.subscribeToPlan('starter')).rejects.toMatchObject({
@@ -913,8 +1004,10 @@ describe('MockApiClient', () => {
     expect(coupon.discount_type).toBe('percent');
     expect(coupon.discount).toBe(2500); // 25% of the 10000 sample
 
+    // Seeded credits: 1000 welcome - 200 applied on invoice 2026-0715.
+    const seededBalance = (await api.getCredits()).balance;
     await api.addCredits(2000, 'Welcome credit');
-    expect((await api.getCredits()).balance).toBe(2000);
+    expect((await api.getCredits()).balance).toBe(seededBalance + 2000);
 
     const result = await api.subscribeToPlan('business', 'sandbox', 'LAUNCH25');
     expect(result.subscription.coupon?.code).toBe('LAUNCH25');
@@ -923,8 +1016,8 @@ describe('MockApiClient', () => {
     const invoice = invoices[0];
     expect(invoice.amount).toBe(19900);
     expect(invoice.discount).toBe(4975); // 25% of 19900
-    expect(invoice.credit_applied).toBe(2000);
-    expect(invoice.amount_due).toBe(12925);
+    expect(invoice.credit_applied).toBe(seededBalance + 2000);
+    expect(invoice.amount_due).toBe(19900 - 4975 - (seededBalance + 2000));
     expect((await api.getCredits()).balance).toBe(0);
 
     await expect(api.validateCoupon('NOPE')).rejects.toMatchObject({ status: 422 });
@@ -1023,5 +1116,220 @@ describe('MockApiClient', () => {
         message: 'A sufficiently long message here.',
       }),
     ).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('serves published landing pages publicly with locale content', async () => {
+    const api = new MockApiClient();
+
+    const offer = await api.getLandingPage('launch-offer');
+    expect(offer.type).toBe('offer');
+    expect(offer.status).toBe('published');
+    expect(offer.content_en[0]).toMatchObject({ kind: 'hero' });
+    expect(offer.content_en.some((s) => s.kind === 'offer')).toBe(true);
+    expect(offer.content_fr[0]).toMatchObject({ kind: 'hero' });
+
+    const promo = await api.getLandingPage('omnex-20');
+    expect(promo.type).toBe('promo');
+    expect(promo.content_en.some((s) => s.kind === 'promo')).toBe(true);
+
+    const comparison = await api.getLandingPage('omnex-vs-consoles');
+    expect(comparison.type).toBe('comparison');
+    expect(comparison.content_en.some((s) => s.kind === 'comparison')).toBe(true);
+  });
+
+  it('hides unknown or unpublished landing pages from the public endpoint', async () => {
+    const api = new MockApiClient();
+
+    await expect(api.getLandingPage('does-not-exist')).rejects.toMatchObject({ status: 404 });
+
+    // A draft created by an owner must not be served publicly.
+    await api.login({ email: 'demo@omnex.cloud', password: 'password' });
+    const draft = await api.createLandingPage({
+      slug: 'secret-draft',
+      type: 'offer',
+      status: 'draft',
+      content_en: [{ kind: 'hero', title: 'Draft', subtitle: 'Hidden', cta_label: 'Go' }],
+      content_fr: [{ kind: 'hero', title: 'Brouillon', subtitle: 'Caché', cta_label: 'Aller' }],
+    });
+    expect(draft.status).toBe('draft');
+    await expect(api.getLandingPage('secret-draft')).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('lets an owner manage landing pages (create, update, publish, delete)', async () => {
+    const api = new MockApiClient();
+    await api.login({ email: 'demo@omnex.cloud', password: 'password' });
+
+    const created = await api.createLandingPage({
+      slug: 'summer-offer',
+      type: 'offer',
+      status: 'draft',
+      content_en: [{ kind: 'hero', title: 'Summer', subtitle: 'Hot deal', cta_label: 'Start' }],
+      content_fr: [{ kind: 'hero', title: 'Été', subtitle: 'Offre chaude', cta_label: 'Commencer' }],
+    });
+    expect(created.id).toBeTruthy();
+    expect(created.published_at).toBeNull();
+
+    const listed = await api.listLandingPages();
+    expect(listed.some((p) => p.slug === 'summer-offer')).toBe(true);
+
+    const published = await api.updateLandingPage(created.id, {
+      slug: 'summer-offer',
+      type: 'offer',
+      status: 'published',
+      content_en: created.content_en,
+      content_fr: created.content_fr,
+    });
+    expect(published.status).toBe('published');
+    expect(published.published_at).toBeTruthy();
+
+    // Now visible publicly.
+    expect((await api.getLandingPage('summer-offer')).status).toBe('published');
+
+    await api.deleteLandingPage(created.id);
+    await expect(api.getLandingPage('summer-offer')).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('validates landing page input and requires auth', async () => {
+    const api = new MockApiClient();
+    await api.logout(); // mock auth state is module-level
+
+    await expect(api.listLandingPages()).rejects.toMatchObject({ status: 401 });
+    await expect(
+      api.createLandingPage({
+        slug: 'Bad Slug!',
+        type: 'offer',
+        status: 'draft',
+        content_en: [],
+        content_fr: [],
+      }),
+    ).rejects.toMatchObject({ status: 401 });
+
+    // A freshly registered user is never MFA-gated (the demo account may be
+    // left with MFA enabled by an earlier test in this file).
+    await api.register({
+      name: 'Landing Tester',
+      email: 'landing-tester@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+    await expect(
+      api.createLandingPage({
+        slug: 'Bad Slug!',
+        type: 'offer',
+        status: 'draft',
+        content_en: [{ kind: 'hero', title: 'X', subtitle: 'Y', cta_label: 'Z' }],
+        content_fr: [{ kind: 'hero', title: 'X', subtitle: 'Y', cta_label: 'Z' }],
+      }),
+    ).rejects.toMatchObject({ status: 422, fieldErrors: { slug: expect.any(Array) } });
+
+    await expect(
+      api.createLandingPage({
+        slug: 'launch-offer', // already exists
+        type: 'offer',
+        status: 'draft',
+        content_en: [{ kind: 'hero', title: 'X', subtitle: 'Y', cta_label: 'Z' }],
+        content_fr: [{ kind: 'hero', title: 'X', subtitle: 'Y', cta_label: 'Z' }],
+      }),
+    ).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('manages the MFA policy and enforces it in the scan', async () => {
+    const api = new MockApiClient();
+    await api.logout();
+    await expect(api.getSecuritySettings()).rejects.toMatchObject({ status: 401 });
+
+    // A freshly registered user has no MFA, so a required policy must flag them.
+    await api.register({
+      name: 'Phase7 Tester',
+      email: 'phase7-tester@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    expect((await api.getSecuritySettings()).mfa_policy).toBe('optional');
+    expect((await api.updateSecuritySettings({ mfa_policy: 'required' })).mfa_policy).toBe('required');
+    await expect(api.updateSecuritySettings({ mfa_policy: 'sometimes' as MfaPolicy })).rejects.toMatchObject({ status: 422 });
+
+    const rules = (await api.getSecurityScore()).findings.map((f) => f.rule);
+    expect(rules).toContain('mfa_enforcement');
+    expect(rules).toContain('mfa');
+  });
+
+  it('lists and revokes active sessions', async () => {
+    const api = new MockApiClient();
+    await api.logout();
+    await expect(api.listSessions()).rejects.toMatchObject({ status: 401 });
+
+    await api.register({
+      name: 'Session Tester',
+      email: 'session-tester@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    const sessions = await api.listSessions();
+    expect(sessions.length).toBeGreaterThanOrEqual(3);
+    expect(sessions.some((s) => s.is_current)).toBe(true);
+    expect(sessions.some((s) => s.ip_address)).toBe(true);
+
+    const other = sessions.find((s) => !s.is_current);
+    await api.revokeSession(other!.id);
+    expect((await api.listSessions()).some((s) => s.id === other!.id)).toBe(false);
+    await expect(api.revokeSession('does-not-exist')).rejects.toMatchObject({ status: 404 });
+
+    await api.revokeOtherSessions();
+    const remaining = await api.listSessions();
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].is_current).toBe(true);
+  });
+
+  it('exposes certificate checks for SSL monitoring', async () => {
+    const api = new MockApiClient();
+    await api.logout();
+    await api.register({
+      name: 'Ssl Tester',
+      email: 'ssl-tester@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    const checks = await api.listSslChecks();
+    expect(Array.isArray(checks)).toBe(true);
+    // Seeded domains are monitored (at least omnex.cloud).
+    expect(checks.length).toBeGreaterThanOrEqual(1);
+    expect(checks.every((c) => ['valid', 'expiring', 'invalid'].includes(c.status))).toBe(true);
+  });
+
+  it('exposes the persisted security score history', async () => {
+    const api = new MockApiClient();
+    await api.logout();
+    await api.register({
+      name: 'History Tester',
+      email: 'history-tester@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    const first = await api.getSecurityHistory();
+    expect(first.samples.length).toBeGreaterThanOrEqual(10);
+    expect(first.samples[0]).toHaveProperty('score');
+    expect(first.samples[0]).toHaveProperty('created_at');
+    // Chronological order (newest last).
+    const dates = first.samples.map((s) => new Date(s.created_at ?? 0).getTime());
+    expect(dates).toEqual([...dates].sort((a, b) => a - b));
+
+    // Dismissing findings appends a new sample reflecting the new score.
+    const report = await api.getSecurityScore();
+    const before = report.score;
+    for (const finding of report.findings) {
+      await api.dismissSecurityFinding(finding.id);
+    }
+
+    const after = (await api.getSecurityScore()).score;
+    expect(after).toBeGreaterThan(before);
+
+    const second = await api.getSecurityHistory();
+    expect(second.samples.length).toBeGreaterThan(first.samples.length);
+    expect(second.samples[second.samples.length - 1].score).toBe(after);
   });
 });

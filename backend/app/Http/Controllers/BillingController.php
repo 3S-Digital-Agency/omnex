@@ -59,6 +59,13 @@ class BillingController extends Controller
         ]);
     }
 
+    public function costBreakdown(Request $request): JsonResponse
+    {
+        $this->authorize('billing.read');
+
+        return response()->json($this->billing->costBreakdown($this->activeOrganization()));
+    }
+
     public function subscribe(Request $request): JsonResponse
     {
         $this->authorize('billing.manage');

@@ -1,18 +1,33 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BellOff, CheckCheck, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Activity,
+  BellOff,
+  CheckCheck,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Flame,
+  TrendingUp,
+} from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
 import { useI18n } from '../../lib/i18n';
 import { useActivityFeed } from '../../lib/useActivityFeed';
 import { ActivityFeedList } from '../../components/activity/ActivityFeedList';
+import { AreaChart } from '../../components/viz/AreaChart';
+import { Heatmap } from '../../components/viz/Heatmap';
+import { KpiCard } from '../../components/viz/KpiCard';
+import { MiniBars } from '../../components/viz/MiniBars';
+import { PeriodSelector } from '../../components/viz/PeriodSelector';
+import type { PeriodDays } from '../../components/viz/PeriodSelector';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Select } from '../../components/ui/Select';
 import { EmptyState, Spinner } from '../../components/ui/Spinner';
 import { api } from '../../lib/api';
-import type { NotificationDto, NotificationSeverity } from '../../lib/api/types';
+import type { ActivityItem, NotificationDto, NotificationSeverity } from '../../lib/api/types';
 import {
   NOTIFICATION_SEVERITY_META,
   NOTIFICATION_SEVERITIES,
@@ -36,6 +51,7 @@ export function ActivityPage() {
   const { activeOrganization } = useAuth();
   const { t } = useI18n();
   const [tab, setTab] = useState<Tab>('notifications');
+  const { items: activityItems } = useActivityFeed(!!activeOrganization);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -48,6 +64,8 @@ export function ActivityPage() {
         </div>
         <Badge tone="success">{t('common.live')}</Badge>
       </header>
+
+      <ActivityCockpit items={activityItems} />
 
       <div
         role="tablist"
@@ -62,7 +80,7 @@ export function ActivityPage() {
         </TabButton>
       </div>
 
-      {tab === 'notifications' ? <NotificationsPanel /> : <ActivityPanel />}
+      {tab === 'notifications' ? <NotificationsPanel /> : <ActivityPanel items={activityItems} />}
     </div>
   );
 }
@@ -91,18 +109,12 @@ function TabButton({
   );
 }
 
-function ActivityPanel() {
-  const { activeOrganization } = useAuth();
+function ActivityPanel({ items }: { items: ActivityItem[] }) {
   const { t } = useI18n();
-  const { items, isLoading } = useActivityFeed(!!activeOrganization);
 
   return (
     <Card className="p-5">
-      {isLoading ? (
-        <div className="flex justify-center py-10">
-          <Spinner />
-        </div>
-      ) : items.length > 0 ? (
+      {items.length > 0 ? (
         <ActivityFeedList items={items} />
       ) : (
         <EmptyState title={t('activity.noActivity')} />
@@ -279,6 +291,226 @@ function NotificationsPanel() {
         </div>
       ) : null}
     </Card>
+  );
+}
+
+const ACTIVITY_TYPES = ['deployment', 'domain', 'ssl', 'security', 'backup', 'incident', 'auth', 'member', 'organization'] as const;
+
+const TYPE_TONES: Record<string, string> = {
+  deployment: 'bg-sky-500',
+  domain: 'bg-brand-500',
+  ssl: 'bg-amber-500',
+  security: 'bg-emerald-500',
+  backup: 'bg-violet-500',
+  incident: 'bg-red-500',
+  auth: 'bg-zinc-400',
+  member: 'bg-teal-500',
+  organization: 'bg-fuchsia-500',
+};
+
+/** Deterministic PRNG so the demo history is stable across re-renders. */
+function mulberry32(seed: number): () => number {
+  let a = seed;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Activity cockpit: 30-day volume trend, per-type volume bars and a
+ * (day × hour) intensity heatmap. The last 30 days come from a deterministic
+ * demo history; today's bucket merges the live SSE feed so the charts update
+ * in real time.
+ */
+function ActivityCockpit({ items }: { items: ActivityItem[] }) {
+  const { t } = useI18n();
+  const [period, setPeriod] = useState<PeriodDays>(30);
+
+  const history = useMemo(() => {
+    const random = mulberry32(20260816);
+    const now = new Date();
+    const dayMs = 86400000;
+    const days: number[] = [];
+    const dayTotals: number[] = [];
+    const typeCounts = new Map<string, number>();
+    for (const type of ACTIVITY_TYPES) typeCounts.set(type, 0);
+
+    for (let offset = period - 1; offset >= 0; offset--) {
+      const date = new Date(now.getTime() - offset * dayMs);
+      const weekday = date.getDay();
+      // Weekends are quieter, occasional burst days stand out.
+      const weekend = weekday === 0 || weekday === 6 ? 0.55 : 1;
+      const burst = random() > 0.85 ? 1.9 : 1;
+      const base = Math.round((3 + random() * 7) * weekend * burst);
+      const hourly = Array.from({ length: 24 }, (_, hour) => {
+        const daytime = hour >= 8 && hour <= 18 ? 2.2 : hour >= 19 && hour <= 23 ? 1.2 : 0.4;
+        return Math.max(0, Math.round((random() * 0.9 + 0.1) * base * daytime * 0.14));
+      });
+      const total = hourly.reduce((sum, value) => sum + value, 0);
+      days.push(...hourly);
+      dayTotals.push(total);
+      if (total === 0) continue;
+      for (const type of ACTIVITY_TYPES) {
+        const share = type === 'deployment' ? 0.2 : type === 'domain' ? 0.16 : type === 'ssl' ? 0.12 : type === 'security' ? 0.12 : type === 'backup' ? 0.1 : type === 'incident' ? 0.06 : type === 'auth' ? 0.1 : type === 'member' ? 0.08 : 0.06;
+        typeCounts.set(type, (typeCounts.get(type) ?? 0) + Math.round(total * share * (0.75 + random() * 0.5)));
+      }
+    }
+
+    // Merge the live feed into today's buckets.
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayBase = new Array(24).fill(0);
+    for (let offset = 0; offset < 24; offset++) {
+      const index = days.length - 24 + offset;
+      todayBase[offset] = days[index];
+    }
+    for (const item of items) {
+      if (!item.created_at) continue;
+      const date = new Date(item.created_at);
+      if (date.getTime() < today.getTime()) continue;
+      const hour = date.getHours();
+      const index = days.length - 24 + hour;
+      days[index] = (days[index] ?? 0) + 1;
+      todayBase[hour] = (todayBase[hour] ?? 0) + 1;
+      if (typeCounts.has(item.type)) typeCounts.set(item.type, (typeCounts.get(item.type) ?? 0) + 1);
+      else typeCounts.set('system', (typeCounts.get('system') ?? 0) + 1);
+    }
+    if (!typeCounts.has('system')) typeCounts.set('system', 0);
+
+    const liveToday = items.filter((item) => item.created_at && new Date(item.created_at).getTime() >= today.getTime()).length;
+    const dayTotalsLive = [...dayTotals];
+    dayTotalsLive[dayTotalsLive.length - 1] += liveToday;
+    const total30 = dayTotalsLive.reduce((sum, value) => sum + value, 0);
+    const maxDay = Math.max(...dayTotalsLive, 1);
+
+    // 7 most recent days × 24 hours for the heatmap.
+    const last7 = days.slice(-24 * 7);
+    const heatRows: { value: number; label: string }[][] = [];
+    for (let row = 0; row < 7; row++) {
+      const offset = row * 24;
+      const date = new Date(today.getTime() + (row - 6) * dayMs);
+      const rowCells: { value: number; label: string }[] = [];
+      for (let hour = 0; hour < 24; hour++) {
+        const value = last7[offset + hour] ?? 0;
+        const label = `${date.toLocaleDateString(undefined, { weekday: 'short' })} ${String(hour).padStart(2, '0')}:00`;
+        rowCells.push({ value, label });
+      }
+      heatRows.push(rowCells);
+    }
+
+    return { dayTotals: dayTotalsLive, total30, maxDay, typeCounts, heatRows, todayBase, liveToday };
+  }, [items, period]);
+
+  const total30 = history.total30;
+  const todayTotal = history.todayBase.reduce((sum, value) => sum + value, 0);
+  const avg = Math.round((total30 - history.liveToday) / Math.max(1, period));
+  const activeHours = history.todayBase.filter((value) => value > 0).length;
+
+  const bars = ACTIVITY_TYPES.map((type) => ({
+    label: t(`activity.type.${type}`),
+    value: history.typeCounts.get(type) ?? 0,
+    tone: TYPE_TONES[type],
+  }));
+  const systemCount = history.typeCounts.get('system') ?? 0;
+  if (systemCount > 0) bars.push({ label: t('activity.type.system'), value: systemCount, tone: 'bg-zinc-500' });
+  bars.sort((a, b) => b.value - a.value);
+
+  const hourColumns = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, '0'));
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard
+          label={t('activity.cockpit.total', { days: period })}
+          value={total30}
+          icon={Activity}
+          to="/activity"
+          ariaLabel={t('activity.cockpit.totalAria', { days: period })}
+          sub={t('activity.cockpit.totalSub')}
+        />
+        <KpiCard
+          label={t('activity.cockpit.today')}
+          value={todayTotal}
+          icon={Flame}
+          to="/activity"
+          accent={todayTotal > 0 ? 'bg-amber-500/15 text-amber-300' : 'bg-brand-700/15 text-brand-300'}
+          ariaLabel={t('activity.cockpit.todayAria')}
+          sub={t('activity.cockpit.todaySub')}
+        />
+        <KpiCard
+          label={t('activity.cockpit.avg')}
+          value={avg}
+          icon={TrendingUp}
+          to="/activity"
+          ariaLabel={t('activity.cockpit.avgAria')}
+          sub={t('activity.cockpit.avgSub')}
+        />
+        <KpiCard
+          label={t('activity.cockpit.hours')}
+          value={activeHours}
+          icon={Clock}
+          to="/activity"
+          accent={activeHours >= 16 ? 'bg-emerald-500/15 text-emerald-300' : 'bg-brand-700/15 text-brand-300'}
+          ariaLabel={t('activity.cockpit.hoursAria')}
+          sub={t('activity.cockpit.hoursSub')}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <Card className="p-5 lg:col-span-2">            <div className="flex items-baseline justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-white">{t('activity.cockpit.trendTitle', { days: period })}</h3>
+                <p className="mt-1 text-xs text-zinc-500">{t('activity.cockpit.trendSub', { days: period })}</p>
+              </div>
+              <PeriodSelector value={period} onChange={setPeriod} />
+            </div>
+          <AreaChart
+            values={history.dayTotals}
+            height={110}
+            className="mt-4 text-brand-400"
+            label={t('activity.cockpit.trendTitle', { days: period })}
+          />
+        </Card>
+
+        <Card className="p-5">
+          <h3 className="text-sm font-semibold text-white">{t('activity.cockpit.byType')}</h3>
+          <p className="mt-1 text-xs text-zinc-500">{t('activity.cockpit.byTypeSub')}</p>
+          <MiniBars data={bars} height={110} className="mt-4" />
+        </Card>
+      </div>
+
+      <Card className="p-5">
+        <div className="flex items-baseline justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-white">{t('activity.cockpit.heatmapTitle')}</h3>
+            <p className="mt-1 text-xs text-zinc-500">{t('activity.cockpit.heatmapSub')}</p>
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] text-zinc-500">
+            {t('activity.cockpit.less')}
+            <span className="h-2.5 w-2.5 rounded-[3px] bg-white/[0.04]" />
+            <span className="h-2.5 w-2.5 rounded-[3px] bg-brand-800/70" />
+            <span className="h-2.5 w-2.5 rounded-[3px] bg-brand-700" />
+            <span className="h-2.5 w-2.5 rounded-[3px] bg-brand-600" />
+            <span className="h-2.5 w-2.5 rounded-[3px] bg-brand-500" />
+            {t('activity.cockpit.more')}
+          </div>
+        </div>
+        <div className="mt-4">
+          <Heatmap
+            data={history.heatRows}
+            columns={hourColumns}
+            label={t('activity.cockpit.heatmapTitle')}
+          />
+        </div>
+        <p className="mt-3 text-center text-[10px] text-zinc-600">
+          {t('activity.cockpit.heatmapFooter')}
+        </p>
+      </Card>
+    </div>
   );
 }
 

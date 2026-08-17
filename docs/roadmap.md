@@ -29,9 +29,9 @@
   provision/deploy/rollback, encrypted env vars, auto-rollback on failure).
 - **Phase 6 — Billing: IMPLEMENTED** (`PaymentProviderInterface`, sandbox +
   Stripe; plans, subscriptions, invoices, webhook-verified activation, cancel).
-- **Phase 7 — Security: PARTIALLY DELIVERED** (findings engine + Security
-  Score live). Remaining: MFA enforcement policy, session management,
-  SSL/vulnerability monitoring, backup status.
+- **Phase 7 — Security: IMPLEMENTED** (findings engine + Security Score,
+  MFA enforcement policy, session management, SSL/certificate monitoring,
+  backup status).
 - **Phase 8 — Cloud: IMPLEMENTED** (VPS via `ServerProviderInterface` — sandbox/Hetzner/DO/custom —, clés SSH + coffre, métriques SSE + historique, alertes de seuil, snapshots planifiés avec rétention, validation de tokens).
 - **Phase 9 — Marketing & Commercial Website: PLANNED** (site public vitrine, pages services, tarifs, preuve sociale, SEO, analytics, CTA).
 - **Phase 10+ — Deploy, Mail, AI, Automate, Marketplace, Scale, Launch: PLANNED.**
@@ -59,7 +59,17 @@ Scope:
 - Laravel 11+ app with PostgreSQL + Redis (via Docker Compose).
 - Modular structure (`app/Modules`), `Support`, port/registry shell.
 - Auth: register, login, logout, email verification, MFA (TOTP), Sanctum SPA
-  + API tokens, session/device management.
+  + API tokens, session/device management, and **passwordless passkey
+  sign-in** (WebAuthn — Face ID / Touch ID / Windows Hello) with a
+  `/auth/passkey/options` + `/auth/passkey/verify` contract; sandbox
+  fallback keeps the demo fully functional without a platform authenticator.
+- **FIDO2/WebAuthn authenticator management**: `authenticators` table
+  (credential id, public key, sign count, transport, last used), endpoints
+  for register/verify/revoke + **adaptive security levels** (standard /
+  enhanced / critical on `users.security_level`), and the **« My
+  authenticators »** settings UI (add a YubiKey / passkey / biometric
+  device, name it, see last-used & registration dates, revoke). Biometric
+  data never leaves the device — OMNEX stores only public keys.
 - Organizations: create, memberships, invitations, teams, roles, permissions
   (custom RBAC on the model above).
 - Tenant isolation: global scope + RLS + namespace + tests.
@@ -87,14 +97,50 @@ Real-time via WebSockets; aggregated activity feed from the event bus.
 **DoD:** real-time dashboard reflecting real backend events; global nav;
 keyboard-first command palette.
 
+**Members cockpit**: animated KPIs (total / pending invites / MFA-enabled /
+unprotected), a **role-distribution donut** (owner/admin/developer/viewer)
+with legend, an **MFA adoption progress bar** per organization and a
+**members & invitations timeline** (joins and pending invites, newest first)
+on the Members page.
+
+**Activity cockpit** (Notifications & Activity page): animated KPIs (events /
+events today / daily average / active hours — today's bucket merges
+the live SSE stream), a **volume area chart**, a **per-type volume bar
+chart** and a **7-day × 24-hour activity heatmap** (hourly intensity grid
+with hover tooltips and legend).
+
+**Period selector (7/30/90 days)** on the Security, Cloud (server metrics),
+Activity and Audit cockpits: shared `PeriodSelector` component; Security and
+Cloud filter persisted history samples by cutoff (Cloud metrics backfill now
+spans ~90 days, one sample per day), Activity regenerates its deterministic
+history and Audit filters its log table by timestamp — KPI labels stay in
+sync ("Events · 7 days", "Volume on 90 days").
+
+**Settings cockpit**: configuration gauges (MFA on/off, email verified,
+interface language, linked accounts) with progress bars, a **profile
+completion donut** (name, email, verified email, MFA, language, linked
+account), an **integration-status donut + per-provider list** (linked /
+available) and an **organization profile card** (plan, status, progress).
+
+**Audit cockpit** (Audit Log page): animated KPIs (events / success rate /
+failures / unique actors), an **action-distribution donut** (auth, members,
+domains, DNS, organization…), a **per-actor frequency bar chart** and a
+**success/failure result stacked bar** above the immutable log table.
+
 ---
 
 ## Phase 3 — Domain + DNS
 
 Domain Engine + OMNEX DNS behind `DomainProviderInterface` /
 `DnsProviderInterface`. Search, register, renew, transfer, contacts, privacy,
-locking, nameservers; A/AAAA/CNAME/MX/TXT/NS/SRV/CAA, DNSSEC, templates,
-validation, import/export, history, rollback, propagation monitoring.
+locking, nameservers; A/AAAA/CNAME/MX/TXT/NS/SRV/CAA, DNSSEC,templates, validation, import/export, history, rollback, propagation monitoring.
+
+The Domains UI is a **cockpit**: a portfolio overview with a status
+distribution donut (active / expiring soon / expired), animated KPI chips and
+a per-domain **expiry timeline** (progress bars with days-left, each row
+links to the domain), plus a **DNSSEC deployment progress bar** and a
+**propagation progress stacked bar** (synced / pending / outdated) on the
+domain detail page.
 
 **DoD:** full DNS zone CRUD + history/rollback on a **test/sandbox provider**
 first; expiration monitoring produces real events; a real registrar is
@@ -120,6 +166,12 @@ permissions, quotas, versioning, trash, search, previews, favorites, recent.
 abstraction and Cloud UI; a third-party engine is added only for a demonstrated
 technical advantage and can never become the System of Record.
 
+The Drive UI is a **cockpit**: an animated **quota gauge** (donut + progress
+bar with used/limit), a **cumulative usage timeline** (`GET /storage/usage-history`
+— daily buckets over the last 30 days, newest last, from the version history)
+and a **files-by-type distribution donut** (image/media/text/document/archive/other
+by MIME category).
+
 **DoD:** swap between two storage providers without changing drive code;
 cross-tenant namespace tests green; versioning + trash restore tested.
 
@@ -137,8 +189,13 @@ deploy → automatic rollback; env vars never leak via API.
 `SiteService` (provision/deploy/rollback/delete, encrypted env vars at rest),
 `SiteController` REST API, RBAC `sites.read`/`sites.manage`, and the Sites UI
 (list → provision → deploy → live, build logs, manual rollback, automatic
-rollback on failed deploy). **Remaining:** real hosting providers (Vercel,
-Netlify, Forge…), Git webhooks/auto-deploy, SSL/CDN/cache, backups.
+rollback on failed deploy). The Sites UI is a **cockpit**: a fleet overview
+with a deployment-status donut (healthy / failed / rolled back /
+provisioning), animated KPI chips, per-site **health bars** and a
+**deployment timeline** on the detail page (vertical colored timeline with a
+"Current" badge) plus a **deployments-by-status stacked bar** (live / failed /
+rolled back). **Remaining:** real hosting providers (Vercel, Netlify,
+Forge…), Git webhooks/auto-deploy, SSL/CDN/cache, backups.
 
 ---
 
@@ -160,8 +217,11 @@ redemption caps, Stripe `discounts[0][coupon]` + `omnex:stripe-sync-coupons`),
 **credits** (signed ledger, applied against invoices) and **proration**
 (plan change credits the unused period) and **automatic renewals**
 (`omnex:billing-renewals`, scheduled daily, `--dry-run` preview, Stripe-managed
-subscriptions skipped) shipped with tests. **Remaining:** live
-Stripe keys, taxes, refunds, dunning schedules, customer portal.
+subscriptions skipped) shipped with tests. **Billing cockpit**: credit gauge
+(animated donut + progress, adaptive color), cumulative spend timeline
+(area chart over invoices), per-service cost breakdown (multi-segment donut
+from `/billing/cost-breakdown`, aggregated by plan) — live in the Billing UI.
+**Remaining:** live Stripe keys, taxes, refunds, dunning schedules, customer portal.
 
 ---
 
@@ -171,12 +231,22 @@ Security Center, MFA enforcement policy, session management, audit,
 vulnerability/SSL/domain monitoring, backup status, Security Score with
 severity/explanation/impact/remediation/action.
 
-**Status: partially delivered** — the findings engine behind the Security
-Score is live (`SecurityService`, `security_findings` table, `SecurityController`,
-RBAC `security.read`/`security.manage`, Security Center UI, dashboard score wired
-to the API). Rules: MFA off, unverified email, single-member org, expiring
-domains, DNSSEC off. Still planned: MFA enforcement policy, session
-management, SSL/vulnerability monitoring, backup status.
+**Status: delivered** — the findings engine behind the Security Score is live
+(`SecurityService`, `security_findings` table, `SecurityController`, RBAC
+`security.read`/`security.manage`, Security Center UI, dashboard score wired to
+the API). Rules: MFA off, unverified email, single-member org, expiring
+domains, DNSSEC off. **MFA enforcement policy** (`mfa_policy` per organization,
+optional/required, enforced via the `mfa_enforcement` finding until every
+member complies), **session management** (`/sessions` — list devices with
+IP/UA via stamped Sanctum tokens, revoke one or all others), **SSL/certificate
+monitoring** (`SslCheckerInterface` + sandbox checker, `ssl_checks` table,
+`ssl_invalid`/`ssl_expiring` findings, `/security/ssl-checks`) and **backup
+status** (`backup_disabled` finding for servers without scheduled snapshots).
+**Security cockpit**: persisted score samples (`security_score_samples`,
+recorded on every meaningful scan/dismiss/reopen/policy change),
+`/security/history` endpoint, animated score donut, severity-distribution
+multi-segment donut, score-evolution area chart with scan history, and a
+remediation-progress stacked bar (resolved/open/dismissed + resolution rate).
 
 ---
 
@@ -216,6 +286,13 @@ UI, `server_snapshots` table, and a daily scheduled `omnex:server-snapshots`
 command (`--dry-run` preview) that creates due snapshots and prunes expired
 ones on the platform and locally.
 
+The Cloud UI is a **cockpit**: a fleet overview (animated KPIs — total /
+running / stopped / provisioning / failed — with a status-distribution
+stacked bar), and per-server **metric donuts** (CPU / memory / disk, animated
+with usage-aware coloring), **three shared AreaChart timelines** (one per
+metric over the persisted history) and an **operations progress stacked bar**
+(succeeded / pending / failed).
+
 Remaining: per-provider real time-series metrics, firewall, provider cost
 tracking. Add further providers only after one is production-solid.
 
@@ -242,8 +319,16 @@ instant switch, persisted preference, `hreflang` + `<html lang>` synced), and
 local event store with UTM capture/attribution, optional GA4 via
 `VITE_GA4_MEASUREMENT_ID` gated behind explicit consent, `pageview`,
 `cta_clicked`, `signup_started`, `lead_submitted`, `quote_requested`,
-`demo_requested`). Remaining: blog/content hub, landing page engine,
-remarketing pixels + A/B testing harness.
+`demo_requested`).
+
+**Landing page engine (CMS):** campaign pages served on `/landing/:slug` with
+per-locale JSON sections (`hero`, `offer`, `promo`, `comparison`, `features`,
+`cta`, `faq`), rendered by `LandingPageView` with the design system + unique
+SEO meta, `hreflang` and `Product`/`BreadcrumbList` JSON-LD. Backed by a
+Laravel CMS (`landing_pages` table, public show gated to published, owner-only
+management API) and managed from the app at `/campaigns` (list, editor,
+publish/unpublish, delete). Remaining: blog/content hub, remarketing pixels +
+A/B testing harness.
 
 **Placement:** Phase 9 deliberately sits right after the core product is solid
 (Phase 8) and before the deep platform phases (Deploy, Mail, AI…), because the
@@ -329,7 +414,7 @@ design system and brand.
 - **P1 — Per-service pages + SEO foundations** (sitemap, structured data, meta).
 - **P1 — Contact/quote forms + lead handling.**
 - **P1 — Testimonials + case studies + FAQ.**
-- **P2 — Blog/content hub + landing page engine.**
+- **P2 — Blog/content hub. Landing page engine delivered.**
 - **P2 — Remarketing + A/B testing harness.**
 
 ### Definition of Done

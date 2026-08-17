@@ -1,3 +1,5 @@
+export type SecurityLevel = 'standard' | 'enhanced' | 'critical';
+
 export interface UserDto {
   id: string;
   name: string;
@@ -8,6 +10,25 @@ export interface UserDto {
   status: string;
   last_login_at?: string | null;
   created_at?: string;
+  security_level?: SecurityLevel;
+}
+
+export interface AuthenticatorDto {
+  id: string;
+  name: string;
+  transport?: string | null;
+  last_used_at?: string | null;
+  created_at?: string | null;
+}
+
+/** Server-issued WebAuthn registration options. */
+export interface PasskeyRegisterOptionsDto {
+  challenge: string;
+  rp: { id: string; name: string };
+  user: { id: string; name: string; display_name: string };
+  pub_key_cred_params: Array<{ type: string; alg: number }>;
+  timeout: number;
+  registration_token: string;
 }
 
 export interface RoleDto {
@@ -151,6 +172,23 @@ export interface SocialAccountDto {
 
 export interface SocialRedirectResponse {
   url: string | null;
+}
+
+/** Server-generated WebAuthn assertion options (JSON-serializable). */
+export interface PasskeyRequestOptionsDto {
+  challenge: string; // base64url
+  rp_id: string;
+  timeout?: number;
+  allow_credentials?: Array<{ id: string; type: string }>;
+}
+
+/** Client credential payload sent back for verification. */
+export interface PasskeyCredentialDto {
+  id: string;
+  raw_id: string;
+  type: string;
+  response: { client_data_json: string; authenticator_data: string; signature: string };
+  client_extension_results?: Record<string, unknown>;
 }
 
 export interface VerifyMfaInput {
@@ -378,6 +416,15 @@ export interface DriveListing {
   folders: DriveFolderDto[];
   files: DriveFileDto[];
   quota: DriveQuota;
+}
+
+export interface DriveUsageSampleDto {
+  date: string;
+  bytes: number;
+}
+
+export interface DriveUsageHistoryDto {
+  samples: DriveUsageSampleDto[];
 }
 
 export interface DriveDownloadDto {
@@ -653,6 +700,17 @@ export interface InvoiceDto {
   created_at?: string;
 }
 
+export interface BillingCostServiceDto {
+  service: string;
+  amount: number;
+}
+
+export interface BillingCostBreakdownDto {
+  total: number;
+  currency: string;
+  services: BillingCostServiceDto[];
+}
+
 export interface BillingSubscribeResponse {
   subscription: SubscriptionDto;
   checkout_url: string;
@@ -728,6 +786,38 @@ export interface CouponRedemptionDto {
 export type SecuritySeverity = 'high' | 'medium' | 'low';
 export type SecurityFindingStatus = 'open' | 'resolved' | 'dismissed';
 
+export type MfaPolicy = 'optional' | 'required';
+
+export interface SecuritySettingsDto {
+  mfa_policy: MfaPolicy;
+}
+
+export interface SecuritySettingsInput {
+  mfa_policy: MfaPolicy;
+}
+
+export type SslCheckStatus = 'valid' | 'expiring' | 'invalid';
+
+export interface SslCheckDto {
+  id: string;
+  target_type: 'site' | 'domain';
+  target_id: string;
+  status: SslCheckStatus;
+  days_remaining: number | null;
+  details?: Record<string, unknown> | null;
+  checked_at: string | null;
+}
+
+export interface SessionDto {
+  id: string;
+  name: string;
+  ip_address: string | null;
+  user_agent: string | null;
+  last_used_at: string | null;
+  created_at: string | null;
+  is_current: boolean;
+}
+
 export interface SecurityFindingDto {
   id: string;
   rule: string;
@@ -756,6 +846,19 @@ export interface SecurityScoreDto {
   findings: SecurityFindingDto[];
 }
 
+export interface SecurityScoreSampleDto {
+  score: number;
+  open: number;
+  high: number;
+  medium: number;
+  low: number;
+  created_at: string | null;
+}
+
+export interface SecurityHistoryDto {
+  samples: SecurityScoreSampleDto[];
+}
+
 export interface ContactLeadInput {
   name: string;
   email: string;
@@ -779,4 +882,93 @@ export interface ContactLeadDto {
   source: string | null;
   status: string;
   created_at: string;
+}
+
+export type LandingPageType = 'offer' | 'promo' | 'comparison';
+export type LandingPageStatus = 'draft' | 'published';
+
+export interface LandingHeroSection {
+  kind: 'hero';
+  badge?: string;
+  title: string;
+  subtitle: string;
+  cta_label: string;
+  cta_secondary?: string;
+}
+
+export interface LandingOfferSection {
+  kind: 'offer';
+  title: string;
+  description: string;
+  price: string;
+  price_note?: string;
+  features: string[];
+  cta_label: string;
+  highlight?: boolean;
+}
+
+export interface LandingPromoSection {
+  kind: 'promo';
+  title: string;
+  code: string;
+  discount: string;
+  description: string;
+  expires_at?: string;
+  cta_label: string;
+}
+
+export interface LandingComparisonSection {
+  kind: 'comparison';
+  title: string;
+  subtitle?: string;
+  columns: { name: string; highlight?: boolean; cta_label?: string }[];
+  rows: { label: string; values: (string | boolean)[] }[];
+}
+
+export interface LandingFeaturesSection {
+  kind: 'features';
+  title: string;
+  items: { title: string; desc: string }[];
+}
+
+export interface LandingCtaSection {
+  kind: 'cta';
+  title: string;
+  subtitle?: string;
+  label: string;
+}
+
+export interface LandingFaqSection {
+  kind: 'faq';
+  title: string;
+  items: { q: string; a: string }[];
+}
+
+export type LandingPageSection =
+  | LandingHeroSection
+  | LandingOfferSection
+  | LandingPromoSection
+  | LandingComparisonSection
+  | LandingFeaturesSection
+  | LandingCtaSection
+  | LandingFaqSection;
+
+export interface LandingPageDto {
+  id: string;
+  slug: string;
+  type: LandingPageType;
+  status: LandingPageStatus;
+  content_en: LandingPageSection[];
+  content_fr: LandingPageSection[];
+  published_at: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface LandingPageInput {
+  slug: string;
+  type: LandingPageType;
+  status: LandingPageStatus;
+  content_en: LandingPageSection[];
+  content_fr: LandingPageSection[];
 }

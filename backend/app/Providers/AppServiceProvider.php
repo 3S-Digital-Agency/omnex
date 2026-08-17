@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Contracts\DnsPropagationCheckerInterface;
+use App\Contracts\SslCheckerInterface;
 use App\Events\DnsRecordChanged;
 use App\Events\DnssecChanged;
 use App\Events\DomainExpiring;
@@ -24,6 +25,7 @@ use App\Support\Domains\DnsService;
 use App\Support\Domains\DomainProviderRegistry;
 use App\Support\Domains\DomainService;
 use App\Support\Domains\Providers\SandboxDnsPropagationChecker;
+use App\Support\Security\Checkers\SandboxSslChecker;
 use App\Support\Security\SecurityService;
 use App\Support\Sites\SiteProviderRegistry;
 use App\Support\Sites\SiteService;
@@ -50,6 +52,9 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(DomainProviderRegistry::class, fn () => new DomainProviderRegistry);
         $this->app->singleton(DnsProviderRegistry::class, fn () => new DnsProviderRegistry);
         $this->app->bind(DnsPropagationCheckerInterface::class, fn () => new SandboxDnsPropagationChecker);
+        $this->app->bind(SslCheckerInterface::class, fn () => new SandboxSslChecker(
+            (int) config('omnex.security.ssl_warning_days', 30),
+        ));
         $this->app->singleton(DnsPropagationService::class);
         $this->app->singleton(DomainService::class);
         $this->app->singleton(DnsService::class);

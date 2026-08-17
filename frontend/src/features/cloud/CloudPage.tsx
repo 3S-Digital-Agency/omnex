@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   ArrowLeft,
@@ -25,6 +25,13 @@ import { Dialog } from '../../components/ui/Dialog';
 import { Field } from '../../components/ui/Field';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
+import { AreaChart } from '../../components/viz/AreaChart';
+import { PeriodSelector } from '../../components/viz/PeriodSelector';
+import type { PeriodDays } from '../../components/viz/PeriodSelector';
+import { Donut } from '../../components/viz/Donut';
+import { Sparkline } from '../../components/viz/Sparkline';
+import { StackedBar } from '../../components/viz/StackedBar';
+import { useAnimatedNumber } from '../../components/viz/useMotion';
 import { EmptyState, Spinner } from '../../components/ui/Spinner';
 import { useToast } from '../../components/ui/Toast';
 import { errorMessage } from '../../lib/errors';
@@ -42,26 +49,10 @@ function parseTags(text: string): string[] {
     .filter((tag) => tag !== '');
 }
 
-function Sparkline({ values, height = 48 }: { values: number[]; height?: number }) {
-  if (values.length < 2) return null;
-
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = Math.max(max - min, 1);
-  const width = 100; // viewBox units, stretched via preserveAspectRatio
-  const points = values
-    .map((value, index) => {
-      const x = (index / (values.length - 1)) * width;
-      const y = height - 3 - ((value - min) / range) * (height - 6);
-      return `${x.toFixed(2)},${y.toFixed(2)}`;
-    })
-    .join(' ');
-
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="h-12 w-full" aria-hidden="true">
-      <polyline points={points} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
-  );
+function metricTone(percent: number): 'text-emerald-400' | 'text-amber-400' | 'text-red-400' {
+  if (percent >= 95) return 'text-red-400';
+  if (percent >= 80) return 'text-amber-400';
+  return 'text-emerald-400';
 }
 
 function MetricsRow({ label, percent, detail }: { label: string; percent: number; detail: string }) {
@@ -83,6 +74,41 @@ function MetricsRow({ label, percent, detail }: { label: string; percent: number
           style={{ width: `${clamped}%` }}
         />
       </div>
+    </div>
+  );
+}
+
+/** Compact area chart of one metric series (shared AreaChart, fluid width). */
+function MiniMetricTimeline({ label, values, tone }: { label: string; values: number[]; tone: string }) {
+  return (
+    <div className="rounded-lg border border-edge bg-raised p-3">
+      <p className="text-xs font-medium text-zinc-400">{label}</p>
+      <div className={cn('mt-1', tone)}>
+        <AreaChart values={values} height={64} showLastPoint={false} min={0} max={100} label={label} />
+      </div>
+    </div>
+  );
+}
+
+/** One animated metric donut (CPU / RAM / disk) with the live % in the center. */
+function MetricDonut({ label, percent, detail }: { label: string; percent: number; detail: string }) {
+  const clamped = Math.max(0, Math.min(100, percent));
+  const animated = Math.round(useAnimatedNumber(clamped));
+
+  return (
+    <div className="flex flex-col items-center gap-2 rounded-xl border border-edge bg-raised p-4 text-center">
+      <Donut
+        value={clamped}
+        size={104}
+        thickness={9}
+        className={metricTone(clamped)}
+        trackClass="text-white/5"
+        label={`${label}: ${clamped}%`}
+      >
+        <span className={cn('text-xl font-bold', metricTone(clamped))}>{animated}%</span>
+      </Donut>
+      <span className="text-xs font-medium text-zinc-400">{label}</span>
+      <span className="text-[11px] text-zinc-500">{detail}</span>
     </div>
   );
 }
@@ -204,6 +230,8 @@ export function CloudPage() {
         ) : null}
       </header>
 
+      <FleetOverview servers={list.data ?? []} t={t} isLoading={list.isLoading} />
+
       <Card>
         <CardHeader title={t('cloud.servers')} description={t('cloud.serversDescription')} />
         <div className="p-5">
@@ -312,10 +340,17 @@ function ServerDetail({
 
   const [metrics, setMetrics] = useState<ServerMetricsDto | null>(null);
   const [historyValues, setHistoryValues] = useState<ServerMetricsDto[]>([]);
+  const [period, setPeriod] = useState<PeriodDays>(30);
+
+  const filteredHistory = useMemo(() => {
+    if (period >= 90) return historyValues;
+    const cutoff = Date.now() - period * 86400000;
+    return historyValues.filter((sample) => new Date(sample.sampled_at).getTime() >= cutoff);
+  }, [historyValues, period]);
 
   const history = useQuery({
     queryKey: ['cloud', activeOrganization?.id, 'metrics-history', server.id],
-    queryFn: () => api.listServerMetricsHistory(server.id, 60),
+    queryFn: () => api.listServerMetricsHistory(server.id, 90),
     enabled: !!activeOrganization?.id,
   });
 
@@ -328,7 +363,7 @@ function ServerDetail({
 
   useEffect(() => api.subscribeServerMetrics(server.id, (sample) => {
     setMetrics(sample);
-    setHistoryValues((previous) => [...previous, sample].slice(-60));
+    setHistoryValues((previous) => [...previous, sample].slice(-90));
   }), [server.id]);
 
   const invalidate = () => {
@@ -442,29 +477,51 @@ function ServerDetail({
       <Card>
         <CardHeader title={t('cloud.metrics')}
           description={t('cloud.metricsDescription')}
-          action={<Badge tone="success">{t('common.live')}</Badge>}
+          action={
+            <span className="flex items-center gap-2">
+              <PeriodSelector value={period} onChange={setPeriod} />
+              <Badge tone="success">{t('common.live')}</Badge>
+            </span>
+          }
         />
-        <div className="space-y-4 p-5">
+        <div className="space-y-5 p-5">
           {metrics ? (
             <>
-              <MetricsRow label={t('cloud.cpu')} percent={metrics.cpu} detail={`${metrics.cpu}%`} />
-              <MetricsRow
-                label={t('cloud.ram')}
-                percent={(metrics.memory_used / metrics.memory_total) * 100}
-                detail={`${formatBytes(metrics.memory_used)} / ${formatBytes(metrics.memory_total)}`}
-              />
-              <MetricsRow
-                label={t('cloud.disk')}
-                percent={(metrics.disk_used / metrics.disk_total) * 100}
-                detail={`${formatBytes(metrics.disk_used)} / ${formatBytes(metrics.disk_total)}`}
-              />
-              <div className="pt-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <MetricDonut
+                  label={t('cloud.cpu')}
+                  percent={metrics.cpu}
+                  detail={`${metrics.cpu}%`}
+                />
+                <MetricDonut
+                  label={t('cloud.ram')}
+                  percent={(metrics.memory_used / metrics.memory_total) * 100}
+                  detail={`${formatBytes(metrics.memory_used)} / ${formatBytes(metrics.memory_total)}`}
+                />
+                <MetricDonut
+                  label={t('cloud.disk')}
+                  percent={(metrics.disk_used / metrics.disk_total) * 100}
+                  detail={`${formatBytes(metrics.disk_used)} / ${formatBytes(metrics.disk_total)}`}
+                />
+              </div>
+
+              <div className="pt-1">
                 <div className="flex items-center justify-between text-xs text-zinc-500">
                   <span>{t('cloud.metricsHistory')}</span>
-                  <span>{historyValues.length} {t('cloud.metricsSamples')}</span>
+                  <span>{filteredHistory.length} {t('cloud.metricsSamples')}</span>
                 </div>
-                <div className="text-brand-400">
-                  <Sparkline values={historyValues.map((sample) => sample.cpu)} />
+                <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <MiniMetricTimeline label={t('cloud.cpu')} values={filteredHistory.map((s) => s.cpu)} tone="text-brand-400" />
+                  <MiniMetricTimeline
+                    label={t('cloud.ram')}
+                    values={filteredHistory.map((s) => (s.memory_total > 0 ? (s.memory_used / s.memory_total) * 100 : 0))}
+                    tone="text-violet-400"
+                  />
+                  <MiniMetricTimeline
+                    label={t('cloud.disk')}
+                    values={filteredHistory.map((s) => (s.disk_total > 0 ? (s.disk_used / s.disk_total) * 100 : 0))}
+                    tone="text-cyan-400"
+                  />
                 </div>
               </div>
               <p className="text-xs text-zinc-600">
@@ -481,37 +538,122 @@ function ServerDetail({
 
       <Card>
         <CardHeader title={t('cloud.operations')} description={t('cloud.operationsDescription')} />
-        <div className="p-5">
+        <div className="space-y-4 p-5">
           {operations.isLoading ? (
             <div className="flex justify-center py-6">
               <Spinner />
             </div>
           ) : operations.data && operations.data.length > 0 ? (
-            <ul className="space-y-2">
-              {operations.data.map((operation) => (
-                <li key={operation.id} className="flex items-center gap-3 rounded-lg border border-edge bg-raised px-3 py-2.5">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-white">
-                        {t(OPERATION_LABEL_KEYS[operation.type] ?? operation.type)}
+            <>
+              <OperationProgress data={operations.data} t={t} />
+              <ul className="space-y-2">
+                {operations.data.map((operation) => (
+                  <li key={operation.id} className="flex items-center gap-3 rounded-lg border border-edge bg-raised px-3 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-white">
+                          {t(OPERATION_LABEL_KEYS[operation.type] ?? operation.type)}
+                        </p>
+                        <Badge tone={operation.status === 'succeeded' ? 'success' : operation.status === 'failed' ? 'danger' : 'warning'}>
+                          {operation.status}
+                        </Badge>
+                      </div>
+                      <p className="truncate text-xs text-zinc-500">
+                        {operation.started_at ?? '—'}
+                        {operation.error ? ` · ${operation.error}` : ''}
                       </p>
-                      <Badge tone={operation.status === 'succeeded' ? 'success' : operation.status === 'failed' ? 'danger' : 'warning'}>
-                        {operation.status}
-                      </Badge>
                     </div>
-                    <p className="truncate text-xs text-zinc-500">
-                      {operation.started_at ?? '—'}
-                      {operation.error ? ` · ${operation.error}` : ''}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                  </li>
+                ))}
+              </ul>
+            </>
           ) : (
             <EmptyState title={t('cloud.noOperations')} />
           )}
         </div>
       </Card>
+    </div>
+  );
+}
+
+/** Fleet cockpit: animated KPIs + status distribution for every server. */
+function FleetOverview({
+  servers,
+  t,
+  isLoading,
+}: {
+  servers: ServerDto[];
+  t: (key: string, params?: Record<string, string | number>) => string;
+  isLoading: boolean;
+}) {
+  const total = servers.length;
+  const running = servers.filter((server) => server.status === 'running').length;
+  const stopped = servers.filter((server) => server.status === 'stopped').length;
+  const provisioning = servers.filter((server) => server.status === 'provisioning').length;
+  const failed = servers.filter((server) => server.status === 'failed').length;
+
+  const kpi = [
+    { label: t('cloud.fleet.total'), value: total, tone: 'text-white', spark: 'text-brand-400' },
+    { label: t('cloud.fleet.running'), value: running, tone: 'text-emerald-400', spark: 'text-emerald-400' },
+    { label: t('cloud.fleet.stopped'), value: stopped, tone: 'text-zinc-300', spark: 'text-zinc-400' },
+    { label: t('cloud.fleet.provisioning'), value: provisioning, tone: 'text-amber-400', spark: 'text-amber-400' },
+    { label: t('cloud.fleet.failed'), value: failed, tone: failed > 0 ? 'text-red-400' : 'text-zinc-400', spark: 'text-red-400' },
+  ];
+
+  return (
+    <Card>
+      <CardHeader title={t('cloud.fleet.title')} description={t('cloud.fleet.description')} />
+      <div className="space-y-4 p-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {kpi.map((item) => (
+            <div key={item.label} className="rounded-xl border border-edge bg-raised p-3">
+              <p className={cn('text-2xl font-bold', item.tone)}>{isLoading ? '—' : item.value}</p>
+              <p className="mt-0.5 text-xs text-zinc-500">{item.label}</p>
+            </div>
+          ))}
+        </div>
+        {!isLoading && total > 0 ? (
+          <StackedBar
+            items={[
+              { value: running, color: 'bg-emerald-400', label: t('cloud.fleet.running') },
+              { value: stopped, color: 'bg-zinc-500', label: t('cloud.fleet.stopped') },
+              { value: provisioning, color: 'bg-amber-400', label: t('cloud.fleet.provisioning') },
+              { value: failed, color: 'bg-red-400', label: t('cloud.fleet.failed') },
+            ]}
+            total={total}
+            height={10}
+          />
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
+/** Stacked progress of server operations by status (succeeded / pending / failed). */
+function OperationProgress({
+  data,
+  t,
+}: {
+  data: { status: string }[];
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  const succeeded = data.filter((operation) => operation.status === 'succeeded').length;
+  const pending = data.filter((operation) => operation.status === 'pending' || operation.status === 'running').length;
+  const failed = data.filter((operation) => operation.status === 'failed').length;
+
+  return (
+    <div className="rounded-lg border border-edge bg-raised p-3">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+        {t('cloud.opProgress')}
+      </p>
+      <StackedBar
+        items={[
+          { value: succeeded, color: 'bg-emerald-400', label: t('cloud.opSucceeded') },
+          { value: pending, color: 'bg-amber-400', label: t('cloud.opPending') },
+          { value: failed, color: 'bg-red-400', label: t('cloud.opFailed') },
+        ]}
+        height={10}
+      />
     </div>
   );
 }

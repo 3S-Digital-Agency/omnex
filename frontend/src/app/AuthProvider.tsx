@@ -7,10 +7,18 @@ import type {
   InvitationDto,
   MembershipDto,
   OrganizationDto,
+  PasskeyCredentialDto,
   UserDto,
 } from '../lib/api/types';
 
 type Status = 'loading' | 'unauthenticated' | 'authenticated' | 'mfa';
+
+function base64UrlEncode(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let index = 0; index < bytes.length; index++) binary += String.fromCharCode(bytes[index]);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
 
 interface AuthState {
   status: Status;
@@ -26,6 +34,8 @@ interface AuthContextValue extends AuthState {
   register: (name: string, email: string, password: string) => Promise<void>;
   verifyMfa: (code: string, recoveryCode?: string) => Promise<void>;
   completeSocial: (code: string) => Promise<void>;
+  /** Passkey sign-in: `assertion` from the WebAuthn ceremony, or null in sandbox mode. */
+  signInWithPasskey: (assertion: PublicKeyCredential | null) => Promise<void>;
   logout: () => Promise<void>;
   switchOrganization: (orgId: string) => Promise<void>;
   acceptInvitation: (token: string) => Promise<void>;
@@ -125,6 +135,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [applySession],
   );
 
+  const signInWithPasskey = useCallback(
+    async (assertion: PublicKeyCredential | null) => {
+      let credential: PasskeyCredentialDto | null = null;
+      if (assertion) {
+        const response = assertion.response as AuthenticatorAssertionResponse;
+        credential = {
+          id: assertion.id,
+          raw_id: assertion.rawId ? btoa(String.fromCharCode(...new Uint8Array(assertion.rawId))) : assertion.id,
+          type: assertion.type,
+          response: {
+            client_data_json: base64UrlEncode(response.clientDataJSON),
+            authenticator_data: base64UrlEncode(response.authenticatorData),
+            signature: base64UrlEncode(response.signature),
+          },
+          client_extension_results: (assertion.getClientExtensionResults?.() ?? {}) as Record<string, unknown>,
+        };
+      }
+      const res = await api.verifyPasskey(credential);
+      applySession(res);
+    },
+    [applySession],
+  );
+
   const logout = useCallback(async () => {
     await api.logout().catch(() => undefined);
     session.clear();
@@ -160,13 +193,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       verifyMfa,
       completeSocial,
+      signInWithPasskey,
       logout,
       switchOrganization,
       acceptInvitation,
       refresh,
       hasPermission,
     }),
-    [state, login, register, verifyMfa, completeSocial, logout, switchOrganization, acceptInvitation, refresh, hasPermission],
+    [state, login, register, verifyMfa, completeSocial, signInWithPasskey, logout, switchOrganization, acceptInvitation, refresh, hasPermission],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

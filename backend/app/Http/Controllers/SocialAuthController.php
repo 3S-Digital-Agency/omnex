@@ -10,6 +10,7 @@ use App\Http\Resources\UserResource;
 use App\Models\Invitation;
 use App\Models\User;
 use App\Support\Audit\AuditLogger;
+use App\Support\Auth\TokenIssuer;
 use App\Support\SocialAuth\SocialAuthException;
 use App\Support\SocialAuth\SocialAuthRegistry;
 use App\Support\SocialAuth\SocialAuthService;
@@ -132,7 +133,7 @@ class SocialAuthController extends Controller
             ->first();
 
         return response()->json([
-            'token' => $user->createToken('omnex-spa')->plainTextToken,
+            'token' => TokenIssuer::issue($user, request()),
             'user' => new UserResource($user),
             'memberships' => MembershipResource::collection($memberships),
             'active_organization' => $active?->organization

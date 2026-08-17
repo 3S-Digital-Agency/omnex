@@ -26,9 +26,13 @@ import type {
   DriveFileUpdateInput,
   DriveFolderDto,
   DriveListing,
+  DriveUsageHistoryDto,
   DriveVersionDto,
   InvitationDto,
+  BillingCostBreakdownDto,
   InvoiceDto,
+  LandingPageDto,
+  LandingPageInput,
   LoginInput,
   LoginResponse,
   MeResponse,
@@ -46,7 +50,12 @@ import type {
   RegisterInput,
   RoleDto,
   SecurityFindingDto,
+  SecurityHistoryDto,
   SecurityScoreDto,
+  SecuritySettingsDto,
+  SecuritySettingsInput,
+  SessionDto,
+  SslCheckDto,
   CloudProviderDto,
   CloudProviderVerifyDto,
   ContactLeadDto,
@@ -72,6 +81,11 @@ import type {
   SocialAccountDto,
   SocialProviderDto,
   SocialRedirectResponse,
+  AuthenticatorDto,
+  PasskeyCredentialDto,
+  PasskeyRegisterOptionsDto,
+  PasskeyRequestOptionsDto,
+  SecurityLevel,
   StorageProviderDto,
   SubscriptionDto,
   SwitchResponse,
@@ -107,6 +121,27 @@ export interface ApiClient {
   completeSocial(code: string): Promise<AuthSession>;
   listSocialAccounts(): Promise<SocialAccountDto[]>;
   unlinkSocial(provider: string): Promise<void>;
+
+  /** Server-issued WebAuthn assertion options for a passkey sign-in. */
+  passkeyRequestOptions(): Promise<PasskeyRequestOptionsDto>;
+  /** Verify a WebAuthn assertion and complete the passkey sign-in. `null` = sandbox fallback. */
+  verifyPasskey(credential: PasskeyCredentialDto | null): Promise<AuthSession>;
+
+  /** List the registered authenticators (YubiKey, passkeys, biometrics). */
+  listAuthenticators(): Promise<AuthenticatorDto[]>;
+  /** Issue a WebAuthn registration challenge for a new authenticator. */
+  passkeyRegisterOptions(): Promise<PasskeyRegisterOptionsDto>;
+  /** Store a newly created credential. */
+  registerPasskey(input: {
+    registration_token: string;
+    credential: PasskeyCredentialDto;
+    name: string;
+    transport?: string;
+  }): Promise<AuthenticatorDto>;
+  /** Revoke an authenticator (lost key, replaced device…). */
+  revokeAuthenticator(id: string): Promise<void>;
+  /** Update the adaptive security level (standard / enhanced / critical). */
+  updateSecurityLevel(level: SecurityLevel): Promise<SecurityLevel>;
 
   setupMfa(): Promise<MfaSetupResponse>;
   confirmMfa(code: string): Promise<MfaConfirmResponse>;
@@ -165,6 +200,7 @@ export interface ApiClient {
 
   listStorageProviders(): Promise<StorageProviderDto[]>;
   listDrive(folderId?: string): Promise<DriveListing>;
+  getDriveUsageHistory(): Promise<DriveUsageHistoryDto>;
   listDriveTrash(): Promise<DriveFileDto[]>;
   createFolder(parentId: string | null, name: string): Promise<DriveFolderDto>;
   renameFolder(folderId: string, name: string): Promise<DriveFolderDto>;
@@ -182,11 +218,19 @@ export interface ApiClient {
   scanSecurity(): Promise<SecurityScoreDto>;
   dismissSecurityFinding(id: string): Promise<SecurityFindingDto>;
   reopenSecurityFinding(id: string): Promise<SecurityFindingDto>;
+  getSecuritySettings(): Promise<SecuritySettingsDto>;
+  updateSecuritySettings(input: SecuritySettingsInput): Promise<SecuritySettingsDto>;
+  getSecurityHistory(): Promise<SecurityHistoryDto>;
+  listSslChecks(): Promise<SslCheckDto[]>;
+  listSessions(): Promise<SessionDto[]>;
+  revokeSession(id: string): Promise<void>;
+  revokeOtherSessions(): Promise<void>;
 
   listBillingProviders(): Promise<PaymentProviderDto[]>;
   listBillingPlans(): Promise<BillingPlanDto[]>;
   getSubscription(): Promise<SubscriptionDto | null>;
   listInvoices(): Promise<InvoiceDto[]>;
+  getBillingCostBreakdown(): Promise<BillingCostBreakdownDto>;
   subscribeToPlan(plan: string, provider?: string, coupon?: string): Promise<BillingSubscribeResponse>;
   cancelSubscription(id: string): Promise<SubscriptionDto>;
   validateCoupon(code: string): Promise<CouponDto>;
@@ -210,6 +254,12 @@ export interface ApiClient {
   rollbackSite(siteId: string, deploymentId: string): Promise<SiteDeploymentDto>;
 
   submitContactLead(input: ContactLeadInput): Promise<ContactLeadDto>;
+
+  getLandingPage(slug: string): Promise<LandingPageDto>;
+  listLandingPages(): Promise<LandingPageDto[]>;
+  createLandingPage(input: LandingPageInput): Promise<LandingPageDto>;
+  updateLandingPage(id: string, input: LandingPageInput): Promise<LandingPageDto>;
+  deleteLandingPage(id: string): Promise<void>;
 
   listCloudProviders(): Promise<CloudProviderDto[]>;
   verifyCloudProviders(provider?: string): Promise<CloudProviderVerifyDto[]>;

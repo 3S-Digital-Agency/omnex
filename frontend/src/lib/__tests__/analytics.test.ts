@@ -1,5 +1,13 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { captureUtm, getConsent, getStoredEvents, getUtm, setConsent, track } from '../analytics';
+import {
+  captureUtm,
+  getConsent,
+  getStoredEvents,
+  getUtm,
+  onConsentChange,
+  setConsent,
+  track,
+} from '../analytics';
 
 describe('analytics', () => {
   beforeEach(() => {
@@ -43,5 +51,33 @@ describe('analytics', () => {
 
     setConsent('granted');
     expect(getConsent()).toBe('granted');
+  });
+
+  it('persists the consent choice and notifies subscribers', () => {
+    const seen: string[] = [];
+    const unsubscribe = onConsentChange((value) => seen.push(value));
+
+    expect(getConsent()).toBeNull();
+    setConsent('granted');
+    expect(getConsent()).toBe('granted');
+    expect(seen).toEqual(['granted']);
+
+    setConsent('denied');
+    expect(getConsent()).toBe('denied');
+    expect(seen).toEqual(['granted', 'denied']);
+
+    unsubscribe();
+    setConsent('granted');
+    expect(seen).toEqual(['granted', 'denied']); // no event after unsubscribe
+    expect(getConsent()).toBe('granted');
+  });
+
+  it('does not load gtag when no measurement id is configured (tests/dev)', () => {
+    setConsent('granted');
+    // Without VITE_GA4_MEASUREMENT_ID the script is never injected and the
+    // local-only fallback keeps working.
+    expect((window as { gtag?: unknown }).gtag).toBeUndefined();
+    track('pageview', { path: '/' });
+    expect(getStoredEvents()).toHaveLength(1);
   });
 });

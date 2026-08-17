@@ -25,6 +25,16 @@ class StorageController extends Controller
         return response()->json(['data' => $this->storage->providers()]);
     }
 
+    /** Daily cumulative storage usage over the last N days (newest last). */
+    public function usageHistory(Request $request): JsonResponse
+    {
+        $this->authorize('storage.read');
+
+        return response()->json([
+            'samples' => $this->storage->usageHistory((int) $request->integer('days', 30)),
+        ]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $this->authorize('storage.read');

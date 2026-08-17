@@ -6,6 +6,7 @@ import { setPublicLocale, useI18n } from '../../lib/i18n';
 import { Button } from '../../components/ui/Button';
 import { cn } from '../../lib/utils';
 import { usePageviewTracking } from '../../lib/analytics';
+import { ConsentBanner } from './ConsentBanner';
 
 export function MarketingLayout({ children }: { children: ReactNode }) {
   const { locale, t } = useI18n();
@@ -76,6 +77,8 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
       </header>
 
       <main>{children}</main>
+
+      <ConsentBanner />
 
       {/* Footer */}
       <footer id="contact" className="border-t border-white/5 bg-[#0d0d10]">

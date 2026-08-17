@@ -23,6 +23,9 @@ import { Field } from '../../components/ui/Field';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Textarea } from '../../components/ui/Textarea';
+import { DistributionDonut } from '../../components/viz/DistributionDonut';
+import { ProgressBar } from '../../components/viz/ProgressBar';
+import { StackedBar } from '../../components/viz/StackedBar';
 import { EmptyState, Spinner } from '../../components/ui/Spinner';
 import { useToast } from '../../components/ui/Toast';
 import { errorMessage } from '../../lib/errors';
@@ -132,6 +135,8 @@ export function SitesPage() {
         ) : null}
       </header>
 
+      <SitesCockpit sites={list.data ?? []} t={t} isLoading={list.isLoading} onOpen={setSelectedId} />
+
       <Card>
         <CardHeader title={t('sites.sites')} description={t('sites.sitesDescription')} />
         <div className="p-5">
@@ -193,6 +198,122 @@ export function SitesPage() {
 
       <LogsDialog deployment={logsFor} onClose={() => setLogsFor(null)} />
     </div>
+  );
+}
+
+/** Fleet cockpit: deployment-status donut + per-site health bars. */
+function SitesCockpit({
+  sites,
+  t,
+  isLoading,
+  onOpen,
+}: {
+  sites: SiteDto[];
+  t: (key: string, params?: Record<string, string | number>) => string;
+  isLoading: boolean;
+  onOpen: (siteId: string) => void;
+}) {
+  const counts = { ready: 0, live: 0, failed: 0, rolled_back: 0, provisioning: 0 };
+  for (const site of sites) {
+    if (site.status in counts) counts[site.status as keyof typeof counts] += 1;
+    else counts.ready += 1;
+  }
+  const ok = counts.ready + counts.live;
+
+  const kpis = [
+    { key: 'total', value: sites.length, tone: 'text-white' },
+    { key: 'ok', value: ok, tone: 'text-emerald-400' },
+    { key: 'failed', value: counts.failed, tone: counts.failed > 0 ? 'text-red-400' : 'text-zinc-400' },
+    { key: 'rolled', value: counts.rolled_back, tone: counts.rolled_back > 0 ? 'text-amber-400' : 'text-zinc-400' },
+  ];
+
+  return (
+    <Card>
+      <CardHeader title={t('sites.cockpit.title')} description={t('sites.cockpit.description')} />
+      <div className="space-y-5 p-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {kpis.map((kpi) => (
+            <div key={kpi.key} className="rounded-xl border border-edge bg-raised p-3">
+              <p className={cn('text-2xl font-bold', kpi.tone)}>{isLoading ? '—' : kpi.value}</p>
+              <p className="mt-0.5 text-xs text-zinc-500">{t(`sites.cockpit.${kpi.key}`)}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="flex items-center justify-center gap-6 rounded-xl border border-edge bg-raised p-4">
+            <DistributionDonut
+              segments={
+                isLoading
+                  ? []
+                  : [
+                      { value: ok, color: 'text-emerald-400', label: t('sites.cockpit.ok') },
+                      { value: counts.failed, color: 'text-red-400', label: t('sites.cockpit.failed') },
+                      { value: counts.rolled_back, color: 'text-amber-400', label: t('sites.cockpit.rolled') },
+                      { value: counts.provisioning, color: 'text-brand-400', label: t('sites.cockpit.provisioning') },
+                    ]
+              }
+              size={120}
+              thickness={11}
+              center={
+                <div className="text-center">
+                  <span className="block text-2xl font-bold text-white">{sites.length}</span>
+                  <span className="block text-[10px] uppercase tracking-wider text-zinc-500">{t('sites.cockpit.total')}</span>
+                </div>
+              }
+              label={t('sites.cockpit.title')}
+            />
+            <ul className="space-y-2 text-xs">
+              {(['ok', 'failed', 'rolled', 'provisioning'] as const).map((state) => (
+                <li key={state} className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      'h-2.5 w-2.5 rounded-sm',
+                      state === 'ok' ? 'bg-emerald-400' : state === 'failed' ? 'bg-red-400' : state === 'rolled' ? 'bg-amber-400' : 'bg-brand-500',
+                    )}
+                    aria-hidden="true"
+                  />
+                  <span className="text-zinc-400">{t(`sites.cockpit.${state}`)}</span>
+                  <span className="ml-auto font-semibold text-white">
+                    {state === 'ok' ? ok : state === 'rolled' ? counts.rolled_back : counts[state]}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="space-y-3 rounded-xl border border-edge bg-raised p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">{t('sites.cockpit.health')}</p>
+            {isLoading ? (
+              <div className="flex justify-center py-6">
+                <Spinner />
+              </div>
+            ) : sites.length > 0 ? (
+              sites.map((site) => {
+                const tone = site.status === 'ready' || site.status === 'live' ? 'success' : site.status === 'failed' ? 'danger' : site.status === 'rolled_back' ? 'warning' : 'brand';
+                return (
+                  <button
+                    key={site.id}
+                    onClick={() => onOpen(site.id)}
+                    className="block w-full text-left"
+                  >
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-medium text-white">{site.name}</span>
+                      <Badge tone={statusTone(site.status)}>{site.status}</Badge>
+                    </div>
+                    <div className="mt-1.5">
+                      <ProgressBar percent={site.status === 'ready' || site.status === 'live' ? 100 : site.status === 'provisioning' ? 40 : 15} tone={tone} />
+                    </div>
+                  </button>
+                );
+              })
+            ) : (
+              <p className="py-6 text-center text-sm text-zinc-500">{t('sites.empty')}</p>
+            )}
+          </div>
+        </div>
+      </div>
+    </Card>
   );
 }
 
@@ -315,54 +436,108 @@ function SiteDetail({
             ) : undefined
           }
         />
-        <div className="p-5">
+        <div className="space-y-4 p-5">
           {deployments.isLoading ? (
             <div className="flex justify-center py-6">
               <Spinner />
             </div>
           ) : deployments.data && deployments.data.length > 0 ? (
-            <ul className="space-y-2">
-              {deployments.data.map((deployment) => (
-                <li key={deployment.id} className="flex items-center gap-3 rounded-lg border border-edge bg-raised px-3 py-2.5">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-white">
-                        {t('sites.deploymentN', { n: deployment.number })}
-                      </p>
-                      <Badge tone={statusTone(deployment.status)}>{deployment.status}</Badge>
-                    </div>
-                    <p className="truncate text-xs text-zinc-500">
-                      {deployment.commit_sha ?? '—'} · {deployment.deployed_at ?? '—'}
-                    </p>
-                  </div>
-                  {deployment.url ? (
-                    <Button size="sm" variant="ghost" title={t('sites.open')} onClick={() => window.open(deployment.url!, '_blank', 'noopener,noreferrer')}>
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  ) : null}
-                  {deployment.logs ? (
-                    <Button size="sm" variant="ghost" title={t('sites.logs')} onClick={() => onLogs(deployment)}>
-                      <TerminalSquare className="h-4 w-4" />
-                    </Button>
-                  ) : null}
-                  {canManage && deployment.status === 'live' && site.current_deployment_id !== deployment.id ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      loading={rollback.isPending && rollback.variables === deployment.id}
-                      onClick={() => rollback.mutate(deployment.id)}
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" /> {t('sites.rollback')}
-                    </Button>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
+            <>
+              <DeploymentProgress data={deployments.data} t={t} />
+              <ol className="relative space-y-4 border-l border-edge pl-5">
+                {deployments.data.map((deployment) => {
+                  const isCurrent = site.current_deployment_id === deployment.id;
+                  return (
+                    <li key={deployment.id} className="relative">
+                      <span
+                        className={cn(
+                          'absolute -left-[27px] top-1.5 h-3 w-3 rounded-full border-2 border-background',
+                          deployment.status === 'live' || deployment.status === 'ready'
+                            ? 'bg-emerald-400'
+                            : deployment.status === 'failed'
+                              ? 'bg-red-400'
+                              : deployment.status === 'rolled_back'
+                                ? 'bg-amber-400'
+                                : 'bg-brand-500',
+                        )}
+                        aria-hidden="true"
+                      />
+                      <div className="rounded-lg border border-edge bg-raised px-3 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-white">
+                            {t('sites.deploymentN', { n: deployment.number })}
+                          </p>
+                          <Badge tone={statusTone(deployment.status)}>{deployment.status}</Badge>
+                          {isCurrent ? <Badge tone="brand">{t('sites.cockpit.current')}</Badge> : null}
+                        </div>
+                        <p className="truncate text-xs text-zinc-500">
+                          {deployment.commit_sha ?? '—'} · {deployment.deployed_at ?? '—'}
+                        </p>
+                        <div className="mt-2 flex items-center gap-1">
+                          {deployment.url ? (
+                            <Button size="sm" variant="ghost" title={t('sites.open')} onClick={() => window.open(deployment.url!, '_blank', 'noopener,noreferrer')}>
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          ) : null}
+                          {deployment.logs ? (
+                            <Button size="sm" variant="ghost" title={t('sites.logs')} onClick={() => onLogs(deployment)}>
+                              <TerminalSquare className="h-4 w-4" />
+                            </Button>
+                          ) : null}
+                          {canManage && deployment.status === 'live' && !isCurrent ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              loading={rollback.isPending && rollback.variables === deployment.id}
+                              onClick={() => rollback.mutate(deployment.id)}
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" /> {t('sites.rollback')}
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            </>
           ) : (
             <EmptyState title={t('sites.noDeployments')} description={canManage ? t('sites.noDeploymentsDescription') : undefined} />
           )}
         </div>
       </Card>
+    </div>
+  );
+}
+
+/** Stacked progress of deployments by status (live / failed / rolled back). */
+function DeploymentProgress({
+  data,
+  t,
+}: {
+  data: { status: string }[];
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  const live = data.filter((d) => d.status === 'live' || d.status === 'ready').length;
+  const failed = data.filter((d) => d.status === 'failed').length;
+  const rolledBack = data.filter((d) => d.status === 'rolled_back').length;
+  const other = data.length - live - failed - rolledBack;
+
+  return (
+    <div className="rounded-lg border border-edge bg-raised p-3">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+        {t('sites.cockpit.deployProgress')}
+      </p>
+      <StackedBar
+        items={[
+          { value: live, color: 'bg-emerald-400', label: t('sites.cockpit.live') },
+          { value: failed, color: 'bg-red-400', label: t('sites.cockpit.failed') },
+          { value: rolledBack, color: 'bg-amber-400', label: t('sites.cockpit.rolled') },
+          { value: other, color: 'bg-brand-500', label: t('sites.cockpit.provisioning') },
+        ]}
+        total={data.length}
+        height={10}
+      />
     </div>
   );
 }

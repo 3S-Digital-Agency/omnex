@@ -246,6 +246,28 @@ it('enforces storage permissions', function () {
         ->assertStatus(403);
 });
 
+it('exposes a cumulative usage history over N days', function () {
+    [$user, $organization] = driveContext();
+
+    $this->withHeader('X-Organization', $organization->id)
+        ->postJson('/api/v1/storage/files', [
+            'name' => 'a.txt',
+            'contents' => b64('abcde'),
+        ])->assertStatus(201);
+
+    $samples = $this->withHeader('X-Organization', $organization->id)
+        ->getJson('/api/v1/storage/usage-history')
+        ->assertOk()
+        ->json('samples');
+
+    expect($samples)->toHaveCount(30);
+    expect($samples[0])->toHaveKeys(['date', 'bytes']);
+    // Cumulative: never decreases, and the final bucket holds the current usage.
+    $bytes = collect($samples)->pluck('bytes');
+    expect($bytes->sort()->values()->all())->toBe($bytes->all());
+    expect((int) $bytes->last())->toBeGreaterThanOrEqual(5);
+});
+
 it('isolates the drive between tenants', function () {
     $userA = User::factory()->create();
     $orgA = Organization::factory()->create();

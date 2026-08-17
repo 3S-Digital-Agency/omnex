@@ -14,6 +14,7 @@ use App\Models\User;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\PlanSeeder;
 use Database\Seeders\RoleSeeder;
+use Laravel\Sanctum\Sanctum;
 
 beforeEach(function () {
     $this->seed(PermissionSeeder::class);
@@ -156,6 +157,51 @@ it('skips Stripe-managed and non-active subscriptions', function () {
         ->assertExitCode(0);
 
     expect(Invoice::count())->toBe(0);
+});
+
+it('exposes a cost breakdown aggregated by service', function () {
+    [$user, $organization] = billingRenewalContext();
+
+    Sanctum::actingAs($user);
+
+    $starter = Plan::where('slug', 'starter')->firstOrFail();
+    $pro = Plan::where('slug', 'pro')->firstOrFail();
+
+    $subA = Subscription::create([
+        'organization_id' => $organization->id,
+        'plan_id' => $starter->id,
+        'provider' => 'sandbox',
+        'status' => 'active',
+        'current_period_start' => now()->subMonth(),
+        'current_period_end' => now()->subDay(),
+    ]);
+
+    $subB = Subscription::create([
+        'organization_id' => $organization->id,
+        'plan_id' => $pro->id,
+        'provider' => 'sandbox',
+        'status' => 'active',
+        'current_period_start' => now()->subMonth(),
+        'current_period_end' => now()->subDay(),
+    ]);
+
+    $this->artisan('omnex:billing-renewals')->assertExitCode(0);
+
+    $breakdown = $this->withHeader('X-Organization', $organization->id)
+        ->getJson('/api/v1/billing/cost-breakdown')
+        ->assertOk()
+        ->json();
+
+    expect($breakdown['services'])->not->toBeEmpty();
+
+    $services = collect($breakdown['services'])->keyBy('service');
+    expect($services->has('Starter'))->toBeTrue()
+        ->and($services->has('Pro'))->toBeTrue()
+        ->and($services->sum('amount'))->toBe((int) $breakdown['total'])
+        ->and($breakdown['currency'])->toBe('usd');
+
+    expect(Subscription::find($subA->id))->not->toBeNull()
+        ->and(Subscription::find($subB->id))->not->toBeNull();
 });
 
 it('supports a dry run that writes nothing', function () {

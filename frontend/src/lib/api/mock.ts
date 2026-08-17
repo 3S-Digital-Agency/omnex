@@ -33,8 +33,10 @@ import type {
   DriveFileUpdateInput,
   DriveFolderDto,
   DriveListing,
+  DriveUsageHistoryDto,
   DriveVersionDto,
   InvitationDto,
+  BillingCostBreakdownDto,
   InvoiceDto,
   LoginInput,
   LoginResponse,
@@ -55,7 +57,13 @@ import type {
   RegisterInput,
   RoleDto,
   SecurityFindingDto,
+  SecurityHistoryDto,
   SecurityScoreDto,
+  SecurityScoreSampleDto,
+  SecuritySettingsDto,
+  SecuritySettingsInput,
+  SessionDto,
+  SslCheckDto,
   ServerCreateInput,
   ServerDto,
   ServerMetricsDto,
@@ -64,6 +72,8 @@ import type {
   ServerUpdateInput,
   ContactLeadDto,
   ContactLeadInput,
+  LandingPageDto,
+  LandingPageInput,
   SshKeyCreateInput,
   SshKeyDto,
   SshKeyGenerateInput,
@@ -78,7 +88,12 @@ import type {
   SiteUpdateInput,
   SocialAccountDto,
   SocialProviderDto,
+  AuthenticatorDto,
   SocialRedirectResponse,
+  PasskeyCredentialDto,
+  PasskeyRegisterOptionsDto,
+  PasskeyRequestOptionsDto,
+  SecurityLevel,
   StorageProviderDto,
   SubscriptionDto,
   SwitchResponse,
@@ -105,6 +120,10 @@ interface MockUser extends UserDto {
   password: string;
   pendingMfaSecret?: string;
   recoveryCodes?: string[];
+}
+
+interface MockAuthenticator extends AuthenticatorDto {
+  userId: string;
 }
 
 interface MockMembership {
@@ -204,11 +223,35 @@ const users: MockUser[] = [
     email_verified_at: '2026-01-16T10:00:00Z',
     created_at: '2026-01-16T10:00:00Z',
   },
+  {
+    id: 'user-ops',
+    name: 'Ops Admin',
+    email: 'ops@omnex.cloud',
+    password: 'password',
+    mfa_enabled: true,
+    locale: null,
+    status: 'active',
+    email_verified_at: '2026-03-10T08:00:00Z',
+    created_at: '2026-03-10T08:00:00Z',
+  },
+  {
+    id: 'user-audit',
+    name: 'Audit Viewer',
+    email: 'audit@omnex.cloud',
+    password: 'password',
+    mfa_enabled: false,
+    locale: null,
+    status: 'active',
+    email_verified_at: '2026-05-20T09:30:00Z',
+    created_at: '2026-05-20T09:30:00Z',
+  },
 ];
 
 const memberships: MockMembership[] = [
   { id: 'memb-owner', organizationId: 'org-omnex-hq', userId: 'user-demo-owner', roleId: 'role-owner', status: 'active', joined_at: '2026-01-15T09:05:00Z' },
   { id: 'memb-dev', organizationId: 'org-omnex-hq', userId: 'user-dev', roleId: 'role-developer', status: 'active', joined_at: '2026-01-16T10:05:00Z' },
+  { id: 'memb-ops', organizationId: 'org-omnex-hq', userId: 'user-ops', roleId: 'role-admin', status: 'active', joined_at: '2026-03-10T08:05:00Z' },
+  { id: 'memb-audit', organizationId: 'org-omnex-hq', userId: 'user-audit', roleId: 'role-viewer', status: 'active', joined_at: '2026-05-20T09:35:00Z' },
 ];
 
 const invitations: MockInvitation[] = [
@@ -222,15 +265,310 @@ const invitations: MockInvitation[] = [
     expires_at: '2026-09-01T00:00:00Z',
     created_at: '2026-02-01T12:00:00Z',
   },
+  {
+    id: 'inv-2',
+    organizationId: 'org-omnex-hq',
+    email: 'bob@example.com',
+    roleId: 'role-developer',
+    token: 'mock-invite-token-2',
+    status: 'pending',
+    expires_at: '2026-08-25T00:00:00Z',
+    created_at: '2026-07-12T14:00:00Z',
+  },
+  {
+    id: 'inv-3',
+    organizationId: 'org-omnex-hq',
+    email: 'carol@example.com',
+    roleId: 'role-viewer',
+    token: 'mock-invite-token-3',
+    status: 'pending',
+    expires_at: '2026-08-30T00:00:00Z',
+    created_at: '2026-07-28T09:15:00Z',
+  },
 ];
 
 const auditLogs: AuditLogDto[] = [
   { id: 1, action: 'organization.created', resource_type: 'organization', resource_id: 'org-omnex-hq', result: 'success', ip_address: '127.0.0.1', created_at: '2026-01-15T09:05:00Z' },
   { id: 2, action: 'member.invited', resource_type: 'invitation', resource_id: 'inv-1', result: 'success', ip_address: '127.0.0.1', created_at: '2026-02-01T12:00:00Z' },
   { id: 3, action: 'user.logged_in', resource_type: 'user', resource_id: 'user-demo-owner', result: 'success', ip_address: '127.0.0.1', created_at: '2026-02-10T08:30:00Z' },
+  { id: 4, action: 'user.registered', resource_type: 'user', resource_id: 'user-demo-owner', result: 'success', ip_address: '127.0.0.1', created_at: '2026-01-15T09:00:00Z' },
+  { id: 5, action: 'user.mfa_enabled', resource_type: 'user', resource_id: 'user-demo-owner', result: 'success', ip_address: '127.0.0.1', created_at: '2026-02-12T14:20:00Z' },
+  { id: 6, action: 'member.invited', resource_type: 'invitation', resource_id: 'inv-1', result: 'success', ip_address: '127.0.0.1', created_at: '2026-03-05T09:15:00Z' },
+  { id: 7, action: 'member.invitation_accepted', resource_type: 'invitation', resource_id: 'inv-1', result: 'success', ip_address: '127.0.0.1', created_at: '2026-03-06T10:00:00Z' },
+  { id: 8, action: 'member.role_changed', resource_type: 'membership', resource_id: 'memb-owner', result: 'success', ip_address: '127.0.0.1', created_at: '2026-03-20T11:30:00Z' },
+  { id: 9, action: 'user.logged_in', resource_type: 'user', resource_id: 'user-demo-owner', result: 'success', ip_address: '127.0.0.1', created_at: '2026-04-02T08:45:00Z' },
+  { id: 10, action: 'user.mfa_failed', resource_type: 'user', resource_id: 'user-demo-owner', result: 'failure', ip_address: '127.0.0.1', created_at: '2026-04-02T08:47:00Z' },
+  { id: 11, action: 'user.mfa_enabled', resource_type: 'user', resource_id: 'user-ops', result: 'success', ip_address: '127.0.0.1', created_at: '2026-04-10T09:00:00Z' },
+  { id: 12, action: 'member.removed', resource_type: 'membership', resource_id: 'memb-ghost', result: 'success', ip_address: '127.0.0.1', created_at: '2026-04-15T16:20:00Z' },
+  { id: 13, action: 'user.logged_in', resource_type: 'user', resource_id: 'user-dev', result: 'success', ip_address: '127.0.0.1', created_at: '2026-05-01T09:10:00Z' },
+  { id: 14, action: 'domain.registered', resource_type: 'domain', resource_id: 'dom-omnex-io', result: 'success', ip_address: '127.0.0.1', created_at: '2026-05-10T13:00:00Z' },
+  { id: 15, action: 'dns.record_updated', resource_type: 'domain', resource_id: 'dom-omnex-io', result: 'success', ip_address: '127.0.0.1', created_at: '2026-05-10T13:10:00Z' },
+  { id: 16, action: 'user.logged_in', resource_type: 'user', resource_id: 'user-demo-owner', result: 'success', ip_address: '127.0.0.1', created_at: '2026-05-20T08:30:00Z' },
+  { id: 17, action: 'user.logged_out', resource_type: 'user', resource_id: 'user-demo-owner', result: 'success', ip_address: '127.0.0.1', created_at: '2026-05-20T18:00:00Z' },
+  { id: 18, action: 'domain.renewed', resource_type: 'domain', resource_id: 'dom-omnex-cloud', result: 'success', ip_address: '127.0.0.1', created_at: '2026-06-01T10:00:00Z' },
+  { id: 19, action: 'user.logged_in', resource_type: 'user', resource_id: 'user-ops', result: 'success', ip_address: '127.0.0.1', created_at: '2026-06-10T08:55:00Z' },
+  { id: 20, action: 'dns.dnssec_disabled', resource_type: 'domain', resource_id: 'dom-omnex-cloud', result: 'success', ip_address: '127.0.0.1', created_at: '2026-06-15T15:30:00Z' },
+  { id: 21, action: 'user.logged_in', resource_type: 'user', resource_id: 'user-dev', result: 'success', ip_address: '127.0.0.1', created_at: '2026-07-01T09:05:00Z' },
+  { id: 22, action: 'user.mfa_failed', resource_type: 'user', resource_id: 'user-dev', result: 'failure', ip_address: '127.0.0.1', created_at: '2026-07-01T09:07:00Z' },
+  { id: 23, action: 'member.invited', resource_type: 'invitation', resource_id: 'inv-2', result: 'success', ip_address: '127.0.0.1', created_at: '2026-07-12T14:00:00Z' },
+  { id: 24, action: 'domain.dnssec_enabled', resource_type: 'domain', resource_id: 'dom-omnex-cloud', result: 'success', ip_address: '127.0.0.1', created_at: '2026-07-20T11:15:00Z' },
+  { id: 25, action: 'user.logged_in', resource_type: 'user', resource_id: 'user-demo-owner', result: 'failure', ip_address: '127.0.0.1', created_at: '2026-07-25T08:20:00Z' },
+  { id: 26, action: 'user.logged_in', resource_type: 'user', resource_id: 'user-demo-owner', result: 'success', ip_address: '127.0.0.1', created_at: '2026-07-25T08:22:00Z' },
+  { id: 27, action: 'member.invited', resource_type: 'invitation', resource_id: 'inv-3', result: 'success', ip_address: '127.0.0.1', created_at: '2026-07-28T09:15:00Z' },
+  { id: 28, action: 'dns.record_updated', resource_type: 'domain', resource_id: 'dom-omnex-cloud', result: 'success', ip_address: '127.0.0.1', created_at: '2026-08-01T10:30:00Z' },
+  { id: 29, action: 'user.logged_in', resource_type: 'user', resource_id: 'user-audit', result: 'success', ip_address: '127.0.0.1', created_at: '2026-08-05T09:40:00Z' },
+  { id: 30, action: 'domain.transfer_initiated', resource_type: 'domain', resource_id: 'dom-omnex-io', result: 'failure', ip_address: '127.0.0.1', created_at: '2026-08-10T14:45:00Z' },
+  { id: 31, action: 'user.mfa_enabled', resource_type: 'user', resource_id: 'user-ops', result: 'success', ip_address: '127.0.0.1', created_at: '2026-08-12T09:20:00Z' },
+  { id: 32, action: 'dns.record_created', resource_type: 'domain', resource_id: 'dom-omnex-cloud', result: 'success', ip_address: '127.0.0.1', created_at: '2026-08-13T16:05:00Z' },
+  { id: 33, action: 'member.role_changed', resource_type: 'membership', resource_id: 'memb-dev', result: 'success', ip_address: '127.0.0.1', created_at: '2026-08-15T11:40:00Z' },
 ];
 
 const contactLeads: ContactLeadDto[] = [];
+
+// --- Landing pages (CMS campaign engine) --------------------------------
+const landingPages: LandingPageDto[] = [
+  {
+    id: uid('lp'),
+    slug: 'launch-offer',
+    type: 'offer',
+    status: 'published',
+    content_en: [
+      {
+        kind: 'hero',
+        badge: 'Limited launch offer',
+        title: 'Everything you need to run your infrastructure — free for the first year',
+        subtitle:
+          'Domains, DNS, sites, cloud servers, storage and security from a single control plane. No credit card, no commitment, cancel anytime.',
+        cta_label: 'Claim the launch offer',
+        cta_secondary: 'Talk to a specialist',
+      },
+      {
+        kind: 'offer',
+        title: 'Launch plan',
+        description: 'All OMNEX features included for the first 12 months — then $12/mo. Cancel anytime.',
+        price: '$0',
+        price_note: '/month for 12 months',
+        features: [
+          'Domains & managed DNS with DNSSEC',
+          '5 cloud servers (any provider)',
+          '10 sites deployed from Git',
+          '100 GB OMNEX Drive storage',
+          'Live Security Score & alerts',
+          'Priority support',
+        ],
+        cta_label: 'Claim the offer',
+        highlight: true,
+      },
+      {
+        kind: 'features',
+        title: 'What you get on day one',
+        items: [
+          { title: 'One control plane', desc: 'Every resource becomes a system object — no more juggling half a dozen consoles.' },
+          { title: 'Provider-agnostic', desc: 'Registrars, compute, storage and payments sit behind clean provider interfaces. Switch without rewriting anything.' },
+          { title: 'Sovereign by design', desc: 'OMNEX owns its abstractions. Your data stays on the infrastructure you choose.' },
+        ],
+      },
+      {
+        kind: 'cta',
+        title: 'Offer ends soon',
+        subtitle: 'The first-year discount is limited to early teams. Set up in minutes.',
+        label: 'Start free — no credit card',
+      },
+    ],
+    content_fr: [
+      {
+        kind: 'hero',
+        badge: 'Offre de lancement limitée',
+        title: 'Tout ce qu’il faut pour gérer votre infrastructure — gratuit la première année',
+        subtitle:
+          'Domaines, DNS, sites, serveurs cloud, stockage et sécurité depuis un seul plan de contrôle. Sans carte de crédit, sans engagement, annulable à tout moment.',
+        cta_label: 'Profiter de l’offre de lancement',
+        cta_secondary: 'Parler à un spécialiste',
+      },
+      {
+        kind: 'offer',
+        title: 'Forfait lancement',
+        description: 'Toutes les fonctions OMNEX incluses pendant les 12 premiers mois — puis 12 $/mois. Annulable à tout moment.',
+        price: '0 $',
+        price_note: '/mois pendant 12 mois',
+        features: [
+          'Domaines et DNS géré avec DNSSEC',
+          '5 serveurs cloud (tout fournisseur)',
+          '10 sites déployés depuis Git',
+          '100 Go de stockage OMNEX Drive',
+          'Score de sécurité en direct et alertes',
+          'Support prioritaire',
+        ],
+        cta_label: 'Profiter de l’offre',
+        highlight: true,
+      },
+      {
+        kind: 'features',
+        title: 'Ce que vous obtenez dès le premier jour',
+        items: [
+          { title: 'Un seul plan de contrôle', desc: 'Chaque ressource devient un objet du système — fini la jonglerie entre une demi-douzaine de consoles.' },
+          { title: 'Indépendant du fournisseur', desc: 'Registraires, calcul, stockage et paiements reposent sur des interfaces propres. Changez sans rien réécrire.' },
+          { title: 'Souverain par conception', desc: 'OMNEX possède ses abstractions. Vos données restent sur l’infrastructure que vous choisissez.' },
+        ],
+      },
+      {
+        kind: 'cta',
+        title: 'L’offre se termine bientôt',
+        subtitle: 'La remise de la première année est limitée aux premières équipes. Installation en quelques minutes.',
+        label: 'Commencer gratuitement — sans carte de crédit',
+      },
+    ],
+    published_at: nowIso(),
+  },
+  {
+    id: uid('lp'),
+    slug: 'omnex-20',
+    type: 'promo',
+    status: 'published',
+    content_en: [
+      {
+        kind: 'hero',
+        badge: 'Promo code',
+        title: '20% off every plan — for your whole first year',
+        subtitle: 'Use the code below at checkout. Applies to Pro and Business, including cloud, domains and storage.',
+        cta_label: 'Start with OMNEX20',
+      },
+      {
+        kind: 'promo',
+        title: 'Your promo code',
+        code: 'OMNEX20',
+        discount: '20% off',
+        description: 'Applied automatically at checkout on any annual plan. One code per organization, valid until the end of the month.',
+        expires_at: '2026-12-31',
+        cta_label: 'Redeem the code',
+      },
+      {
+        kind: 'cta',
+        title: 'Ready to simplify your infrastructure?',
+        subtitle: 'Set up in minutes — the discount applies instantly at checkout.',
+        label: 'Sign in with OMNEX20',
+      },
+    ],
+    content_fr: [
+      {
+        kind: 'hero',
+        badge: 'Code promo',
+        title: '20 % de rabais sur tous les forfaits — toute votre première année',
+        subtitle: 'Utilisez le code ci-dessous au paiement. Valable sur Pro et Business, y compris cloud, domaines et stockage.',
+        cta_label: 'Commencer avec OMNEX20',
+      },
+      {
+        kind: 'promo',
+        title: 'Votre code promo',
+        code: 'OMNEX20',
+        discount: '20 % de rabais',
+        description: 'Appliqué automatiquement au paiement sur tout forfait annuel. Un code par organisation, valable jusqu’à la fin du mois.',
+        expires_at: '2026-12-31',
+        cta_label: 'Utiliser le code',
+      },
+      {
+        kind: 'cta',
+        title: 'Prêt à simplifier votre infrastructure ?',
+        subtitle: 'Installation en quelques minutes — la remise s’applique instantanément au paiement.',
+        label: 'Se connecter avec OMNEX20',
+      },
+    ],
+    published_at: nowIso(),
+  },
+  {
+    id: uid('lp'),
+    slug: 'omnex-vs-consoles',
+    type: 'comparison',
+    status: 'published',
+    content_en: [
+      {
+        kind: 'hero',
+        badge: 'Comparison',
+        title: 'One control plane instead of five consoles',
+        subtitle:
+          'See how OMNEX compares to juggling separate tools for domains, DNS, hosting, storage and billing.',
+        cta_label: 'Try the comparison yourself',
+      },
+      {
+        kind: 'comparison',
+        title: 'OMNEX vs. the scattered stack',
+        subtitle: 'What it costs to run your infrastructure across separate providers and consoles.',
+        columns: [
+          { name: 'OMNEX', highlight: true, cta_label: 'Get started' },
+          { name: '5 separate consoles' },
+        ],
+        rows: [
+          { label: 'Domains & DNS', values: [true, true] },
+          { label: 'Single identity & RBAC', values: [true, false] },
+          { label: 'One audit log for everything', values: [true, false] },
+          { label: 'Live Security Score', values: [true, false] },
+          { label: 'Provider-agnostic (switch anytime)', values: [true, false] },
+          { label: 'Monthly billing from one invoice', values: [true, false] },
+          { label: 'Time to onboard a new team member', values: ['Minutes', 'Days'] },
+          { label: 'Vendor lock-in', values: ['None', 'Everywhere'] },
+        ],
+      },
+      {
+        kind: 'faq',
+        title: 'Questions teams ask',
+        items: [
+          { q: 'Can I keep my current providers?', a: 'Yes. OMNEX sits in front of your registrars, hosts and storage with clean provider interfaces — you keep what works.' },
+          { q: 'What happens if I leave?', a: 'Nothing is locked in. Export everything — domains, DNS zones, files and config — any time.' },
+        ],
+      },
+      {
+        kind: 'cta',
+        title: 'Ready to consolidate?',
+        subtitle: 'Replace five consoles with one control plane in an afternoon.',
+        label: 'Start consolidating',
+      },
+    ],
+    content_fr: [
+      {
+        kind: 'hero',
+        badge: 'Comparaison',
+        title: 'Un seul plan de contrôle au lieu de cinq consoles',
+        subtitle:
+          'Découvrez comment OMNEX se compare à la jonglerie entre des outils séparés pour domaines, DNS, hébergement, stockage et facturation.',
+        cta_label: 'Faire la comparaison vous-même',
+      },
+      {
+        kind: 'comparison',
+        title: 'OMNEX contre la pile éparpillée',
+        subtitle: 'Ce que coûte la gestion de votre infrastructure entre plusieurs fournisseurs et consoles.',
+        columns: [
+          { name: 'OMNEX', highlight: true, cta_label: 'Commencer' },
+          { name: '5 consoles séparées' },
+        ],
+        rows: [
+          { label: 'Domaines et DNS', values: [true, true] },
+          { label: 'Identité unique et RBAC', values: [true, false] },
+          { label: 'Un journal d’audit pour tout', values: [true, false] },
+          { label: 'Score de sécurité en direct', values: [true, false] },
+          { label: 'Indépendant du fournisseur (changez à tout moment)', values: [true, false] },
+          { label: 'Facturation mensuelle sur une seule facture', values: [true, false] },
+          { label: 'Intégration d’un nouveau membre', values: ['Minutes', 'Jours'] },
+          { label: 'Verrouillage fournisseur', values: ['Aucun', 'Partout'] },
+        ],
+      },
+      {
+        kind: 'faq',
+        title: 'Les questions des équipes',
+        items: [
+          { q: 'Puis-je garder mes fournisseurs actuels ?', a: 'Oui. OMNEX se place devant vos registraires, hébergeurs et stockage avec des interfaces propres — vous gardez ce qui fonctionne.' },
+          { q: 'Que se passe-t-il si je pars ?', a: 'Rien n’est verrouillé. Exportez tout — domaines, zones DNS, fichiers et configuration — à tout moment.' },
+        ],
+      },
+      {
+        kind: 'cta',
+        title: 'Prêt à consolider ?',
+        subtitle: 'Remplacez cinq consoles par un seul plan de contrôle en un après-midi.',
+        label: 'Commencer la consolidation',
+      },
+    ],
+    published_at: nowIso(),
+  },
+];
 
 const notifications: NotificationDto[] = [
   {
@@ -537,6 +875,41 @@ const driveFolders: DriveFolderDto[] = [];
 const driveFiles: DriveFileDto[] = [];
 const driveVersions: MockDriveVersion[] = [];
 
+// Demo files (root folder) with versions spread over the last month so the
+// usage-history timeline and the by-type donut have data to show.
+function seedDriveDemo(): void {
+  const mk = (name: string, mimeType: string, size: number, daysAgo: number): DriveFileDto => {
+    const id = `drv-${name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}`;
+    const createdAt = new Date(Date.now() - daysAgo * 86400000).toISOString();
+    driveFiles.push({
+      id,
+      folder_id: null,
+      name,
+      mime_type: mimeType,
+      size,
+      checksum: null,
+      version: 1,
+      status: 'active',
+      trashed_at: null,
+      created_at: createdAt,
+      updated_at: createdAt,
+    });
+    driveVersions.push({ id: `${id}-v1`, file_id: id, version: 1, size, checksum: null, created_at: createdAt, content: '' });
+    return driveFiles[driveFiles.length - 1];
+  };
+
+  // Report grows over time: a first version now, more added in the past days.
+  mk('hero-banner.png', 'image/png', 2 * 1024 * 1024, 26);
+  mk('rapport-q3.pdf', 'application/pdf', 5 * 1024 * 1024, 18);
+  mk('backup-0815.zip', 'application/zip', 512 * 1024 * 1024, 6);
+  mk('config.yaml', 'text/yaml', 2048, 2);
+
+  // Second versions for two files (grows the timeline further back).
+  driveVersions.push({ id: 'drv-hero-banner-png-v0', file_id: 'drv-hero-banner-png', version: 0, size: 1024 * 1024, checksum: null, created_at: new Date(Date.now() - 30 * 86400000).toISOString(), content: '' });
+  driveVersions.push({ id: 'drv-rapport-q3-pdf-v0', file_id: 'drv-rapport-q3-pdf', version: 0, size: 2 * 1024 * 1024, checksum: null, created_at: new Date(Date.now() - 24 * 86400000).toISOString(), content: '' });
+}
+seedDriveDemo();
+
 function driveQuotaUsed(): number {
   return driveVersions.reduce((sum, v) => sum + v.size, 0);
 }
@@ -563,8 +936,80 @@ const BILLING_PLANS: BillingPlanDto[] = [
   { id: 'plan-business', slug: 'business', name: 'Business', description: 'For organizations with compliance and scale needs.', price_monthly: 19900, price_yearly: 199000, currency: 'usd', features: ['Unlimited everything', 'SLA & compliance', 'Dedicated support', 'SSO & audit'] },
 ];
 
-const subscriptions: SubscriptionDto[] = [];
-const invoices: InvoiceDto[] = [];
+// Demo billing state: an active Starter subscription with a few paid
+// invoices spread over the last months, so the cockpit has data to show.
+function starterPlan(): BillingPlanDto {
+  return BILLING_PLANS.find((p) => p.slug === 'starter')!;
+}
+
+const subscriptions: SubscriptionDto[] = [
+  {
+    id: 'sub-starter',
+    plan: { ...starterPlan(), features: [...starterPlan().features] },
+    coupon: null,
+    provider: 'sandbox',
+    status: 'active',
+    current_period_start: new Date(Date.now() - 12 * 86400000).toISOString(),
+    current_period_end: new Date(Date.now() + 18 * 86400000).toISOString(),
+    canceled_at: null,
+    created_at: new Date(Date.now() - 120 * 86400000).toISOString(),
+    updated_at: nowIso(),
+  },
+];
+const invoices: InvoiceDto[] = [
+  {
+    id: 'inv-2026-0814',
+    number: '2026-0814',
+    amount: 1200,
+    discount: 0,
+    credit_applied: 0,
+    amount_due: 1200,
+    currency: 'usd',
+    status: 'paid',
+    provider: 'sandbox',
+    paid_at: new Date(Date.now() - 2 * 86400000).toISOString(),
+    period_start: new Date(Date.now() - 32 * 86400000).toISOString(),
+    period_end: new Date(Date.now() - 2 * 86400000).toISOString(),
+    plan: { ...starterPlan(), features: [] },
+    created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
+  },
+  {
+    id: 'inv-2026-0715',
+    number: '2026-0715',
+    amount: 1200,
+    discount: 300,
+    credit_applied: 200,
+    amount_due: 700,
+    currency: 'usd',
+    status: 'paid',
+    provider: 'sandbox',
+    paid_at: new Date(Date.now() - 32 * 86400000).toISOString(),
+    period_start: new Date(Date.now() - 62 * 86400000).toISOString(),
+    period_end: new Date(Date.now() - 32 * 86400000).toISOString(),
+    plan: { ...starterPlan(), features: [] },
+    created_at: new Date(Date.now() - 32 * 86400000).toISOString(),
+  },
+  {
+    id: 'inv-2026-0615',
+    number: '2026-0615',
+    amount: 1200,
+    discount: 0,
+    credit_applied: 0,
+    amount_due: 1200,
+    currency: 'usd',
+    status: 'paid',
+    provider: 'sandbox',
+    paid_at: new Date(Date.now() - 62 * 86400000).toISOString(),
+    period_start: new Date(Date.now() - 92 * 86400000).toISOString(),
+    period_end: new Date(Date.now() - 62 * 86400000).toISOString(),
+    plan: { ...starterPlan(), features: [] },
+    created_at: new Date(Date.now() - 62 * 86400000).toISOString(),
+  },
+];
+const creditEntries: CreditEntryDto[] = [
+  { id: 'credit-welcome', amount: 1000, currency: 'usd', reason: 'Welcome credit', created_at: new Date(Date.now() - 120 * 86400000).toISOString() },
+  { id: 'credit-inv-2026-0715', amount: -200, currency: 'usd', reason: 'invoice:2026-0715', created_at: new Date(Date.now() - 32 * 86400000).toISOString() },
+];
 
 // Demo coupon catalog mirroring the backend `coupons` table.
 const mockCoupons: CouponAdminDto[] = [
@@ -589,8 +1034,6 @@ function toAppliedCoupon(coupon: CouponDto): AppliedCouponDto {
   return { id: coupon.code, code: coupon.code, name: coupon.name, discount_type: coupon.discount_type, discount_value: coupon.discount_value };
 }
 
-const creditEntries: CreditEntryDto[] = [];
-
 function creditBalance(): number {
   return creditEntries.reduce((sum, entry) => sum + entry.amount, 0);
 }
@@ -606,8 +1049,95 @@ const SITE_PROVIDERS: SiteProviderDto[] = [
   { name: 'custom', label: 'Custom', configured: false },
 ];
 
-const sites: SiteDto[] = [];
-const siteDeployments: SiteDeploymentDto[] = [];
+const sites: SiteDto[] = [
+  {
+    id: 'site-marketing',
+    name: 'Marketing',
+    framework: 'static',
+    git_url: 'https://github.com/acme/marketing.git',
+    git_branch: 'main',
+    provider: 'sandbox',
+    status: 'ready',
+    url: 'https://marketing.omnex.cloud',
+    current_deployment_id: 'dep-marketing-2',
+    environment_variable_keys: ['APP_ENV'],
+    deployments_count: 3,
+    created_at: '2026-04-12T00:00:00Z',
+    updated_at: '2026-08-14T00:00:00Z',
+  },
+  {
+    id: 'site-api',
+    name: 'API Docs',
+    framework: 'next',
+    git_url: 'https://github.com/acme/api-docs.git',
+    git_branch: 'main',
+    provider: 'sandbox',
+    status: 'ready',
+    url: 'https://api-docs.omnex.cloud',
+    current_deployment_id: 'dep-api-1',
+    environment_variable_keys: [],
+    deployments_count: 2,
+    created_at: '2026-05-20T00:00:00Z',
+    updated_at: '2026-08-10T00:00:00Z',
+  },
+];
+const siteDeployments: SiteDeploymentDto[] = [
+  {
+    id: 'dep-marketing-1',
+    site_id: 'site-marketing',
+    number: 1,
+    commit_sha: 'a1b2c3d',
+    status: 'rolled_back',
+    url: 'https://marketing.omnex.cloud',
+    logs: 'Build OK\nDeploy cancelled by user',
+    deployed_at: '2026-08-08T10:00:00Z',
+    created_at: '2026-08-08T10:00:00Z',
+  },
+  {
+    id: 'dep-marketing-2',
+    site_id: 'site-marketing',
+    number: 2,
+    commit_sha: 'e4f5a6b',
+    status: 'live',
+    url: 'https://marketing.omnex.cloud',
+    logs: 'Build OK\nDeployed to sandbox',
+    deployed_at: '2026-08-14T10:00:00Z',
+    created_at: '2026-08-14T10:00:00Z',
+  },
+  {
+    id: 'dep-marketing-3',
+    site_id: 'site-marketing',
+    number: 3,
+    commit_sha: '9a8b7c6',
+    status: 'failed',
+    url: null,
+    logs: 'Build failed: missing config',
+    deployed_at: '2026-08-15T10:00:00Z',
+    created_at: '2026-08-15T10:00:00Z',
+  },
+  {
+    id: 'dep-api-1',
+    site_id: 'site-api',
+    number: 1,
+    commit_sha: 'c0ffee1',
+    status: 'live',
+    url: 'https://api-docs.omnex.cloud',
+    logs: 'Build OK\nDeployed to sandbox',
+    deployed_at: '2026-08-10T10:00:00Z',
+    created_at: '2026-08-10T10:00:00Z',
+  },
+  {
+    id: 'dep-api-2',
+    site_id: 'site-api',
+    number: 2,
+    commit_sha: 'd00d5a7',
+    status: 'live',
+    url: 'https://api-docs.omnex.cloud',
+    logs: 'Build OK\nDeployed to sandbox',
+    deployed_at: '2026-08-16T10:00:00Z',
+    created_at: '2026-08-16T10:00:00Z',
+  },
+];
 
 function siteById(siteId: string): SiteDto {
   const site = sites.find((s) => s.id === siteId);
@@ -661,8 +1191,94 @@ export function cloudProviders(): CloudProviderDto[] {
 }
 
 const sshKeys: SshKeyDto[] = [];
-const servers: ServerDto[] = [];
-const serverOperations: ServerOperationDto[] = [];
+const servers: ServerDto[] = [
+  {
+    id: 'srv-web-01',
+    name: 'web-01',
+    region: 'fsn1',
+    plan: 'cpx11',
+    image: 'ubuntu-24.04',
+    provider: 'sandbox',
+    status: 'running',
+    ipv4: '192.0.2.10',
+    ipv6: '2001:db8::10',
+    ssh_key: null,
+    ssh_key_id: 'key-main',
+    tags: ['web', 'prod'],
+    snapshot_frequency: 'daily',
+    snapshot_retention_days: 7,
+    last_snapshot_at: new Date(Date.now() - 86400000).toISOString(),
+    operations_count: 4,
+    created_at: '2026-02-10T00:00:00Z',
+    updated_at: '2026-08-15T00:00:00Z',
+  },
+  {
+    id: 'srv-db-01',
+    name: 'db-01',
+    region: 'nbg1',
+    plan: 'cpx21',
+    image: 'debian-12',
+    provider: 'sandbox',
+    status: 'stopped',
+    ipv4: '192.0.2.20',
+    ipv6: '2001:db8::20',
+    ssh_key: null,
+    ssh_key_id: 'key-main',
+    tags: ['db', 'staging'],
+    snapshot_frequency: 'weekly',
+    snapshot_retention_days: 14,
+    last_snapshot_at: null,
+    operations_count: 2,
+    created_at: '2026-03-05T00:00:00Z',
+    updated_at: '2026-08-10T00:00:00Z',
+  },
+];
+const serverOperations: ServerOperationDto[] = [
+  {
+    id: 'op-web-provision',
+    server_id: 'srv-web-01',
+    type: 'provision',
+    status: 'succeeded',
+    started_at: '2026-02-10T00:00:00Z',
+    completed_at: '2026-02-10T00:02:30Z',
+    result: 'Server ready',
+    error: null,
+    created_at: '2026-02-10T00:00:00Z',
+  },
+  {
+    id: 'op-web-snapshot',
+    server_id: 'srv-web-01',
+    type: 'snapshot',
+    status: 'succeeded',
+    started_at: new Date(Date.now() - 86400000).toISOString(),
+    completed_at: new Date(Date.now() - 86400000 + 30000).toISOString(),
+    result: 'Snapshot created',
+    error: null,
+    created_at: new Date(Date.now() - 86400000).toISOString(),
+  },
+  {
+    id: 'op-web-reboot',
+    server_id: 'srv-web-01',
+    type: 'reboot',
+    status: 'running',
+    started_at: new Date(Date.now() - 60000).toISOString(),
+    completed_at: null,
+    result: null,
+    error: null,
+    created_at: new Date(Date.now() - 60000).toISOString(),
+  },
+  {
+    id: 'op-db-stop',
+    server_id: 'srv-db-01',
+    type: 'stop',
+    status: 'failed',
+    started_at: '2026-08-10T00:00:00Z',
+    completed_at: '2026-08-10T00:01:00Z',
+    result: null,
+    error: 'Agent timeout',
+    created_at: '2026-08-10T00:00:00Z',
+  },
+];
 const serverSnapshots: ServerSnapshotDto[] = [];
 
 // Encrypted vault (mock): the private key text is "sealed" with a verifier
@@ -730,9 +1346,10 @@ function sandboxServerIpv4(name: string, region: string, plan: string, image: st
   return `10.${a}.${b}.${c}`;
 }
 
-function mockMetricsSample(seed: string, bucketOffset = 0): ServerMetricsDto {
+function mockMetricsSample(seed: string, bucketOffset = 0, daysOffset = 0): ServerMetricsDto {
   // Deterministic walk over 5-second buckets, mirroring the backend sandbox.
-  // bucketOffset < 0 backfills the history (older buckets).
+  // bucketOffset < 0 backfills the history (older buckets); daysOffset > 0
+  // dates backfilled samples so the 7/30/90-day period selector shows depth.
   const bucket = Math.floor(Date.now() / 5000) + bucketOffset;
   let hash = 2166136261;
   const input = `${seed}:${bucket}`;
@@ -747,6 +1364,7 @@ function mockMetricsSample(seed: string, bucketOffset = 0): ServerMetricsDto {
   const diskTotal = 80 * 1024 * 1024 * 1024;
   const diskUsed = Math.round(diskTotal * (0.34 + ((hash >>> 5) % 8) / 100));
 
+  const sampledAt = new Date(Date.now() - daysOffset * 86400000);
   return {
     server_id: seed,
     cpu,
@@ -754,7 +1372,7 @@ function mockMetricsSample(seed: string, bucketOffset = 0): ServerMetricsDto {
     memory_total: memoryTotal,
     disk_used: diskUsed,
     disk_total: diskTotal,
-    sampled_at: nowIso(),
+    sampled_at: sampledAt.toISOString(),
   };
 }
 
@@ -823,6 +1441,81 @@ function runServerOperation(server: ServerDto, type: string, successStatus: stri
 }
 
 const dismissedSecurityFindingIds = new Set<string>();
+
+// MFA enforcement policy (per-organization, mirrored in the mock).
+let mfaPolicy: 'optional' | 'required' = 'optional';
+
+// Persisted score samples — a growing timeline for the Security cockpit.
+// Seeded with a plausible improvement curve; a new sample is appended when
+// the score changes (dismiss / reopen / policy switch / manual scan).
+const daysAgo = (days: number, hour = 9) => {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  date.setHours(hour, 0, 0, 0);
+  return date.toISOString();
+};
+let securityScoreSamples: SecurityScoreSampleDto[] = [
+  { score: 28, open: 15, high: 5, medium: 7, low: 3, created_at: daysAgo(90) },
+  { score: 33, open: 14, high: 4, medium: 6, low: 4, created_at: daysAgo(75) },
+  { score: 36, open: 13, high: 4, medium: 6, low: 3, created_at: daysAgo(60) },
+  { score: 39, open: 12, high: 4, medium: 5, low: 3, created_at: daysAgo(45) },
+  { score: 42, open: 11, high: 3, medium: 5, low: 3, created_at: daysAgo(28) },
+  { score: 45, open: 11, high: 3, medium: 5, low: 3, created_at: daysAgo(24) },
+  { score: 49, open: 10, high: 3, medium: 4, low: 3, created_at: daysAgo(20) },
+  { score: 52, open: 10, high: 2, medium: 5, low: 3, created_at: daysAgo(16) },
+  { score: 56, open: 9, high: 2, medium: 4, low: 3, created_at: daysAgo(13) },
+  { score: 61, open: 8, high: 2, medium: 4, low: 2, created_at: daysAgo(10) },
+  { score: 64, open: 8, high: 1, medium: 4, low: 3, created_at: daysAgo(7) },
+  { score: 67, open: 7, high: 1, medium: 3, low: 3, created_at: daysAgo(5) },
+  { score: 70, open: 6, high: 1, medium: 3, low: 2, created_at: daysAgo(3) },
+  { score: 72, open: 6, high: 1, medium: 3, low: 2, created_at: daysAgo(1) },
+];
+
+/** Append a score sample when the score differs from the last recorded one. */
+function recordSecuritySample(): void {
+  const report = computeSecurityReport();
+  const last = securityScoreSamples[securityScoreSamples.length - 1];
+  if (last && last.score === report.score) return;
+  securityScoreSamples.push({
+    score: report.score,
+    open: report.summary.open,
+    high: report.summary.high,
+    medium: report.summary.medium,
+    low: report.summary.low,
+    created_at: nowIso(),
+  });
+}
+
+// Active API sessions for the current user (device context for the UI).
+let mockSessions: SessionDto[] = [
+  {
+    id: 'session-current',
+    name: 'omnex-spa',
+    ip_address: '127.0.0.1',
+    user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36',
+    last_used_at: nowIso(),
+    created_at: nowIso(),
+    is_current: true,
+  },
+  {
+    id: 'session-laptop',
+    name: 'omnex-spa',
+    ip_address: '192.168.1.42',
+    user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15',
+    last_used_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+    created_at: new Date(Date.now() - 12 * 86400000).toISOString(),
+    is_current: false,
+  },
+  {
+    id: 'session-mobile',
+    name: 'omnex-spa',
+    ip_address: '10.0.0.7',
+    user_agent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+    last_used_at: new Date(Date.now() - 12 * 86400000).toISOString(),
+    created_at: new Date(Date.now() - 21 * 86400000).toISOString(),
+    is_current: false,
+  },
+];
 
 const SECURITY_PENALTIES: Record<string, number> = { high: 25, medium: 15, low: 10 };
 
@@ -897,7 +1590,102 @@ function computeSecurityFindings(): SecurityFindingDto[] {
     }
   }
 
+  // MFA enforcement policy: when required, an org-level finding stays open
+  // until every active member enables MFA.
+  if (mfaPolicy === 'required') {
+    const withoutMfa = memberUsers.filter((u) => !u.mfa_enabled);
+    if (withoutMfa.length > 0) {
+      findings.push(
+        securityFinding('mfa_enforcement', 'high', null, null, {
+          policy: 'required',
+          affected_users: withoutMfa.map((u) => ({ name: u.name, email: u.email })),
+        }),
+      );
+    }
+  }
+
+  // SSL / certificate monitoring from the (deterministic) checks.
+  for (const check of computeSslChecks()) {
+    if (check.status === 'invalid') {
+      findings.push(
+        securityFinding('ssl_invalid', 'high', check.target_type, check.target_id, {
+          target: check.details?.url ?? check.details?.target ?? '',
+        }),
+      );
+    } else if (check.status === 'expiring') {
+      findings.push(
+        securityFinding('ssl_expiring', 'medium', check.target_type, check.target_id, {
+          target: check.details?.target ?? '',
+          days_remaining: check.days_remaining,
+        }),
+      );
+    }
+  }
+
+  // Backup status: servers with scheduled snapshots disabled.
+  for (const server of servers) {
+    if (server.snapshot_frequency === 'disabled') {
+      findings.push(
+        securityFinding('backup_disabled', 'medium', 'server', server.id, {
+          server: server.name,
+          provider: server.provider,
+        }),
+      );
+    }
+  }
+
   return findings;
+}
+
+function mockSslDays(targetId: string): number {
+  return 5 + (crc32(targetId) % 396);
+}
+
+/** Deterministic certificate checks mirroring the sandbox checker. */
+function computeSslChecks(): SslCheckDto[] {
+  const checks: SslCheckDto[] = [];
+
+  for (const site of sites) {
+    const url = site.url ?? '';
+    if (url === '') continue;
+    if (!url.startsWith('https://')) {
+      checks.push({
+        id: `ssl-${site.id}`,
+        target_type: 'site',
+        target_id: site.id,
+        status: 'invalid',
+        days_remaining: null,
+        details: { url },
+        checked_at: nowIso(),
+      });
+    } else {
+      const days = mockSslDays(site.id);
+      checks.push({
+        id: `ssl-${site.id}`,
+        target_type: 'site',
+        target_id: site.id,
+        status: days <= 30 ? 'expiring' : 'valid',
+        days_remaining: days,
+        details: { target: site.name },
+        checked_at: nowIso(),
+      });
+    }
+  }
+
+  for (const domain of domains) {
+    const days = mockSslDays(domain.id);
+    checks.push({
+      id: `ssl-${domain.id}`,
+      target_type: 'domain',
+      target_id: domain.id,
+      status: days <= 30 ? 'expiring' : 'valid',
+      days_remaining: days,
+      details: { target: domain.name },
+      checked_at: nowIso(),
+    });
+  }
+
+  return checks;
 }
 
 function computeSecurityReport(): SecurityScoreDto {
@@ -1081,7 +1869,51 @@ interface MockSocialAccount extends SocialAccountDto {
   userId: string;
 }
 
-const socialAccounts: MockSocialAccount[] = [];
+const socialAccounts: MockSocialAccount[] = [
+  {
+    id: 'sa-github-demo',
+    userId: 'user-demo-owner',
+    provider: 'github',
+    provider_email: 'demo@omnex.cloud',
+    name: 'demo-owner',
+    created_at: '2026-01-15T09:10:00Z',
+  },
+];
+
+const authenticators: MockAuthenticator[] = [
+  {
+    id: 'auth-yubikey-main',
+    userId: 'user-demo-owner',
+    name: 'YubiKey 5 NFC',
+    transport: 'usb',
+    last_used_at: nowIso(),
+    created_at: '2026-02-12T14:20:00Z',
+  },
+  {
+    id: 'auth-hello-pc',
+    userId: 'user-demo-owner',
+    name: 'PC professionnel',
+    transport: 'internal',
+    last_used_at: new Date(Date.now() - 5 * 60000).toISOString(),
+    created_at: '2026-03-20T09:00:00Z',
+  },
+  {
+    id: 'auth-yubikey-backup',
+    userId: 'user-demo-owner',
+    name: 'YubiKey Backup',
+    transport: 'nfc',
+    last_used_at: new Date(Date.now() - 12 * 86400000).toISOString(),
+    created_at: '2026-04-05T10:30:00Z',
+  },
+  {
+    id: 'auth-iphone-faceid',
+    userId: 'user-demo-owner',
+    name: 'iPhone Face ID',
+    transport: 'internal',
+    last_used_at: new Date(Date.now() - 2 * 86400000).toISOString(),
+    created_at: '2026-06-01T08:00:00Z',
+  },
+];
 
 let currentUserId: string | null = null;
 const mfaChallenges = new Map<string, string>();
@@ -1113,6 +1945,7 @@ const toUserDto = (user: MockUser): UserDto => ({
   status: user.status,
   last_login_at: user.last_login_at,
   created_at: user.created_at,
+  security_level: user.security_level ?? 'standard',
 });
 
 const toMembershipDto = (m: MockMembership): MembershipDto => {
@@ -1301,6 +2134,117 @@ export class MockApiClient implements ApiClient {
     session.setOrganizationId(activeOrg?.id ?? null);
 
     return Promise.resolve(buildSession(user));
+  }
+
+  async passkeyRequestOptions(): Promise<PasskeyRequestOptionsDto> {
+    const random = new Uint8Array(32);
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+      crypto.getRandomValues(random);
+    } else {
+      for (let index = 0; index < random.length; index++) random[index] = Math.floor(Math.random() * 256);
+    }
+    const challenge = btoa(String.fromCharCode(...random)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const rpId = typeof window !== 'undefined' && window.location?.hostname ? window.location.hostname : 'localhost';
+    return Promise.resolve({ challenge, rp_id: rpId, timeout: 60_000, allow_credentials: [] });
+  }
+
+  async verifyPasskey(credential: PasskeyCredentialDto | null): Promise<AuthSession> {
+    if (credential && (!credential.id || !credential.response?.client_data_json)) {
+      throw new ApiError(422, 'Validation failed', undefined, { credential: ['Invalid WebAuthn assertion.'] });
+    }
+    // Sandbox: any locally verified assertion (or the demo fallback) authenticates the demo account.
+    const user = users.find((candidate) => candidate.id === 'user-demo-owner') ?? users[0];
+    if (!user) throw new ApiError(401, 'Unauthenticated');
+    if (!socialAccounts.some((account) => account.provider === 'passkey' && account.userId === user.id)) {
+      socialAccounts.push({
+        id: uid('passkey'),
+        provider: 'passkey',
+        provider_email: user.email,
+        name: 'Passkey',
+        created_at: nowIso(),
+        userId: user.id,
+      });
+    }
+    currentUserId = user.id;
+    session.setToken(`mock-token-${user.id}`);
+    const activeOrg = organizations.find((org) =>
+      memberships.some((m) => m.userId === user.id && m.organizationId === org.id),
+    ) ?? null;
+    session.setOrganizationId(activeOrg?.id ?? null);
+    return Promise.resolve(buildSession(user));
+  }
+
+  async listAuthenticators(): Promise<AuthenticatorDto[]> {
+    const user = requireUser();
+    return Promise.resolve(
+      authenticators
+        .filter((authenticator) => authenticator.userId === user.id)
+        .map(({ userId: _userId, ...authenticator }) => ({ ...authenticator })),
+    );
+  }
+
+  async passkeyRegisterOptions(): Promise<PasskeyRegisterOptionsDto> {
+    const user = requireUser();
+    const random = new Uint8Array(32);
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) crypto.getRandomValues(random);
+    const challenge = btoa(String.fromCharCode(...random)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const rpId = typeof window !== 'undefined' && window.location?.hostname ? window.location.hostname : 'localhost';
+    return Promise.resolve({
+      challenge,
+      rp: { id: rpId, name: 'OMNEX' },
+      user: {
+        id: btoa(user.id).replace(/=+$/, ''),
+        name: user.email,
+        display_name: user.name,
+      },
+      pub_key_cred_params: [
+        { type: 'public-key', alg: -7 },
+        { type: 'public-key', alg: -257 },
+      ],
+      timeout: 60_000,
+      registration_token: uid('reg'),
+    });
+  }
+
+  async registerPasskey(input: {
+    registration_token: string;
+    credential: PasskeyCredentialDto;
+    name: string;
+    transport?: string;
+  }): Promise<AuthenticatorDto> {
+    const user = requireUser();
+    if (!input.registration_token || !input.credential?.id) {
+      throw new ApiError(422, 'Validation failed', undefined, { credential: ['Invalid WebAuthn credential.'] });
+    }
+    const existing = authenticators.some(
+      (authenticator) => authenticator.userId === user.id && authenticator.id === input.credential.id,
+    );
+    if (existing) throw new ApiError(409, 'This credential is already registered.');
+    const created: MockAuthenticator = {
+      id: input.credential.id,
+      userId: user.id,
+      name: input.name || 'Security key',
+      transport: input.transport || null,
+      last_used_at: nowIso(),
+      created_at: nowIso(),
+    };
+    authenticators.push(created);
+    const { userId: _userId, ...dto } = created;
+    return Promise.resolve({ ...dto });
+  }
+
+  async revokeAuthenticator(id: string): Promise<void> {
+    const user = requireUser();
+    const index = authenticators.findIndex((authenticator) => authenticator.id === id && authenticator.userId === user.id);
+    if (index === -1) throw new ApiError(404, 'Not found');
+    authenticators.splice(index, 1);
+    return Promise.resolve();
+  }
+
+  async updateSecurityLevel(level: SecurityLevel): Promise<SecurityLevel> {
+    const user = requireUser();
+    user.security_level = level;
+    return Promise.resolve(level);
   }
 
   async listSocialAccounts(): Promise<SocialAccountDto[]> {
@@ -1893,6 +2837,33 @@ export class MockApiClient implements ApiClient {
     });
   }
 
+  async getDriveUsageHistory(): Promise<DriveUsageHistoryDto> {
+    requireUser();
+    // Cumulative daily usage over the last 30 days, mirroring the backend.
+    const days = 30;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const perDay = new Map<string, number>();
+    for (const version of driveVersions) {
+      if (!version.created_at) continue;
+      const date = new Date(version.created_at);
+      const key = date.toISOString().slice(0, 10);
+      perDay.set(key, (perDay.get(key) ?? 0) + version.size);
+    }
+
+    const samples = [];
+    let cumulative = 0;
+    for (let offset = days - 1; offset >= 0; offset--) {
+      const date = new Date(today.getTime() - offset * 86400000);
+      const key = date.toISOString().slice(0, 10);
+      cumulative += perDay.get(key) ?? 0;
+      samples.push({ date: key, bytes: cumulative });
+    }
+
+    return Promise.resolve({ samples });
+  }
+
   async listDriveTrash(): Promise<DriveFileDto[]> {
     requireUser();
     return Promise.resolve(driveFiles.filter((f) => f.trashed_at));
@@ -2087,6 +3058,7 @@ export class MockApiClient implements ApiClient {
     const finding = computeSecurityFindings().find((f) => f.id === id);
     if (!finding) throw new ApiError(404, 'Not found', 'Finding not found.');
     dismissedSecurityFindingIds.add(id);
+    recordSecuritySample();
     return Promise.resolve({ ...finding, status: 'dismissed', dismissed_at: nowIso() });
   }
 
@@ -2095,7 +3067,54 @@ export class MockApiClient implements ApiClient {
     const finding = computeSecurityFindings().find((f) => f.id === id);
     if (!finding) throw new ApiError(404, 'Not found', 'Finding not found.');
     dismissedSecurityFindingIds.delete(id);
+    recordSecuritySample();
     return Promise.resolve({ ...finding, status: 'open', dismissed_at: null });
+  }
+
+  async getSecuritySettings(): Promise<SecuritySettingsDto> {
+    requireUser();
+    return Promise.resolve({ mfa_policy: mfaPolicy });
+  }
+
+  async updateSecuritySettings(input: SecuritySettingsInput): Promise<SecuritySettingsDto> {
+    requireUser();
+    if (!['optional', 'required'].includes(input.mfa_policy)) {
+      throw new ApiError(422, 'Validation failed', undefined, { mfa_policy: ['The selected mfa policy is invalid.'] });
+    }
+    mfaPolicy = input.mfa_policy;
+    recordSecuritySample();
+    return Promise.resolve({ mfa_policy: mfaPolicy });
+  }
+
+  async listSslChecks(): Promise<SslCheckDto[]> {
+    requireUser();
+    return Promise.resolve(computeSslChecks());
+  }
+
+  async getSecurityHistory(): Promise<SecurityHistoryDto> {
+    requireUser();
+    return Promise.resolve({
+      samples: securityScoreSamples.map((sample) => ({ ...sample })),
+    });
+  }
+
+  async listSessions(): Promise<SessionDto[]> {
+    requireUser();
+    return Promise.resolve(mockSessions.map((s) => ({ ...s })));
+  }
+
+  async revokeSession(id: string): Promise<void> {
+    requireUser();
+    const index = mockSessions.findIndex((s) => s.id === id);
+    if (index === -1) throw new ApiError(404, 'Not found', 'Session not found.');
+    mockSessions.splice(index, 1);
+    return Promise.resolve();
+  }
+
+  async revokeOtherSessions(): Promise<void> {
+    requireUser();
+    mockSessions = mockSessions.filter((s) => s.id === 'session-current');
+    return Promise.resolve();
   }
 
   async listSiteProviders(): Promise<SiteProviderDto[]> {
@@ -2606,12 +3625,13 @@ export class MockApiClient implements ApiClient {
   async listServerMetricsHistory(serverId: string, limit = 60): Promise<ServerMetricsDto[]> {
     requireUser();
     serverById(serverId);
-    // Deterministic backfill of the last `limit` buckets, oldest first,
-    // mirroring the backend's persisted history + synthetic generator.
-    const count = Math.max(1, Math.min(240, Math.floor(limit)));
+    // Deterministic backfill spread over ~90 days (one sample per day), oldest
+    // first, so the 7/30/90-day period selector reveals different depth.
+    const count = Math.max(1, Math.min(90, Math.floor(limit)));
     const samples: ServerMetricsDto[] = [];
-    for (let offset = -(count - 1); offset <= 0; offset += 1) {
-      samples.push(mockMetricsSample(serverId, offset));
+    for (let index = 0; index < count; index += 1) {
+      const daysOffset = count - 1 - index;
+      samples.push(mockMetricsSample(serverId, -index, daysOffset));
     }
     return Promise.resolve(samples);
   }
@@ -2691,6 +3711,23 @@ export class MockApiClient implements ApiClient {
     return Promise.resolve(
       [...invoices].sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '')),
     );
+  }
+
+  async getBillingCostBreakdown(): Promise<BillingCostBreakdownDto> {
+    requireUser();
+    const byService = new Map<string, number>();
+    let currency = 'usd';
+    let total = 0;
+    for (const invoice of invoices) {
+      const service = invoice.plan?.name ?? 'One-time';
+      byService.set(service, (byService.get(service) ?? 0) + invoice.amount_due);
+      total += invoice.amount_due;
+      currency = invoice.currency;
+    }
+    const services = [...byService.entries()]
+      .map(([service, amount]) => ({ service, amount }))
+      .sort((a, b) => b.amount - a.amount);
+    return Promise.resolve({ total, currency, services });
   }
 
   async subscribeToPlan(plan: string, provider = 'sandbox', couponCode?: string): Promise<BillingSubscribeResponse> {
@@ -2944,5 +3981,80 @@ export class MockApiClient implements ApiClient {
     });
 
     return Promise.resolve({ ...lead });
+  }
+
+  async getLandingPage(slug: string): Promise<LandingPageDto> {
+    // Public endpoint — no session required. Only published pages are served.
+    const page = landingPages.find((p) => p.slug === slug && p.status === 'published');
+    if (!page) throw new ApiError(404, 'Not found', 'Landing page not found.');
+    return Promise.resolve({ ...page });
+  }
+
+  async listLandingPages(): Promise<LandingPageDto[]> {
+    requireUser();
+    return Promise.resolve(landingPages.map((page) => ({ ...page })));
+  }
+
+  async createLandingPage(input: LandingPageInput): Promise<LandingPageDto> {
+    requireUser();
+    this.validateLandingPageInput(input, null);
+    const page: LandingPageDto = {
+      id: uid('lp'),
+      ...input,
+      content_en: JSON.parse(JSON.stringify(input.content_en)),
+      content_fr: JSON.parse(JSON.stringify(input.content_fr)),
+      published_at: input.status === 'published' ? nowIso() : null,
+      created_at: nowIso(),
+      updated_at: nowIso(),
+    };
+    landingPages.unshift(page);
+    return Promise.resolve({ ...page });
+  }
+
+  async updateLandingPage(id: string, input: LandingPageInput): Promise<LandingPageDto> {
+    requireUser();
+    const page = landingPages.find((p) => p.id === id);
+    if (!page) throw new ApiError(404, 'Not found', 'Landing page not found.');
+    this.validateLandingPageInput(input, page.slug);
+    page.slug = input.slug;
+    page.type = input.type;
+    page.status = input.status;
+    page.content_en = JSON.parse(JSON.stringify(input.content_en));
+    page.content_fr = JSON.parse(JSON.stringify(input.content_fr));
+    page.published_at = input.status === 'published' ? (page.published_at ?? nowIso()) : null;
+    page.updated_at = nowIso();
+    return Promise.resolve({ ...page });
+  }
+
+  async deleteLandingPage(id: string): Promise<void> {
+    requireUser();
+    const index = landingPages.findIndex((p) => p.id === id);
+    if (index === -1) throw new ApiError(404, 'Not found', 'Landing page not found.');
+    landingPages.splice(index, 1);
+    return Promise.resolve();
+  }
+
+  private validateLandingPageInput(input: LandingPageInput, currentSlug: string | null): void {
+    const fieldErrors: Record<string, string[]> = {};
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(input.slug.trim())) {
+      fieldErrors.slug = ['The slug may only contain lowercase letters, numbers and hyphens.'];
+    } else if (landingPages.some((p) => p.slug === input.slug.trim() && p.slug !== currentSlug)) {
+      fieldErrors.slug = ['The slug has already been taken.'];
+    }
+    if (!['offer', 'promo', 'comparison'].includes(input.type)) {
+      fieldErrors.type = ['The selected type is invalid.'];
+    }
+    if (!['draft', 'published'].includes(input.status)) {
+      fieldErrors.status = ['The selected status is invalid.'];
+    }
+    if (!Array.isArray(input.content_en) || input.content_en.length === 0) {
+      fieldErrors.content_en = ['The content_en must contain at least one section.'];
+    }
+    if (!Array.isArray(input.content_fr) || input.content_fr.length === 0) {
+      fieldErrors.content_fr = ['The content_fr must contain at least one section.'];
+    }
+    if (Object.keys(fieldErrors).length > 0) {
+      throw new ApiError(422, 'Validation failed', 'The given data was invalid.', fieldErrors);
+    }
   }
 }

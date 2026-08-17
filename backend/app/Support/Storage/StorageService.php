@@ -258,6 +258,41 @@ final class StorageService
     }
 
     /**
+     * Daily cumulative usage over the last `days` days (newest last). Each
+     * bucket is the total bytes stored up to that date, so the timeline
+     * reflects real growth from the version history.
+     */
+    public function usageHistory(int $days = 30): array
+    {
+        $days = max(7, min(90, $days));
+        $today = now()->startOfDay();
+
+        $versions = DriveVersion::query()
+            ->selectRaw('DATE(created_at) as day, SUM(size) as bytes')
+            ->where('created_at', '>=', $today->copy()->subDays($days - 1))
+            ->groupByRaw('DATE(created_at)')
+            ->orderBy('day')
+            ->get()
+            ->keyBy('day');
+
+        $samples = [];
+        $cumulative = (int) DriveVersion::query()
+            ->where('created_at', '<', $today->copy()->subDays($days - 1))
+            ->sum('size');
+
+        for ($offset = $days - 1; $offset >= 0; $offset--) {
+            $date = $today->copy()->subDays($offset);
+            $cumulative += (int) ($versions->get($date->toDateString())->bytes ?? 0);
+            $samples[] = [
+                'date' => $date->toDateString(),
+                'bytes' => $cumulative,
+            ];
+        }
+
+        return $samples;
+    }
+
+    /**
      * Store new bytes as the next version of an existing file (remote first,
      * then metadata). Also used to "restore" an old version as a new one.
      */

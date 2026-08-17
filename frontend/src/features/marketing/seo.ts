@@ -102,6 +102,37 @@ export function serviceJsonLd(serviceId: string, name: string, description: stri
   };
 }
 
+/** Campaign landing page — Product + Offer for SEO. */
+export function campaignJsonLd(slug: string, title: string, description: string) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: title,
+    url: `${BASE_URL}/landing/${slug}`,
+    description,
+    brand: { '@type': 'Brand', name: 'OMNEX' },
+    offers: {
+      '@type': 'Offer',
+      url: `${BASE_URL}/landing/${slug}`,
+      availability: 'https://schema.org/InStock',
+      priceCurrency: 'USD',
+    },
+  };
+}
+
+/** BreadcrumbList for campaign pages. */
+export function campaignBreadcrumbJsonLd(slug: string, title: string) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: BASE_URL },
+      { '@type': 'ListItem', position: 2, name: 'Campaign', item: `${BASE_URL}/landing/${slug}` },
+      { '@type': 'ListItem', position: 3, name: title, item: `${BASE_URL}/landing/${slug}` },
+    ],
+  };
+}
+
 /** BreadcrumbList for service pages. */
 export function breadcrumbJsonLd(serviceId: string, serviceName: string) {
   return {

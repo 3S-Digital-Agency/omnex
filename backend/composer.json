@@ -3,7 +3,7 @@
     "type": "project",
     "description": "OMNEX Cloud OS — Laravel core (modular monolith, multi-tenant).",
     "keywords": ["omnex", "cloud", "hosting", "laravel", "multi-tenant"],
-    "license": "MIT",
+    "license": "Apache-2.0",
     "require": {
         "php": "^8.2",
         "laravel/framework": "^12.0",

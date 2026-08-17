@@ -26,6 +26,8 @@ import { MarketingLayout } from './features/marketing/MarketingLayout';
 import { MarketingHomePage } from './features/marketing/MarketingHomePage';
 import { MarketingServicePage } from './features/marketing/MarketingServicePage';
 import { ContactPage } from './features/marketing/ContactPage';
+import { LandingPageRoute } from './features/marketing/LandingPageRoute';
+import { LandingPagesPage } from './features/marketing/LandingPagesPage';
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { status, activeOrganization } = useAuth();
@@ -85,6 +87,14 @@ export function App() {
           </MarketingLayout>
         }
       />
+      <Route
+        path="/landing/:slug"
+        element={
+          <MarketingLayout>
+            <LandingPageRoute />
+          </MarketingLayout>
+        }
+      />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<Navigate to="/login" replace />} />
       <Route path="/mfa" element={<MfaVerifyPage />} />
@@ -111,6 +121,7 @@ export function App() {
         <Route path="/storage" element={<StoragePage />} />
         <Route path="/billing/coupons" element={<CouponAdminPage />} />
         <Route path="/billing" element={<BillingPage />} />
+        <Route path="/campaigns" element={<LandingPagesPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

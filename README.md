@@ -297,3 +297,22 @@ cross-tenant attack test checklist.
 
 The Laravel backend is validated against a local portable PHP + PostgreSQL
 setup (see `infra/dev-env.sh`); `php artisan test` runs the full Pest suite.
+
+---
+
+## License
+
+OMNEX uses a **multi-license matrix** (see [`docs/licensing.md`](docs/licensing.md)):
+
+| Component | License |
+|---|---|
+| OMNEX Core (this repository) | 🟢 Apache License 2.0 |
+| Protocols / interfaces / OpenAPI | 🟢 Apache 2.0 |
+| SDKs & libraries | 🟢 MIT or Apache 2.0 |
+| Documentation | 🟢 CC BY-SA 4.0 |
+| OMNEX™ brand | 🔐 Distinct brand policy |
+| Operated infrastructure / enterprise services | ⏳ To be defined (must allow commerce) |
+
+The full Apache 2.0 license text lives in [`LICENSE`](LICENSE). Contributions
+are governed by DCO or CLA (strategy to be decided); see the licensing policy
+for details.

@@ -87,12 +87,21 @@ it('flags expiring domains and unsigned zones', function () {
 
     $response = $this->withHeader('X-Organization', $organization->id)
         ->getJson('/api/v1/security')
-        ->assertOk()
-        ->assertJsonPath('score', 35);
+        ->assertOk();
 
     $rules = collect($response->json('findings'))->pluck('rule');
 
     expect($rules)->toContain('domain_expiring')->toContain('dnssec_disabled');
+
+    // The score is derived from the deterministic scan, which since Phase 7
+    // also includes certificate monitoring (the domain may add an ssl_* check
+    // finding). Compute it from the actual findings instead of hard-coding.
+    $penalties = ['high' => 25, 'medium' => 15, 'low' => 10];
+    $penalty = collect($response->json('findings'))
+        ->where('status', 'open')
+        ->sum(fn ($finding) => $penalties[$finding['severity']] ?? 0);
+
+    expect($response->json('score'))->toBe(max(0, 100 - $penalty));
 });
 
 it('resolves findings that are fixed on rescan', function () {

@@ -12,6 +12,8 @@ import { Dialog } from '../../components/ui/Dialog';
 import { Field } from '../../components/ui/Field';
 import { Select } from '../../components/ui/Select';
 import { Textarea } from '../../components/ui/Textarea';
+import { ProgressBar } from '../../components/viz/ProgressBar';
+import { StackedBar } from '../../components/viz/StackedBar';
 import { EmptyState, Spinner } from '../../components/ui/Spinner';
 import { useToast } from '../../components/ui/Toast';
 import { DnsRecordDialog } from './DnsRecordDialog';
@@ -519,11 +521,22 @@ function DnssecCard({ domainId, canManage }: { domainId: string; canManage: bool
           ) : undefined
         }
       />
-      <div className="flex items-center gap-2 border-t border-edge px-5 py-4">
-        <Badge tone={status?.enabled ? 'success' : 'neutral'}>
-          {status?.enabled ? t('dnssec.enabled') : t('dnssec.disabled')}
-        </Badge>
-        {status?.status ? <span className="font-mono text-xs text-zinc-500">{status.status}</span> : null}
+      <div className="space-y-4 border-t border-edge px-5 py-4">
+        <div className="flex items-center gap-2">
+          <Badge tone={status?.enabled ? 'success' : 'neutral'}>
+            {status?.enabled ? t('dnssec.enabled') : t('dnssec.disabled')}
+          </Badge>
+          {status?.status ? <span className="font-mono text-xs text-zinc-500">{status.status}</span> : null}
+        </div>
+        <div>
+          <div className="mb-1.5 flex items-center justify-between text-xs">
+            <span className="text-zinc-500">{t('dnssec.progress')}</span>
+            <span className={status?.enabled ? 'font-semibold text-emerald-400' : 'text-zinc-400'}>
+              {status?.enabled ? '100%' : '0%'}
+            </span>
+          </div>
+          <ProgressBar percent={status?.enabled ? 100 : 0} tone={status?.enabled ? 'success' : 'brand'} />
+        </div>
       </div>
       {status?.enabled ? (
         <div className="px-5 pb-5">
@@ -624,24 +637,39 @@ function PropagationCard({ domainId, canManage }: { domainId: string; canManage:
         </div>
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-3 border-t border-edge px-5 py-4">
-            <Badge tone="success">
-              {t('propagation.synced')} · {status.summary.synced}
-            </Badge>
-            <Badge tone="warning">
-              {t('propagation.pending')} · {status.summary.pending}
-            </Badge>
-            <Badge tone="danger">
-              {t('propagation.outdated')} · {status.summary.outdated}
-            </Badge>
-            <Badge tone="neutral">
-              {t('propagation.total')} · {status.summary.total}
-            </Badge>
-            {status.checked_at ? (
-              <span className="text-xs text-zinc-500">
-                {t('propagation.checkedAt', { date: formatDate(status.checked_at) })}
-              </span>
-            ) : null}
+          <div className="space-y-4 border-t border-edge px-5 py-4">
+            <StackedBar
+              items={
+                status.summary.total > 0
+                  ? [
+                      { value: status.summary.synced, color: 'bg-emerald-400', label: t('propagation.synced') },
+                      { value: status.summary.pending, color: 'bg-amber-400', label: t('propagation.pending') },
+                      { value: status.summary.outdated, color: 'bg-red-400', label: t('propagation.outdated') },
+                    ]
+                  : []
+              }
+              total={status.summary.total}
+              height={10}
+            />
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge tone="success">
+                {t('propagation.synced')} · {status.summary.synced}
+              </Badge>
+              <Badge tone="warning">
+                {t('propagation.pending')} · {status.summary.pending}
+              </Badge>
+              <Badge tone="danger">
+                {t('propagation.outdated')} · {status.summary.outdated}
+              </Badge>
+              <Badge tone="neutral">
+                {t('propagation.total')} · {status.summary.total}
+              </Badge>
+              {status.checked_at ? (
+                <span className="text-xs text-zinc-500">
+                  {t('propagation.checkedAt', { date: formatDate(status.checked_at) })}
+                </span>
+              ) : null}
+            </div>
           </div>
           <div className="overflow-x-auto border-t border-edge">
             <table className="w-full text-sm">

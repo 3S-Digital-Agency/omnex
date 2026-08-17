@@ -270,6 +270,14 @@ return [
             'medium' => 15,
             'low' => 10,
         ],
+
+        // Certificate monitoring: which SslCheckerInterface implementation to
+        // use. The sandbox checker is deterministic and offline; a real
+        // checker (Let's Encrypt resolver, cert-info service…) can be wired
+        // here later without touching the engine.
+        'ssl_checker' => env('OMNEX_SSL_CHECKER', 'sandbox'),
+        // A certificate is reported as expiring when this many days remain.
+        'ssl_warning_days' => (int) env('OMNEX_SSL_WARNING_DAYS', 30),
     ],
 
 ];

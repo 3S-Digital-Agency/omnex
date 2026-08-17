@@ -4,10 +4,14 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../app/AuthProvider';
 import { api } from '../../lib/api';
-import type { BillingPlanDto, CouponDto, InvoiceDto, SubscriptionDto } from '../../lib/api/types';
+import type { BillingCostServiceDto, BillingPlanDto, CouponDto, InvoiceDto, SubscriptionDto } from '../../lib/api/types';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader } from '../../components/ui/Card';
+import { AreaChart } from '../../components/viz/AreaChart';
+import { DistributionDonut } from '../../components/viz/DistributionDonut';
+import { Donut } from '../../components/viz/Donut';
+import { useAnimatedNumber } from '../../components/viz/useMotion';
 import { EmptyState, Spinner } from '../../components/ui/Spinner';
 import { useToast } from '../../components/ui/Toast';
 import { errorMessage } from '../../lib/errors';
@@ -53,6 +57,11 @@ export function BillingPage() {
   });
   const invoices = useQuery({ queryKey: ['billing', 'invoices', orgId], queryFn: () => api.listInvoices(), enabled: !!orgId });
   const credits = useQuery({ queryKey: ['billing', 'credits', orgId], queryFn: () => api.getCredits(), enabled: !!orgId });
+  const breakdown = useQuery({
+    queryKey: ['billing', 'breakdown', orgId],
+    queryFn: () => api.getBillingCostBreakdown(),
+    enabled: !!orgId,
+  });
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['billing'] });
@@ -137,6 +146,15 @@ export function BillingPage() {
           </Link>
         ) : null}
       </header>
+
+      <BillingCockpit
+        breakdown={breakdown.data ?? { total: 0, currency: 'usd', services: [] }}
+        invoices={invoices.data ?? []}
+        creditBalance={credits.data?.balance ?? 0}
+        isLoading={breakdown.isLoading || invoices.isLoading || credits.isLoading}
+        t={t}
+        formatMoney={formatMoney}
+      />
 
       <Card>
         <CardHeader title={t('billing.currentPlan')} description={t('billing.currentPlan')} />
@@ -326,6 +344,153 @@ export function BillingPage() {
         ) : (
           <div className="p-5">
             <EmptyState title={t('billing.noInvoices')} description={t('billing.noInvoicesDescription')} />
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+const SERVICE_TONES: Record<string, string> = {
+  Free: 'bg-zinc-500',
+  Starter: 'bg-emerald-400',
+  Pro: 'bg-brand-500',
+  Business: 'bg-amber-400',
+};
+
+const SERVICE_COLORS: Record<string, string> = {
+  Free: 'text-zinc-400',
+  Starter: 'text-emerald-400',
+  Pro: 'text-brand-400',
+  Business: 'text-amber-400',
+};
+
+function BillingCockpit({
+  breakdown,
+  invoices,
+  creditBalance,
+  isLoading,
+  t,
+  formatMoney,
+}: {
+  breakdown: { total: number; currency: string; services: BillingCostServiceDto[] };
+  invoices: InvoiceDto[];
+  creditBalance: number;
+  isLoading: boolean;
+  t: (key: string, params?: Record<string, string | number>) => string;
+  formatMoney: (cents: number, currency: string) => string;
+}) {
+  const creditPercent = Math.min(100, (creditBalance / 10000) * 100);
+  const animated = Math.round(useAnimatedNumber(creditPercent));
+
+  // Spending timeline: cumulative invoice amounts, oldest first.
+  const chronological = [...invoices].sort((a, b) =>
+    (a.created_at ?? '').localeCompare(b.created_at ?? ''),
+  );
+  const cumulative: number[] = [];
+  let running = 0;
+  for (const invoice of chronological) {
+    running += invoice.amount_due;
+    cumulative.push(running);
+  }
+
+  const services = breakdown.services;
+  const maxCredit = 10000;
+
+  return (
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      {/* Credit gauge */}
+      <Card className="flex flex-col items-center justify-center p-6 text-center">
+        <p className="text-sm text-zinc-400">{t('billing.cockpit.creditTitle')}</p>
+        <div className="mt-3">
+          <Donut
+            value={creditPercent}
+            size={148}
+            thickness={12}
+            className={creditPercent >= 90 ? 'text-red-400' : creditPercent >= 70 ? 'text-amber-400' : 'text-emerald-400'}
+            label={`${t('billing.cockpit.creditTitle')}: ${Math.round(creditPercent)}%`}
+          >
+            <span className="text-2xl font-bold text-white">{animated}%</span>
+          </Donut>
+        </div>
+        <p className="mt-3 text-xs text-zinc-500">
+          {formatMoney(creditBalance, 'usd')} / {formatMoney(maxCredit, 'usd')}
+        </p>
+      </Card>
+
+      {/* Spending timeline */}
+      <Card className="lg:col-span-2">
+        <CardHeader title={t('billing.cockpit.timelineTitle')} description={t('billing.cockpit.timelineDescription')} />
+        {isLoading ? (
+          <div className="flex justify-center py-10">
+            <Spinner />
+          </div>
+        ) : cumulative.length > 1 ? (
+          <div className="px-5 pb-4 pt-2">
+            <div className="text-brand-400">
+              <AreaChart
+                values={cumulative}
+                height={110}
+                className="text-brand-400"
+                label={`${t('billing.cockpit.timelineTitle')}: ${cumulative.join(', ')}`}
+              />
+            </div>
+            <div className="mt-2 flex items-center justify-between text-[11px] text-zinc-500">
+              <span>{chronological[0].created_at ? formatDate(chronological[0].created_at) : '—'}</span>
+              <span className="font-mono">{formatMoney(running, breakdown.currency)}</span>
+              <span>
+                {chronological[chronological.length - 1].created_at ? formatDate(chronological[chronological.length - 1].created_at) : '—'}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="p-5">
+            <EmptyState title={t('billing.cockpit.timelineEmpty')} />
+          </div>
+        )}
+      </Card>
+
+      {/* Cost breakdown by service */}
+      <Card className="lg:col-span-3">
+        <CardHeader title={t('billing.cockpit.breakdownTitle')} description={t('billing.cockpit.breakdownDescription')} />
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Spinner />
+          </div>
+        ) : services.length > 0 ? (
+          <div className="flex flex-wrap items-center justify-center gap-8 px-5 pb-5">
+            <DistributionDonut
+              segments={services.map((service) => ({
+                value: service.amount,
+                color: SERVICE_COLORS[service.service] ?? 'text-zinc-400',
+                label: service.service,
+              }))}
+              size={132}
+              thickness={11}
+              center={
+                <div className="text-center">
+                  <span className="block text-xl font-bold text-white">{formatMoney(breakdown.total, breakdown.currency)}</span>
+                  <span className="block text-[10px] uppercase tracking-wider text-zinc-500">{t('billing.cockpit.spent')}</span>
+                </div>
+              }
+              label={t('billing.cockpit.breakdownTitle')}
+            />
+            <ul className="space-y-2 text-xs">
+              {services.map((service) => (
+                <li key={service.service} className="flex items-center gap-2">
+                  <span
+                    className={cn('h-2.5 w-2.5 rounded-sm', SERVICE_TONES[service.service] ?? 'bg-zinc-500')}
+                    aria-hidden="true"
+                  />
+                  <span className="text-zinc-400">{service.service}</span>
+                  <span className="ml-auto font-mono font-semibold text-white">{formatMoney(service.amount, breakdown.currency)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <div className="p-5">
+            <EmptyState title={t('billing.cockpit.breakdownEmpty')} />
           </div>
         )}
       </Card>

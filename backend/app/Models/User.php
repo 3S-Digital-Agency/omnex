@@ -25,6 +25,7 @@ class User extends Authenticatable
         'locale',
         'status',
         'last_login_at',
+        'security_level',
     ];
 
     protected $hidden = [
@@ -72,6 +73,11 @@ class User extends Authenticatable
     public function socialAccounts(): HasMany
     {
         return $this->hasMany(SocialAccount::class);
+    }
+
+    public function authenticators(): HasMany
+    {
+        return $this->hasMany(Authenticator::class);
     }
 
     public function activeMembership(): ?Membership

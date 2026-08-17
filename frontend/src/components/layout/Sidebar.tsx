@@ -7,6 +7,7 @@ import {
   HardDrive,
   LayoutDashboard,
   LayoutTemplate,
+  Megaphone,
   ScrollText,
   Server,
   Settings,
@@ -46,6 +47,7 @@ const sections: NavSection[] = [
       { to: '/cloud', labelKey: 'nav.cloud', icon: Server },
       { to: '/storage', labelKey: 'nav.storage', icon: HardDrive },
       { to: '/billing', labelKey: 'nav.billing', icon: CreditCard },
+      { to: '/campaigns', labelKey: 'nav.campaigns', icon: Megaphone },
     ],
   },
   {

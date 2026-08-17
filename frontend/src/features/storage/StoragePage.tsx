@@ -12,11 +12,44 @@ import { Dialog } from '../../components/ui/Dialog';
 import { Field } from '../../components/ui/Field';
 import { Input } from '../../components/ui/Input';
 import { Textarea } from '../../components/ui/Textarea';
+import { AreaChart } from '../../components/viz/AreaChart';
+import { DistributionDonut } from '../../components/viz/DistributionDonut';
+import { Donut } from '../../components/viz/Donut';
+import { ProgressBar } from '../../components/viz/ProgressBar';
+import { useAnimatedNumber } from '../../components/viz/useMotion';
 import { EmptyState, Spinner } from '../../components/ui/Spinner';
 import { useToast } from '../../components/ui/Toast';
 import { errorMessage } from '../../lib/errors';
 import { useI18n } from '../../lib/i18n';
 import { cn, formatBytes } from '../../lib/utils';
+
+/** Maps a MIME type to a coarse file category for the by-type donut. */
+function fileCategory(mimeType: string): string {
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('video/') || mimeType.startsWith('audio/')) return 'media';
+  if (mimeType.startsWith('text/') || mimeType.includes('json') || mimeType.includes('yaml') || mimeType.includes('xml')) return 'text';
+  if (mimeType.includes('pdf') || mimeType.includes('document') || mimeType.includes('sheet') || mimeType.includes('presentation')) return 'document';
+  if (mimeType.includes('zip') || mimeType.includes('compressed') || mimeType.includes('tar') || mimeType.includes('gzip')) return 'archive';
+  return 'other';
+}
+
+const CATEGORY_COLORS: Record<string, string> = {
+  image: 'text-cyan-400',
+  media: 'text-violet-400',
+  text: 'text-brand-400',
+  document: 'text-emerald-400',
+  archive: 'text-amber-400',
+  other: 'text-zinc-400',
+};
+
+const CATEGORY_TONES: Record<string, string> = {
+  image: 'bg-cyan-400',
+  media: 'bg-violet-400',
+  text: 'bg-brand-500',
+  document: 'bg-emerald-400',
+  archive: 'bg-amber-400',
+  other: 'bg-zinc-500',
+};
 
 interface Crumb {
   id: string;
@@ -66,6 +99,12 @@ export function StoragePage() {
   const limit = listing.data?.quota.limit ?? 0;
   const quotaPercent = limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
 
+  const usageHistory = useQuery({
+    queryKey: ['drive', activeOrganization?.id, 'usage-history'],
+    queryFn: () => api.getDriveUsageHistory(),
+    enabled: !!activeOrganization?.id,
+  });
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <header className="flex items-center justify-between">
@@ -88,20 +127,14 @@ export function StoragePage() {
         ) : null}
       </header>
 
-      <Card>
-        <CardHeader title={t('storage.quota')} description={t('storage.quotaDescription')} />
-        <div className="px-5 pb-5">
-          <div className="h-2 w-full overflow-hidden rounded-full bg-raised">
-            <div
-              className="h-full rounded-full bg-brand-500 transition-all"
-              style={{ width: `${quotaPercent}%` }}
-            />
-          </div>
-          <p className="mt-2 text-xs text-zinc-500">
-            {formatBytes(used)} / {limit > 0 ? formatBytes(limit) : '∞'}
-          </p>
-        </div>
-      </Card>
+      <StorageCockpit
+        used={used}
+        limit={limit}
+        files={listing.data?.files ?? []}
+        history={usageHistory.data?.samples ?? []}
+        isLoading={listing.isLoading || usageHistory.isLoading}
+        t={t}
+      />
 
       <Card>
         <div className="flex items-center gap-2 border-b border-edge px-5 py-3">
@@ -249,6 +282,147 @@ export function StoragePage() {
           void invalidate();
         }}
       />
+    </div>
+  );
+}
+
+function StorageCockpit({
+  used,
+  limit,
+  files,
+  history,
+  isLoading,
+  t,
+}: {
+  used: number;
+  limit: number;
+  files: DriveFileDto[];
+  history: { date: string; bytes: number }[];
+  isLoading: boolean;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  const quotaPercent = limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
+  const animated = Math.round(useAnimatedNumber(quotaPercent));
+
+  // Size per category (only current folder listing is available, so this
+  // reflects the visible files — the drive totals would need a server scan).
+  const byCategory = new Map<string, number>();
+  for (const file of files) {
+    const category = fileCategory(file.mime_type);
+    byCategory.set(category, (byCategory.get(category) ?? 0) + file.size);
+  }
+  const categories = ['image', 'media', 'text', 'document', 'archive', 'other']
+    .map((key) => ({ key, bytes: byCategory.get(key) ?? 0 }))
+    .filter((item) => item.bytes > 0);
+  const totalVisible = categories.reduce((sum, item) => sum + item.bytes, 0);
+
+  return (
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      {/* Quota gauge */}
+      <Card className="flex flex-col items-center justify-center p-6 text-center">
+        <p className="text-sm text-zinc-400">{t('storage.quota')}</p>
+        <div className="mt-3">
+          <Donut
+            value={quotaPercent}
+            size={148}
+            thickness={12}
+            className={quotaPercent >= 90 ? 'text-red-400' : quotaPercent >= 70 ? 'text-amber-400' : 'text-brand-400'}
+            label={`${t('storage.quota')}: ${Math.round(quotaPercent)}%`}
+          >
+            <span
+              className={cn(
+                'text-3xl font-bold',
+                quotaPercent >= 90 ? 'text-red-400' : quotaPercent >= 70 ? 'text-amber-400' : 'text-white',
+              )}
+            >
+              {animated}%
+            </span>
+          </Donut>
+        </div>
+        <p className="mt-3 text-xs text-zinc-500">
+          {formatBytes(used)} / {limit > 0 ? formatBytes(limit) : '∞'}
+        </p>
+        <div className="mt-4 w-full">
+          <ProgressBar
+            percent={quotaPercent}
+            tone={quotaPercent >= 90 ? 'danger' : quotaPercent >= 70 ? 'warning' : 'brand'}
+          />
+        </div>
+        <p className="mt-3 text-xs text-zinc-500">
+          {files.length} {t('storage.cockpit.files')}
+        </p>
+      </Card>
+
+      {/* Usage history timeline */}
+      <Card className="lg:col-span-2">
+        <CardHeader title={t('storage.cockpit.historyTitle')} description={t('storage.cockpit.historyDescription')} />
+        {isLoading ? (
+          <div className="flex justify-center py-10">
+            <Spinner />
+          </div>
+        ) : history.length > 1 ? (
+          <div className="px-5 pb-4 pt-2">
+            <div className="text-brand-400">
+              <AreaChart
+                values={history.map((sample) => sample.bytes)}
+                height={120}
+                className="text-brand-400"
+                label={`${t('storage.cockpit.historyTitle')}: ${history.map((s) => formatBytes(s.bytes)).join(', ')}`}
+              />
+            </div>
+            <div className="mt-2 flex items-center justify-between text-[11px] text-zinc-500">
+              <span>{history[0].date}</span>
+              <span>{history[history.length - 1].date}</span>
+            </div>
+          </div>
+        ) : (
+          <div className="p-5">
+            <EmptyState title={t('storage.cockpit.historyEmpty')} />
+          </div>
+        )}
+      </Card>
+
+      {/* Files by type */}
+      <Card className="lg:col-span-3">
+        <CardHeader title={t('storage.cockpit.byTypeTitle')} description={t('storage.cockpit.byTypeDescription')} />
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Spinner />
+          </div>
+        ) : categories.length > 0 ? (
+          <div className="flex flex-wrap items-center justify-center gap-8 px-5 pb-5">
+            <DistributionDonut
+              segments={categories.map((item) => ({
+                value: item.bytes,
+                color: CATEGORY_COLORS[item.key] ?? 'text-zinc-400',
+                label: t(`storage.cockpit.type.${item.key}`),
+              }))}
+              size={132}
+              thickness={11}
+              center={
+                <div className="text-center">
+                  <span className="block text-xl font-bold text-white">{formatBytes(totalVisible)}</span>
+                  <span className="block text-[10px] uppercase tracking-wider text-zinc-500">{t('storage.cockpit.visible')}</span>
+                </div>
+              }
+              label={t('storage.cockpit.byTypeTitle')}
+            />
+            <ul className="space-y-2 text-xs">
+              {categories.map((item) => (
+                <li key={item.key} className="flex items-center gap-2">
+                  <span className={cn('h-2.5 w-2.5 rounded-sm', CATEGORY_TONES[item.key] ?? 'bg-zinc-500')} aria-hidden="true" />
+                  <span className="text-zinc-400">{t(`storage.cockpit.type.${item.key}`)}</span>
+                  <span className="ml-auto font-mono font-semibold text-white">{formatBytes(item.bytes)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <div className="p-5">
+            <EmptyState title={t('storage.cockpit.byTypeEmpty')} />
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

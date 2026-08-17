@@ -92,14 +92,54 @@ export function getUtm(): UtmParams {
   return readJson<UtmParams>(UTM_KEY) ?? {};
 }
 
-export function getConsent(): 'granted' | 'denied' | null {
+export type ConsentValue = 'granted' | 'denied';
+
+export type ConsentStatus = ConsentValue | null;
+
+const CONSENT_EVENT = 'omnex:consent';
+
+export function getConsent(): ConsentStatus {
   if (typeof localStorage === 'undefined') return null;
   const value = localStorage.getItem(CONSENT_KEY);
   return value === 'granted' || value === 'denied' ? value : null;
 }
 
-export function setConsent(value: 'granted' | 'denied'): void {
+/** Consent Mode v2: keep gtag in sync with the stored choice. */
+function applyGtagConsent(value: ConsentValue): void {
+  if (!window.gtag) return;
+  window.gtag('consent', 'update', {
+    ad_storage: value,
+    analytics_storage: value,
+    functionality_storage: value,
+    personalization_storage: value,
+    security_storage: 'granted',
+  });
+  if (value === 'granted' && GA4_MEASUREMENT_ID) {
+    window.gtag('config', GA4_MEASUREMENT_ID);
+  }
+}
+
+/**
+ * Persist the visitor's consent choice, apply it to gtag (Consent Mode v2)
+ * and notify subscribers via the `omnex:consent` event.
+ */
+export function setConsent(value: ConsentValue): void {
   localStorage.setItem(CONSENT_KEY, value);
+  if (value === 'granted') {
+    // Load the tag now — it initializes with denied defaults, then we upgrade.
+    ensureGtag();
+  }
+  applyGtagConsent(value);
+  window.dispatchEvent(new CustomEvent<ConsentValue>(CONSENT_EVENT, { detail: value }));
+}
+
+/** Subscribe to consent changes. Returns an unsubscribe function. */
+export function onConsentChange(listener: (value: ConsentValue) => void): () => void {
+  const handler = (event: Event) => {
+    listener((event as CustomEvent<ConsentValue>).detail);
+  };
+  window.addEventListener(CONSENT_EVENT, handler);
+  return () => window.removeEventListener(CONSENT_EVENT, handler);
 }
 
 /** Locally recorded events (for testing, debugging, or self-hosted export). */
@@ -132,6 +172,14 @@ function ensureGtag(): void {
   window.gtag = function gtag(...args: unknown[]) {
     window.dataLayer?.push(args);
   };
+  // Consent Mode v2: default everything to denied until the visitor opts in.
+  window.gtag('consent', 'default', {
+    ad_storage: 'denied',
+    analytics_storage: 'denied',
+    functionality_storage: 'denied',
+    personalization_storage: 'denied',
+    security_storage: 'granted',
+  });
   window.gtag('js', new Date());
   window.gtag('config', GA4_MEASUREMENT_ID);
 }

@@ -8,12 +8,15 @@ use App\Http\Controllers\ContactLeadController;
 use App\Http\Controllers\DnsController;
 use App\Http\Controllers\DomainController;
 use App\Http\Controllers\InvitationController;
+use App\Http\Controllers\LandingPageController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrganizationController;
+use App\Http\Controllers\PasskeyController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\ServerController;
+use App\Http\Controllers\SessionController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\SocialAuthController;
 use App\Http\Controllers\SshKeyController;
@@ -25,6 +28,11 @@ Route::prefix('v1')->group(function () {
     Route::post('/auth/register', [AuthController::class, 'register']);
     Route::post('/auth/login', [AuthController::class, 'login']);
     Route::post('/auth/mfa/verify', [AuthController::class, 'verifyMfa']);
+
+    // Passkey / FIDO2 / WebAuthn (public): passwordless sign-in with
+    // YubiKey, Touch ID / Face ID, Windows Hello or any FIDO2 authenticator.
+    Route::get('/auth/passkey/options', [PasskeyController::class, 'options']);
+    Route::post('/auth/passkey/verify', [PasskeyController::class, 'verify']);
 
     // Social login (OAuth / OpenID Connect). The callback is public: the
     // browser returns from the provider without an auth token. Intent
@@ -49,10 +57,28 @@ Route::prefix('v1')->group(function () {
         Route::get('/public/leads', [ContactLeadController::class, 'index']);
     });
 
+    // Campaign landing pages. The show endpoint is public (marketing links);
+    // management is platform-level, gated to owners inside the controller.
+    Route::get('/public/landing-pages/{slug}', [LandingPageController::class, 'show']);
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/landing-pages', [LandingPageController::class, 'index']);
+        Route::post('/landing-pages', [LandingPageController::class, 'store']);
+        Route::patch('/landing-pages/{landingPage}', [LandingPageController::class, 'update']);
+        Route::delete('/landing-pages/{landingPage}', [LandingPageController::class, 'destroy']);
+    });
+
     // Invitation acceptance requires auth but is not tenant-scoped (the target
     // organization is resolved from the token, not the active context).
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/invitations/{invitation}/accept', [InvitationController::class, 'accept']);
+    });
+
+    // Session management is user-scoped (not tenant-scoped): a user lists and
+    // revokes their own API sessions from any organization context.
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/sessions', [SessionController::class, 'index']);
+        Route::delete('/sessions/others', [SessionController::class, 'destroyOthers']);
+        Route::delete('/sessions/{session}', [SessionController::class, 'destroy']);
     });
 
     // Everything below resolves + enforces the active organization.
@@ -65,6 +91,13 @@ Route::prefix('v1')->group(function () {
         Route::post('/auth/mfa/setup', [AuthController::class, 'setupMfa']);
         Route::post('/auth/mfa/confirm', [AuthController::class, 'confirmMfa']);
         Route::post('/auth/mfa/disable', [AuthController::class, 'disableMfa']);
+
+        // Authenticator management (passkeys, YubiKey, biometric devices).
+        Route::get('/auth/authenticators', [PasskeyController::class, 'index']);
+        Route::get('/auth/passkey/register-options', [PasskeyController::class, 'registerOptions']);
+        Route::post('/auth/passkey/register', [PasskeyController::class, 'register']);
+        Route::delete('/auth/authenticators/{authenticator}', [PasskeyController::class, 'destroy']);
+        Route::patch('/auth/security-level', [PasskeyController::class, 'updateSecurityLevel']);
 
         Route::get('/organizations', [OrganizationController::class, 'index']);
         Route::post('/organizations', [OrganizationController::class, 'store']);
@@ -86,6 +119,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/billing/plans', [BillingController::class, 'plans']);
         Route::get('/billing/subscription', [BillingController::class, 'subscription']);
         Route::get('/billing/invoices', [BillingController::class, 'invoices']);
+        Route::get('/billing/cost-breakdown', [BillingController::class, 'costBreakdown']);
         Route::post('/billing/subscribe', [BillingController::class, 'subscribe']);
         Route::post('/billing/subscriptions/{subscription}/cancel', [BillingController::class, 'cancel']);
         Route::post('/billing/coupons/validate', [BillingController::class, 'validateCoupon']);
@@ -102,6 +136,10 @@ Route::prefix('v1')->group(function () {
         Route::post('/security/scan', [SecurityController::class, 'scan']);
         Route::post('/security/findings/{finding}/dismiss', [SecurityController::class, 'dismiss']);
         Route::post('/security/findings/{finding}/reopen', [SecurityController::class, 'reopen']);
+        Route::get('/security/settings', [SecurityController::class, 'settings']);
+        Route::patch('/security/settings', [SecurityController::class, 'updateSettings']);
+        Route::get('/security/ssl-checks', [SecurityController::class, 'sslChecks']);
+        Route::get('/security/history', [SecurityController::class, 'history']);
 
         Route::get('/audit', [AuditController::class, 'index']);
         Route::get('/activity', [ActivityController::class, 'index']);
@@ -142,6 +180,7 @@ Route::prefix('v1')->group(function () {
         // OMNEX Drive (Phase 4). Static routes precede the {folder}/{file}
         // routes so they are not captured as a resource id.
         Route::get('/storage/providers', [StorageController::class, 'providers']);
+        Route::get('/storage/usage-history', [StorageController::class, 'usageHistory']);
         Route::get('/storage', [StorageController::class, 'index']);
         Route::get('/storage/trash', [StorageController::class, 'trash']);
         Route::post('/storage/folders', [StorageController::class, 'storeFolder']);

@@ -29,9 +29,13 @@ import type {
   DriveFileUpdateInput,
   DriveFolderDto,
   DriveListing,
+  DriveUsageHistoryDto,
   DriveVersionDto,
   InvitationDto,
+  BillingCostBreakdownDto,
   InvoiceDto,
+  LandingPageDto,
+  LandingPageInput,
   LoginInput,
   LoginResponse,
   MeResponse,
@@ -41,15 +45,25 @@ import type {
   NotificationDto,
   NotificationListDto,
   NotificationQuery,
+  AuthenticatorDto,
   OrganizationDto,
   Paginated,
   PaginatedNotificationList,
+  PasskeyCredentialDto,
+  PasskeyRegisterOptionsDto,
+  PasskeyRequestOptionsDto,
   PaymentProviderDto,
+  SecurityLevel,
   PropagationStatusDto,
   RegisterInput,
   RoleDto,
   SecurityFindingDto,
+  SecurityHistoryDto,
   SecurityScoreDto,
+  SecuritySettingsDto,
+  SecuritySettingsInput,
+  SessionDto,
+  SslCheckDto,
   CloudProviderDto,
   CloudProviderVerifyDto,
   ContactLeadDto,
@@ -164,6 +178,48 @@ export class HttpApiClient implements ApiClient {
 
   completeSocial(code: string): Promise<AuthSession> {
     return this.request('/auth/social/complete', { method: 'POST', body: { code } });
+  }
+
+  passkeyRequestOptions(): Promise<PasskeyRequestOptionsDto> {
+    return this.request('/auth/passkey/options');
+  }
+
+  verifyPasskey(credential: PasskeyCredentialDto | null): Promise<AuthSession> {
+    return this.request('/auth/passkey/verify', { method: 'POST', body: { credential } });
+  }
+
+  async listAuthenticators(): Promise<AuthenticatorDto[]> {
+    const res = await this.request<{ data: AuthenticatorDto[] }>('/auth/authenticators');
+    return res.data;
+  }
+
+  passkeyRegisterOptions(): Promise<PasskeyRegisterOptionsDto> {
+    return this.request('/auth/passkey/register-options');
+  }
+
+  async registerPasskey(input: {
+    registration_token: string;
+    credential: PasskeyCredentialDto;
+    name: string;
+    transport?: string;
+  }): Promise<AuthenticatorDto> {
+    const res = await this.request<{ data: AuthenticatorDto }>('/auth/passkey/register', {
+      method: 'POST',
+      body: input,
+    });
+    return res.data;
+  }
+
+  revokeAuthenticator(id: string): Promise<void> {
+    return this.request(`/auth/authenticators/${id}`, { method: 'DELETE' });
+  }
+
+  async updateSecurityLevel(level: SecurityLevel): Promise<SecurityLevel> {
+    const res = await this.request<{ data: { security_level: SecurityLevel } }>('/auth/security-level', {
+      method: 'PATCH',
+      body: { security_level: level },
+    });
+    return res.data.security_level;
   }
 
   async listSocialAccounts(): Promise<SocialAccountDto[]> {
@@ -540,6 +596,10 @@ export class HttpApiClient implements ApiClient {
     return this.request(folderId ? `/storage/folders/${folderId}` : '/storage');
   }
 
+  getDriveUsageHistory(): Promise<DriveUsageHistoryDto> {
+    return this.request('/storage/usage-history');
+  }
+
   async listDriveTrash(): Promise<DriveFileDto[]> {
     const res = await this.request<{ data: DriveFileDto[] }>('/storage/trash');
     return res.data;
@@ -619,6 +679,40 @@ export class HttpApiClient implements ApiClient {
     return this.request(`/security/findings/${id}/reopen`, { method: 'POST' });
   }
 
+  getSecuritySettings(): Promise<SecuritySettingsDto> {
+    return this.request('/security/settings');
+  }
+
+  async updateSecuritySettings(input: SecuritySettingsInput): Promise<SecuritySettingsDto> {
+    const res = await this.request<SecuritySettingsDto>('/security/settings', {
+      method: 'PATCH',
+      body: input,
+    });
+    return res;
+  }
+
+  getSecurityHistory(): Promise<SecurityHistoryDto> {
+    return this.request('/security/history');
+  }
+
+  async listSslChecks(): Promise<SslCheckDto[]> {
+    const res = await this.request<{ data: SslCheckDto[] }>('/security/ssl-checks');
+    return res.data;
+  }
+
+  async listSessions(): Promise<SessionDto[]> {
+    const res = await this.request<SessionDto[]>('/sessions');
+    return res;
+  }
+
+  revokeSession(id: string): Promise<void> {
+    return this.request(`/sessions/${id}`, { method: 'DELETE' });
+  }
+
+  revokeOtherSessions(): Promise<void> {
+    return this.request('/sessions/others', { method: 'DELETE' });
+  }
+
   async listSiteProviders(): Promise<SiteProviderDto[]> {
     const res = await this.request<{ data: SiteProviderDto[] }>('/sites/providers');
     return res.data;
@@ -664,6 +758,36 @@ export class HttpApiClient implements ApiClient {
       body: input,
     });
     return res.data;
+  }
+
+  async getLandingPage(slug: string): Promise<LandingPageDto> {
+    const res = await this.request<{ data: LandingPageDto }>(`/public/landing-pages/${slug}`);
+    return res.data;
+  }
+
+  async listLandingPages(): Promise<LandingPageDto[]> {
+    const res = await this.request<{ data: LandingPageDto[] }>('/landing-pages');
+    return res.data;
+  }
+
+  async createLandingPage(input: LandingPageInput): Promise<LandingPageDto> {
+    const res = await this.request<{ data: LandingPageDto }>('/landing-pages', {
+      method: 'POST',
+      body: input,
+    });
+    return res.data;
+  }
+
+  async updateLandingPage(id: string, input: LandingPageInput): Promise<LandingPageDto> {
+    const res = await this.request<{ data: LandingPageDto }>(`/landing-pages/${id}`, {
+      method: 'PATCH',
+      body: input,
+    });
+    return res.data;
+  }
+
+  deleteLandingPage(id: string): Promise<void> {
+    return this.request(`/landing-pages/${id}`, { method: 'DELETE' });
   }
 
   rollbackSite(siteId: string, deploymentId: string): Promise<SiteDeploymentDto> {
@@ -859,6 +983,10 @@ export class HttpApiClient implements ApiClient {
   async listInvoices(): Promise<InvoiceDto[]> {
     const res = await this.request<{ data: InvoiceDto[] }>('/billing/invoices');
     return res.data;
+  }
+
+  getBillingCostBreakdown(): Promise<BillingCostBreakdownDto> {
+    return this.request('/billing/cost-breakdown');
   }
 
   subscribeToPlan(plan: string, provider?: string, coupon?: string): Promise<BillingSubscribeResponse> {

@@ -18,6 +18,7 @@ class Organization extends Model
         'slug',
         'plan_tier',
         'status',
+        'mfa_policy',
         'settings',
     ];
 

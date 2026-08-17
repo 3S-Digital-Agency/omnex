@@ -5,6 +5,7 @@ import type { SocialProviderDto } from '../../lib/api/types';
 import { track } from '../../lib/analytics';
 import { errorMessage } from '../../lib/errors';
 import { useI18n } from '../../lib/i18n';
+import { PasskeyLoginButton } from './PasskeyLoginButton';
 
 function ProviderIcon({ provider }: { provider: string }) {
   switch (provider) {
@@ -133,6 +134,7 @@ export function SocialLoginButtons({ standalone = false }: { standalone?: boolea
         </div>
       )}
       <div className="flex flex-col gap-2">
+        <PasskeyLoginButton />
         <div className="flex flex-wrap gap-2">
           {iconProviders.map((provider) => (
             <button

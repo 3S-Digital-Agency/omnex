@@ -9,6 +9,7 @@ use App\Http\Resources\UserResource;
 use App\Models\Invitation;
 use App\Models\User;
 use App\Support\Audit\AuditLogger;
+use App\Support\Auth\TokenIssuer;
 use App\Support\Security\Totp;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -260,7 +261,7 @@ class AuthController extends Controller
 
     private function issueToken(User $user): string
     {
-        return $user->createToken('omnex-spa')->plainTextToken;
+        return TokenIssuer::issue($user, request());
     }
 
     private function mfaChallengeKey(string $token): string

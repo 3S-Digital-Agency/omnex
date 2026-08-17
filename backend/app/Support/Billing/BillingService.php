@@ -242,6 +242,40 @@ final class BillingService
     }
 
     /**
+     * Spent breakdown by service, aggregated from the invoice history
+     * (grouped by plan label). Powers the billing cockpit donut.
+     *
+     * @return array{total: int, currency: string, services: array<int, array{service: string, amount: int}>}
+     */
+    public function costBreakdown(Organization $organization): array
+    {
+        $invoices = Invoice::query()
+            ->with('subscription.plan')
+            ->where('organization_id', $organization->id)
+            ->get();
+
+        $currency = 'usd';
+        $byService = [];
+        foreach ($invoices as $invoice) {
+            $service = $invoice->subscription?->plan?->name ?? 'One-time';
+            $byService[$service] = ($byService[$service] ?? 0) + $invoice->amount_due;
+            $currency = $invoice->currency;
+        }
+
+        $services = collect($byService)
+            ->map(fn (int $amount, string $service) => ['service' => $service, 'amount' => $amount])
+            ->sortByDesc('amount')
+            ->values()
+            ->all();
+
+        return [
+            'total' => (int) $invoices->sum('amount_due'),
+            'currency' => $currency,
+            'services' => $services,
+        ];
+    }
+
+    /**
      * Validate a coupon code without redeeming it.
      *
      * @return array{code: string, name: string, discount_type: string, discount_value: int, discount: int}

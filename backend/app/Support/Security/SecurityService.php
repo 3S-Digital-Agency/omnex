@@ -2,10 +2,16 @@
 
 namespace App\Support\Security;
 
+use App\Contracts\SslCheckerInterface;
 use App\Models\DnsZone;
 use App\Models\Domain;
 use App\Models\Membership;
+use App\Models\Organization;
 use App\Models\SecurityFinding;
+use App\Models\SecurityScoreSample;
+use App\Models\Server;
+use App\Models\Site;
+use App\Models\SslCheck;
 use App\Support\Audit\AuditLogger;
 use App\Support\Tenancy\TenantContext;
 
@@ -26,9 +32,13 @@ final class SecurityService
      */
     public function scan(bool $audit = false): array
     {
+        $this->runSslChecks();
+
         $candidates = $this->runChecks();
 
         $this->reconcile($candidates);
+
+        $this->recordSample(force: $audit);
 
         if ($audit) {
             $open = SecurityFinding::query()->where('status', 'open')->count();
@@ -78,6 +88,8 @@ final class SecurityService
 
         AuditLogger::record('security.finding_dismissed', 'security_finding', $finding->id, null, ['rule' => $finding->rule]);
 
+        $this->recordSample();
+
         return $finding;
     }
 
@@ -90,7 +102,48 @@ final class SecurityService
 
         AuditLogger::record('security.finding_reopened', 'security_finding', $finding->id, null, ['rule' => $finding->rule]);
 
+        $this->recordSample();
+
         return $finding;
+    }
+
+    /**
+     * Persist one score sample. A new row is only written when the score
+     * actually changed (or `force` is set, e.g. a manual scan) so the
+     * timeline stays meaningful and the table does not grow on every read.
+     */
+    public function recordSample(bool $force = false): void
+    {
+        $report = $this->report();
+        $score = $report['score'];
+
+        $last = SecurityScoreSample::query()->latest('created_at')->first();
+        if (! $force && $last !== null && (int) $last->score === $score) {
+            return;
+        }
+
+        SecurityScoreSample::create([
+            'score' => $score,
+            'open' => $report['summary']['open'],
+            'high' => $report['summary']['high'],
+            'medium' => $report['summary']['medium'],
+            'low' => $report['summary']['low'],
+        ]);
+    }
+
+    /**
+     * Chronological score samples (newest last) — the scan history / score
+     * evolution for the cockpit.
+     */
+    public function history(int $limit = 30): array
+    {
+        return SecurityScoreSample::query()
+            ->orderByDesc('created_at')
+            ->limit(max(1, $limit))
+            ->get()
+            ->reverse()
+            ->values()
+            ->all();
     }
 
     /**
@@ -125,6 +178,9 @@ final class SecurityService
             ->with('user')
             ->get();
 
+        $policy = Organization::find(app(TenantContext::class)->id())?->mfa_policy ?? 'optional';
+        $membersWithoutMfa = [];
+
         foreach ($memberships as $membership) {
             $user = $membership->user;
 
@@ -133,6 +189,8 @@ final class SecurityService
             }
 
             if (! $user->mfa_enabled) {
+                $membersWithoutMfa[] = ['name' => $user->name, 'email' => $user->email];
+
                 $candidates[] = $this->candidate('mfa', 'high', 'user', $user->id, [
                     'name' => $user->name,
                     'email' => $user->email,
@@ -145,6 +203,15 @@ final class SecurityService
                     'email' => $user->email,
                 ]);
             }
+        }
+
+        // MFA enforcement policy: when the organization requires MFA, an
+        // org-level finding stays open until every active member complies.
+        if ($policy === 'required' && $membersWithoutMfa !== []) {
+            $candidates[] = $this->candidate('mfa_enforcement', 'high', null, null, [
+                'policy' => 'required',
+                'affected_users' => $membersWithoutMfa,
+            ]);
         }
 
         if ($memberships->count() <= 1) {
@@ -169,7 +236,61 @@ final class SecurityService
             ]);
         }
 
+        // SSL / certificate monitoring: certificates that are expiring or
+        // invalid (including sites not served over HTTPS), from the checks.
+        foreach (SslCheck::query()->whereIn('status', [SslCheck::STATUS_EXPIRING, SslCheck::STATUS_INVALID])->get() as $check) {
+            $severity = $check->status === SslCheck::STATUS_INVALID ? 'high' : 'medium';
+
+            $candidates[] = $this->candidate('ssl_'.$check->status, $severity, $check->target_type, $check->target_id, [
+                'target' => $check->details['target'] ?? null,
+                'days_remaining' => $check->days_remaining,
+                'checked_at' => $check->checked_at?->toIso8601String(),
+            ]);
+        }
+
+        // Backup status: servers with scheduled snapshots disabled have no
+        // recovery point and are flagged until a frequency is configured.
+        foreach (Server::query()->get() as $server) {
+            if ($server->snapshot_frequency === 'disabled') {
+                $candidates[] = $this->candidate('backup_disabled', 'medium', 'server', $server->id, [
+                    'server' => $server->name,
+                    'provider' => $server->provider,
+                ]);
+            }
+        }
+
         return $candidates;
+    }
+
+    /**
+     * Refresh the certificate-monitoring checks for every managed site and
+     * domain through the configured checker, before deriving findings.
+     */
+    private function runSslChecks(): void
+    {
+        $checker = app(SslCheckerInterface::class);
+
+        $targets = [];
+        foreach (Site::query()->get() as $site) {
+            $targets[] = ['site', $site->id, (string) ($site->url ?? '')];
+        }
+        foreach (Domain::query()->get() as $domain) {
+            $targets[] = ['domain', $domain->id, $domain->name];
+        }
+
+        foreach ($targets as [$type, $id, $name]) {
+            $result = $checker->check($type, $id, $name);
+
+            SslCheck::updateOrCreate(
+                ['target_type' => $type, 'target_id' => $id],
+                [
+                    'status' => $result['status'],
+                    'days_remaining' => $result['days_remaining'],
+                    'details' => $result['details'],
+                    'checked_at' => $result['checked_at'],
+                ],
+            );
+        }
     }
 
     /**
