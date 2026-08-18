@@ -9,6 +9,9 @@ on:
 jobs:
   dco:
     name: DCO — commits Signed-off-by
+    # Dependabot commits are authored by GitHub's verified bot and cannot be
+    # signed off individually — skip DCO for automated dependency PRs.
+    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

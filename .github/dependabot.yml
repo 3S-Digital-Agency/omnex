@@ -1,0 +1,62 @@
+version: 2
+
+updates:
+  # ── Backend — Laravel / Composer ──────────────────────────────────────
+  - package-ecosystem: "composer"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Toronto"
+    labels:
+      - "dependencies"
+      - "backend"
+    open-pull-requests-limit: 10
+    versioning-strategy: "increase"
+    groups:
+      laravel:
+        patterns:
+          - "laravel/framework"
+          - "laravel/sanctum"
+          - "laravel/pint"
+          - "laravel/tinker"
+      production-dependencies:
+        dependency-type: "production"
+      development-dependencies:
+        dependency-type: "development"
+
+  # ── Frontend — pnpm (npm ecosystem, auto-detected via pnpm-lock.yaml) ──
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Toronto"
+    labels:
+      - "dependencies"
+      - "frontend"
+    open-pull-requests-limit: 10
+    versioning-strategy: "increase"
+    groups:
+      react-core:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      build-tooling:
+        patterns:
+          - "vite"
+          - "vitest"
+          - "typescript"
+          - "tailwindcss"
+          - "@tailwindcss/*"
+          - "@vitejs/*"
+          - "jsdom"
+          - "pngjs"
+      production-dependencies:
+        dependency-type: "production"
+      development-dependencies:
+        dependency-type: "development"
