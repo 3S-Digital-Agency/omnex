@@ -178,6 +178,36 @@ it('rolls back manually to an earlier deployment', function () {
         ->assertJsonPath('current_deployment_id', $first);
 });
 
+it('resolves a deployment preview url and persists it on the deployment', function () {
+    [$user, $organization] = sitesContext();
+
+    $site = $this->withHeader('X-Organization', $organization->id)
+        ->postJson('/api/v1/sites', [
+            'name' => 'Preview',
+            'framework' => 'static',
+            'git_url' => 'https://github.com/acme/preview.git',
+        ])->assertStatus(201)->json('id');
+
+    $deployment = $this->withHeader('X-Organization', $organization->id)
+        ->postJson("/api/v1/sites/{$site}/deployments")
+        ->assertStatus(201)
+        ->json();
+
+    $this->withHeader('X-Organization', $organization->id)
+        ->getJson("/api/v1/sites/{$site}/deployments/{$deployment['id']}/preview")
+        ->assertOk()
+        ->assertJsonStructure(['url', 'aliases']);
+
+    // The preview URL is now persisted on the deployment record.
+    $persisted = $this->withHeader('X-Organization', $organization->id)
+        ->getJson("/api/v1/sites/{$site}/deployments/{$deployment['id']}")
+        ->assertOk()
+        ->json('preview_url');
+
+    expect($persisted)->toStartWith('https://'.$deployment['commit_sha'].'.')
+        ->toEndWith('.omnex-sites.test');
+});
+
 it('rejects a rollback to a non-live deployment', function () {
     [$user, $organization] = sitesContext();
 

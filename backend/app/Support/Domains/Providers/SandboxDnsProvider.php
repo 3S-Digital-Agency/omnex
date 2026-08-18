@@ -17,6 +17,16 @@ final class SandboxDnsProvider implements DnsProviderInterface
         return 'sandbox';
     }
 
+    public function label(): string
+    {
+        return 'Sandbox';
+    }
+
+    public function isConfigured(): bool
+    {
+        return true;
+    }
+
     public function createZone(string $domain): array
     {
         return ['external_id' => 'sandbox-zone-'.Str::lower(Str::random(12))];

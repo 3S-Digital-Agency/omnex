@@ -66,6 +66,14 @@ final class CustomSiteProvider implements SiteProviderInterface
         ]);
     }
 
+    public function preview(string $providerSiteId, string $commitSha): array
+    {
+        return $this->call('preview', [
+            'provider_site_id' => $providerSiteId,
+            'commit_sha' => $commitSha,
+        ]);
+    }
+
     public function delete(string $providerSiteId): void
     {
         $this->call('delete', ['provider_site_id' => $providerSiteId]);

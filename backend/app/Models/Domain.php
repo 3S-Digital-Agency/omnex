@@ -44,4 +44,9 @@ class Domain extends Model
     {
         return $this->hasOne(DnsZone::class);
     }
+
+    public function certificate(): HasOne
+    {
+        return $this->hasOne(SslCertificate::class);
+    }
 }

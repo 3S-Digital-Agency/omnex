@@ -7,6 +7,7 @@ use App\Models\DriveFile;
 use App\Models\DriveFolder;
 use App\Models\DriveVersion;
 use App\Support\Audit\AuditLogger;
+use App\Support\Providers\ResolvesTenantProvider;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -21,7 +22,21 @@ use Illuminate\Validation\ValidationException;
  */
 final class StorageService
 {
-    public function __construct(private StorageProviderRegistry $providers) {}
+    use ResolvesTenantProvider;
+
+    public function __construct(
+        private StorageProviderRegistry $providers,
+    ) {}
+
+    protected function providerConfigKey(): string
+    {
+        return 'omnex.storage.provider';
+    }
+
+    protected function providerSettingsKey(): string
+    {
+        return 'storage_provider';
+    }
 
     /**
      * @return array<int, array{name: string, label: string, configured: bool}>
@@ -33,7 +48,7 @@ final class StorageService
 
     private function provider(): StorageProviderInterface
     {
-        $provider = $this->providers->get();
+        $provider = $this->providers->get($this->activeProviderName());
 
         if (! $provider->isConfigured()) {
             throw new StorageProviderException("The [{$provider->label()}] storage provider is not configured.");

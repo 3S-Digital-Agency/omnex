@@ -3,6 +3,7 @@
 namespace App\Support\Sites;
 
 use App\Contracts\SiteProviderInterface;
+use App\Support\Sites\Providers\CloudflareSiteProvider;
 use App\Support\Sites\Providers\CustomSiteProvider;
 use App\Support\Sites\Providers\SandboxSiteProvider;
 use InvalidArgumentException;
@@ -16,6 +17,7 @@ final class SiteProviderRegistry
     {
         $this->register(new SandboxSiteProvider);
         $this->register(new CustomSiteProvider);
+        $this->register(new CloudflareSiteProvider);
     }
 
     public function register(SiteProviderInterface $provider): void

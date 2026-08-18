@@ -10,6 +10,12 @@ use App\Events\DomainUpdated;
 use App\Models\DnsZone;
 use App\Models\Domain;
 use App\Models\User;
+use App\Support\Audit\AuditLogger;
+use App\Support\Features\FeatureFlagService;
+use App\Support\Providers\ResolvesTenantProvider;
+use App\Support\Ssl\SslProviderException;
+use App\Support\Ssl\SslService;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -22,7 +28,19 @@ use Illuminate\Support\Facades\DB;
  */
 final class DomainService
 {
+    use ResolvesTenantProvider;
+
     public function __construct(private DomainProviderRegistry $providers) {}
+
+    protected function providerConfigKey(): string
+    {
+        return 'omnex.domain.provider';
+    }
+
+    protected function providerSettingsKey(): string
+    {
+        return 'domain_provider';
+    }
 
     /**
      * @return array<int, array{name: string, label: string, configured: bool}>
@@ -34,7 +52,7 @@ final class DomainService
 
     private function provider(?string $name = null): DomainProviderInterface
     {
-        $provider = $this->providers->get($name);
+        $provider = $this->providers->get($name ?? $this->activeProviderName());
 
         if (! $provider->isConfigured()) {
             throw new DomainProviderException("The [{$provider->label()}] registrar is not configured.");
@@ -80,9 +98,11 @@ final class DomainService
             'expires_at' => $remote['expires_at'] ?? now()->addYear(),
         ], $selected->name());
 
+        $this->provisionSsl($model);
+
         DomainRegistered::dispatch($model);
 
-        return $model->load('zone.records');
+        return $model->load('zone.records', 'certificate');
     }
 
     public function renew(Domain $domain, int $years): Domain
@@ -94,6 +114,8 @@ final class DomainService
         $domain->expires_at = $remote['expires_at'] ?? now()->addYears($years);
         $domain->status = 'active';
         $domain->save();
+
+        $this->provisionSsl($domain, renew: true);
 
         DomainRenewed::dispatch($domain, $years);
 
@@ -120,9 +142,11 @@ final class DomainService
             'expires_at' => $remote['expires_at'] ?? now()->addYear(),
         ], $selected->name());
 
+        $this->provisionSsl($model);
+
         DomainTransferred::dispatch($model);
 
-        return $model->load('zone.records');
+        return $model->load('zone.records', 'certificate');
     }
 
     /**
@@ -219,7 +243,7 @@ final class DomainService
 
             $zone = DnsZone::create([
                 'domain_id' => $domain->id,
-                'provider' => config('omnex.domain.dns_provider', 'sandbox'),
+                'provider' => $this->dnsProviderName(),
                 'status' => 'active',
             ]);
 
@@ -234,6 +258,50 @@ final class DomainService
 
             return $domain;
         });
+    }
+
+    /**
+     * DNS provider assigned to a freshly registered domain's zone: the active
+     * DNS provider for this organization (settings override → env default).
+     */
+    /**
+     * Auto-provision TLS for a domain (issue on register/transfer, renew on
+     * renewal). Best-effort: a failing provider must never block a domain
+     * operation — the failure is audited and the certificate can be issued
+     * manually through the SSL endpoints later.
+     */
+    private function provisionSsl(Domain $domain, bool $renew = false): void
+    {
+        if (! config('omnex.ssl.auto_issue', true)) {
+            return;
+        }
+
+        // TLS is a plan perk: free tiers don't get managed certificates.
+        if (! app(FeatureFlagService::class)->enabled('ssl')) {
+            return;
+        }
+
+        try {
+            $ssl = app(SslService::class);
+
+            if ($renew) {
+                $ssl->renew($domain);
+            } else {
+                $ssl->issue($domain);
+            }
+        } catch (SslProviderException $e) {
+            AuditLogger::record('ssl.provision_failed', 'domain', $domain->id, null, [
+                'error' => $e->getMessage(),
+            ], 'warning');
+        }
+    }
+
+    private function dnsProviderName(): string
+    {
+        $organization = app(TenantContext::class)->organization();
+
+        return (string) ($organization?->settings['dns_provider']
+            ?? config('omnex.domain.dns_provider', 'sandbox'));
     }
 
     private function normalize(string $domain): string

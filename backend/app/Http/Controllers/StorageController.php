@@ -25,6 +25,22 @@ class StorageController extends Controller
         return response()->json(['data' => $this->storage->providers()]);
     }
 
+    public function activeProvider(Request $request): JsonResponse
+    {
+        $this->authorize('storage.read');
+
+        return response()->json(['data' => $this->storage->activeProvider()]);
+    }
+
+    public function setProvider(Request $request): JsonResponse
+    {
+        $this->authorize('storage.manage');
+
+        $validated = $request->validate(['name' => ['required', 'string', 'max:32']]);
+
+        return response()->json(['data' => $this->storage->setProvider($validated['name'])]);
+    }
+
     /** Daily cumulative storage usage over the last N days (newest last). */
     public function usageHistory(Request $request): JsonResponse
     {

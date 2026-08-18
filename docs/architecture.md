@@ -144,31 +144,20 @@ User ──< Membership >── Organization
 
 ## 6. Provider abstraction (ports & adapters)
 
-Every external dependency is behind a PHP interface. Example (Storage, Phase 4):
+Every external dependency is behind a PHP interface in `app/Contracts`
+(registrars, DNS, SSL, storage, sites, cloud, payments). Each brick has a
+`*ProviderRegistry` (Strategy/Factory) that maps a provider `name()` to its
+adapter, and every service resolves the adapter through that registry.
 
-```php
-interface StorageProviderInterface
-{
-    public function put(string $key, $stream, array $options): StorageObject;
-    public function get(string $key): StorageObject;
-    public function delete(string $key): void;
-    public function exists(string $key): bool;
-    public function signedDownloadUrl(string $key, int $ttl): string;
-    public function signedUploadUrl(string $key, int $ttl): string;
-    public function list(string $prefix): iterable;
-}
-```
+The active provider is **data, not code**: it is resolved per organization
+from `organizations.settings` (an explicit assignment) with a fallback to an
+environment variable, via the shared `ResolvesTenantProvider` trait. Credentials
+stay in server-side config/secrets — the settings column holds provider *names*
+only. Adding a provider = new adapter class + one registry entry.
 
-Adapters: `S3Provider`, `R2Provider`, `OVHProvider`, `MinIOProvider`.
-All implement the same interface; they differ only in endpoint, auth, and any
-provider-specific quirks (kept inside the adapter, never leaked to services).
-
-The active provider is **data, not code**: a `providers` table records the
-driver + credentials per organization (or per resource), referenced via a
-service-locator registry. Adding a provider = new adapter class + factory entry.
-
-The same pattern applies to: `DomainProviderInterface`, `DnsProviderInterface`,
-`CloudProviderInterface`, `EmailProviderInterface`, `PaymentProviderInterface`.
+See `docs/architecture-providers.md` for the full contracts, the dynamic switch
+(`GET/PATCH /{service}/provider`), the SSL issuance abstraction, feature
+flags/perks and organization provisioning.
 
 ---
 

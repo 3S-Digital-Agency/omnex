@@ -8,6 +8,7 @@ use App\Http\Controllers\ContactLeadController;
 use App\Http\Controllers\CrossDeviceController;
 use App\Http\Controllers\DnsController;
 use App\Http\Controllers\DomainController;
+use App\Http\Controllers\FeatureFlagController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\LandingPageController;
 use App\Http\Controllers\MemberController;
@@ -21,6 +22,7 @@ use App\Http\Controllers\SessionController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\SocialAuthController;
 use App\Http\Controllers\SshKeyController;
+use App\Http\Controllers\SslController;
 use App\Http\Controllers\StorageController;
 use Illuminate\Support\Facades\Route;
 
@@ -124,6 +126,11 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/roles', [RoleController::class, 'index']);
 
+        // Feature flags / perks (per organization & plan tier).
+        Route::get('/features', [FeatureFlagController::class, 'index']);
+        Route::patch('/features/{flag}', [FeatureFlagController::class, 'update']);
+        Route::delete('/features/{flag}/override', [FeatureFlagController::class, 'reset']);
+
         // Billing (Phase 6). Static routes precede the {subscription} route.
         Route::get('/billing/providers', [BillingController::class, 'providers']);
         Route::get('/billing/plans', [BillingController::class, 'plans']);
@@ -162,6 +169,11 @@ Route::prefix('v1')->group(function () {
         // Domain engine (Phase 3). Static routes are registered before the
         // {domain} route so they are not captured as a domain id.
         Route::get('/domains/providers', [DomainController::class, 'providers']);
+        Route::get('/domains/provider', [DomainController::class, 'activeProvider']);
+        Route::patch('/domains/provider', [DomainController::class, 'setProvider']);
+        Route::get('/dns/providers', [DnsController::class, 'providers']);
+        Route::get('/dns/provider', [DnsController::class, 'activeProvider']);
+        Route::patch('/dns/provider', [DnsController::class, 'setProvider']);
         Route::get('/domains/search', [DomainController::class, 'search']);
         Route::get('/domains/check', [DomainController::class, 'check']);
         Route::post('/domains/transfer', [DomainController::class, 'transfer']);
@@ -170,6 +182,20 @@ Route::prefix('v1')->group(function () {
         Route::get('/domains/{domain}', [DomainController::class, 'show']);
         Route::post('/domains/{domain}/renew', [DomainController::class, 'renew']);
         Route::patch('/domains/{domain}', [DomainController::class, 'update']);
+
+        // TLS / SSL certificates (Phase 3 extension).
+        Route::get('/ssl/providers', [SslController::class, 'providers']);
+        Route::get('/ssl/provider', [SslController::class, 'activeProvider']);
+        Route::get('/ssl/certificates', [SslController::class, 'index']);
+        Route::get('/domains/{domain}/ssl', [SslController::class, 'show']);
+
+        // TLS is a plan perk: the mutation endpoints are gated server-side.
+        Route::middleware('feature:ssl')->group(function () {
+            Route::patch('/ssl/provider', [SslController::class, 'setProvider']);
+            Route::post('/domains/{domain}/ssl', [SslController::class, 'issue']);
+            Route::post('/domains/{domain}/ssl/renew', [SslController::class, 'renew']);
+            Route::delete('/domains/{domain}/ssl', [SslController::class, 'revoke']);
+        });
 
         // DNS engine (Phase 3).
         Route::get('/domains/{domain}/dns', [DnsController::class, 'index']);
@@ -190,6 +216,8 @@ Route::prefix('v1')->group(function () {
         // OMNEX Drive (Phase 4). Static routes precede the {folder}/{file}
         // routes so they are not captured as a resource id.
         Route::get('/storage/providers', [StorageController::class, 'providers']);
+        Route::get('/storage/provider', [StorageController::class, 'activeProvider']);
+        Route::patch('/storage/provider', [StorageController::class, 'setProvider']);
         Route::get('/storage/usage-history', [StorageController::class, 'usageHistory']);
         Route::get('/storage', [StorageController::class, 'index']);
         Route::get('/storage/trash', [StorageController::class, 'trash']);
@@ -210,6 +238,8 @@ Route::prefix('v1')->group(function () {
         // OMNEX Sites (Phase 5). Static routes precede the {site} route so
         // they are not captured as a site id.
         Route::get('/sites/providers', [SiteController::class, 'providers']);
+        Route::get('/sites/provider', [SiteController::class, 'activeProvider']);
+        Route::patch('/sites/provider', [SiteController::class, 'setProvider']);
         Route::get('/sites', [SiteController::class, 'index']);
         Route::post('/sites', [SiteController::class, 'store']);
         Route::get('/sites/{site}', [SiteController::class, 'show']);
@@ -219,10 +249,13 @@ Route::prefix('v1')->group(function () {
         Route::post('/sites/{site}/deployments', [SiteController::class, 'deploy']);
         Route::get('/sites/{site}/deployments/{deployment}', [SiteController::class, 'showDeployment']);
         Route::post('/sites/{site}/deployments/{deployment}/rollback', [SiteController::class, 'rollback']);
+        Route::get('/sites/{site}/deployments/{deployment}/preview', [SiteController::class, 'preview']);
 
         // OMNEX Cloud (Phase 8). Static routes precede the {server} route so
         // they are not captured as a server id (e.g. /cloud/ssh-keys).
         Route::get('/cloud/providers', [ServerController::class, 'providers']);
+        Route::get('/cloud/provider', [ServerController::class, 'activeProvider']);
+        Route::patch('/cloud/provider', [ServerController::class, 'setProvider']);
         Route::get('/cloud/providers/verify', [ServerController::class, 'verifyProviders']);
         Route::get('/cloud', [ServerController::class, 'index']);
         Route::post('/cloud', [ServerController::class, 'store']);

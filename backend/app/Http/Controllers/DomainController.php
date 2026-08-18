@@ -31,6 +31,22 @@ class DomainController extends Controller
         return response()->json(['data' => $this->domains->providers()]);
     }
 
+    public function activeProvider(Request $request): JsonResponse
+    {
+        $this->authorize('domains.read');
+
+        return response()->json(['data' => $this->domains->activeProvider()]);
+    }
+
+    public function setProvider(Request $request): JsonResponse
+    {
+        $this->authorize('domains.manage');
+
+        $validated = $request->validate(['name' => ['required', 'string', 'max:32']]);
+
+        return response()->json(['data' => $this->domains->setProvider($validated['name'])]);
+    }
+
     public function search(Request $request): JsonResponse
     {
         $this->authorize('domains.read');

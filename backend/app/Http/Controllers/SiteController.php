@@ -23,6 +23,22 @@ class SiteController extends Controller
         return response()->json(['data' => $this->sites->providers()]);
     }
 
+    public function activeProvider(Request $request): JsonResponse
+    {
+        $this->authorize('sites.read');
+
+        return response()->json(['data' => $this->sites->activeProvider()]);
+    }
+
+    public function setProvider(Request $request): JsonResponse
+    {
+        $this->authorize('sites.manage');
+
+        $validated = $request->validate(['name' => ['required', 'string', 'max:32']]);
+
+        return response()->json(['data' => $this->sites->setProvider($validated['name'])]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $this->authorize('sites.read');
@@ -158,6 +174,25 @@ class SiteController extends Controller
         }
 
         return response()->json(new SiteDeploymentResource($deployment));
+    }
+
+    public function preview(Request $request, string $site, string $deployment): JsonResponse
+    {
+        $this->authorize('sites.read');
+
+        $site = Site::findOrFail($site);
+        $deployment = SiteDeployment::where('site_id', $site->id)->findOrFail($deployment);
+
+        try {
+            $preview = $this->sites->preview($site, $deployment);
+        } catch (SiteProviderException $e) {
+            abort(503, $e->getMessage());
+        }
+
+        return response()->json([
+            'url' => $preview['url'],
+            'aliases' => $preview['aliases'],
+        ]);
     }
 
     /**

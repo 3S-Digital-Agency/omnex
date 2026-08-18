@@ -49,7 +49,67 @@ it('lists the storage providers', function () {
         ->assertJsonPath('data.0.name', 'sandbox')
         ->assertJsonPath('data.0.configured', true)
         ->assertJsonPath('data.1.name', 's3')
-        ->assertJsonPath('data.1.configured', false);
+        ->assertJsonPath('data.1.configured', false)
+        ->assertJsonPath('data.2.name', 'r2')
+        ->assertJsonPath('data.2.label', 'Cloudflare R2')
+        ->assertJsonPath('data.2.configured', false);
+});
+
+it('reports the active storage provider (sandbox by default)', function () {
+    [$user, $organization] = driveContext();
+
+    $this->withHeader('X-Organization', $organization->id)
+        ->getJson('/api/v1/storage/provider')
+        ->assertOk()
+        ->assertJsonPath('data.name', 'sandbox')
+        ->assertJsonPath('data.active', true);
+});
+
+it('switches the active storage provider per organization', function () {
+    [$user, $organization] = driveContext();
+
+    $this->withHeader('X-Organization', $organization->id)
+        ->patchJson('/api/v1/storage/provider', ['name' => 's3'])
+        ->assertOk()
+        ->assertJsonPath('data.name', 's3');
+
+    // Persisted on the organization settings.
+    expect(Organization::findOrFail($organization->id)->settings['storage_provider'])->toBe('s3');
+
+    $this->withHeader('X-Organization', $organization->id)
+        ->getJson('/api/v1/storage/provider')
+        ->assertOk()
+        ->assertJsonPath('data.name', 's3');
+});
+
+it('rejects an unknown storage provider', function () {
+    [$user, $organization] = driveContext();
+
+    $this->withHeader('X-Organization', $organization->id)
+        ->patchJson('/api/v1/storage/provider', ['name' => 'nope'])
+        ->assertStatus(422);
+});
+
+it('requires storage.manage to switch the provider', function () {
+    $user = User::factory()->create();
+    $organization = Organization::factory()->create();
+
+    Membership::create([
+        'organization_id' => $organization->id,
+        'user_id' => $user->id,
+        'role_id' => Role::where('key', 'viewer')->firstOrFail()->id,
+        'status' => 'active',
+    ]);
+
+    Sanctum::actingAs($user);
+
+    $this->withHeader('X-Organization', $organization->id)
+        ->getJson('/api/v1/storage/provider')
+        ->assertOk();
+
+    $this->withHeader('X-Organization', $organization->id)
+        ->patchJson('/api/v1/storage/provider', ['name' => 's3'])
+        ->assertStatus(403);
 });
 
 it('lists an empty drive with quota', function () {

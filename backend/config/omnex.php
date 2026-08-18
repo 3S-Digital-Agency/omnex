@@ -121,6 +121,17 @@ return [
             'key' => env('OMNEX_STORAGE_S3_KEY', ''),
             'secret' => env('OMNEX_STORAGE_S3_SECRET', ''),
         ],
+        // Cloudflare R2, explicit provider (S3-compatible). Endpoint is
+        // derived from the account id when left empty. Credentials must be R2
+        // API tokens (the global Cloudflare API token is not valid for S3).
+        'r2' => [
+            'endpoint' => env('OMNEX_STORAGE_R2_ENDPOINT', ''),
+            'region' => env('OMNEX_STORAGE_R2_REGION', 'auto'),
+            'bucket' => env('OMNEX_STORAGE_R2_BUCKET', ''),
+            'key' => env('OMNEX_STORAGE_R2_KEY', ''),
+            'secret' => env('OMNEX_STORAGE_R2_SECRET', ''),
+            'account_id' => env('CLOUDFLARE_ACCOUNT_ID', ''),
+        ],
     ],
 
     /*
@@ -285,6 +296,60 @@ return [
     | every open finding.
     |
     */
+
+    /*
+    |--------------------------------------------------------------------------
+    | TLS / SSL certificate issuance
+    |--------------------------------------------------------------------------
+    |
+    | Provider names resolve through SslProviderRegistry. The sandbox issues a
+    | deterministic certificate locally; Cloudflare maps issuance onto its
+    | Universal SSL edge certificates (config/cloudflare.php); Let's Encrypt
+    | issues a real certificate via ACME v2 + dns-01 (config/letsencrypt.php).
+    | The active provider can be overridden per organization
+    | (settings.ssl_provider).
+    |
+    */
+
+    'ssl' => [
+        'provider' => env('OMNEX_SSL_PROVIDER', 'sandbox'),
+        // Nominal certificate validity when the provider does not report one.
+        'validity_days' => (int) env('OMNEX_SSL_VALIDITY_DAYS', 90),
+        // Auto-issue a certificate when a domain is registered/transferred.
+        'auto_issue' => (bool) env('OMNEX_SSL_AUTO_ISSUE', true),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Feature flags / perks (per organization & plan tier)
+    |--------------------------------------------------------------------------
+    |
+    | Each flag resolves, in order: an organization override
+    | (`organizations.settings.features.<flag>`), then the plan-tier default
+    | (`tiers[<plan_tier>]`), then the platform `default`. A number flag of `0`
+    | means "unlimited" (no cap). `real_providers` gates whether an org may
+    | switch off the sandbox to a live provider (Cloudflare/Hetzner/Stripe…).
+    |
+    */
+
+    'features' => [
+        'domains' => ['label' => 'Domains & DNS', 'type' => 'boolean', 'default' => true, 'tiers' => ['free' => true, 'starter' => true, 'pro' => true, 'business' => true]],
+        'dnssec' => ['label' => 'DNSSEC', 'type' => 'boolean', 'default' => false, 'tiers' => ['free' => false, 'starter' => true, 'pro' => true, 'business' => true]],
+        'ssl' => ['label' => 'TLS certificates', 'type' => 'boolean', 'default' => false, 'tiers' => ['free' => false, 'starter' => true, 'pro' => true, 'business' => true]],
+        'drive' => ['label' => 'OMNEX Drive', 'type' => 'boolean', 'default' => true, 'tiers' => ['free' => true, 'starter' => true, 'pro' => true, 'business' => true]],
+        'sites' => ['label' => 'Sites', 'type' => 'boolean', 'default' => false, 'tiers' => ['free' => false, 'starter' => true, 'pro' => true, 'business' => true]],
+        'cloud' => ['label' => 'Cloud servers', 'type' => 'boolean', 'default' => false, 'tiers' => ['free' => false, 'starter' => false, 'pro' => true, 'business' => true]],
+        'security' => ['label' => 'Security Center', 'type' => 'boolean', 'default' => true, 'tiers' => ['free' => true, 'starter' => true, 'pro' => true, 'business' => true]],
+        'billing' => ['label' => 'Billing', 'type' => 'boolean', 'default' => true, 'tiers' => ['free' => true, 'starter' => true, 'pro' => true, 'business' => true]],
+        'snapshots' => ['label' => 'Server snapshots', 'type' => 'boolean', 'default' => false, 'tiers' => ['free' => false, 'starter' => false, 'pro' => true, 'business' => true]],
+        'passkeys' => ['label' => 'Passkeys / WebAuthn', 'type' => 'boolean', 'default' => true, 'tiers' => ['free' => true, 'starter' => true, 'pro' => true, 'business' => true]],
+        'real_providers' => ['label' => 'Live providers', 'type' => 'boolean', 'default' => false, 'tiers' => ['free' => false, 'starter' => false, 'pro' => true, 'business' => true]],
+        'storage_quota_bytes' => ['label' => 'Storage quota', 'type' => 'number', 'default' => 1073741824, 'tiers' => ['free' => 1073741824, 'starter' => 26843545600, 'pro' => 268435456000, 'business' => 0]],
+        'domain_limit' => ['label' => 'Domain limit', 'type' => 'number', 'default' => 1, 'tiers' => ['free' => 1, 'starter' => 10, 'pro' => 0, 'business' => 0]],
+        'member_limit' => ['label' => 'Member limit', 'type' => 'number', 'default' => 1, 'tiers' => ['free' => 1, 'starter' => 5, 'pro' => 0, 'business' => 0]],
+        'server_limit' => ['label' => 'Server limit', 'type' => 'number', 'default' => 0, 'tiers' => ['free' => 0, 'starter' => 3, 'pro' => 0, 'business' => 0]],
+        'site_limit' => ['label' => 'Site limit', 'type' => 'number', 'default' => 0, 'tiers' => ['free' => 0, 'starter' => 3, 'pro' => 0, 'business' => 0]],
+    ],
 
     'security' => [
         'severity_penalties' => [

@@ -9,6 +9,7 @@ use App\Models\DnsHistory;
 use App\Models\DnsRecord;
 use App\Models\DnsZone;
 use App\Models\User;
+use App\Support\Providers\ResolvesTenantProvider;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -19,11 +20,31 @@ use Illuminate\Validation\ValidationException;
  */
 final class DnsService
 {
+    use ResolvesTenantProvider;
+
     public function __construct(private DnsProviderRegistry $providers) {}
+
+    protected function providerConfigKey(): string
+    {
+        return 'omnex.domain.dns_provider';
+    }
+
+    protected function providerSettingsKey(): string
+    {
+        return 'dns_provider';
+    }
 
     private function provider(): DnsProviderInterface
     {
-        return $this->providers->get();
+        return $this->providers->get($this->activeProviderName());
+    }
+
+    /**
+     * @return array<int, array{name: string, label: string, configured: bool}>
+     */
+    public function providers(): array
+    {
+        return $this->providers->all();
     }
 
     /**

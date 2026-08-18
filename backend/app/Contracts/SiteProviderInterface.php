@@ -48,5 +48,14 @@ interface SiteProviderInterface
      */
     public function rollback(string $providerSiteId, string $commitSha): array;
 
+    /**
+     * Resolve the preview URL (and aliases) of a specific deployment. Some
+     * platforms give every deployment its own preview URL (Cloudflare Pages,
+     * Vercel…); providers without previews return the production URL.
+     *
+     * @return array{url: string, aliases: array<int, string>}
+     */
+    public function preview(string $providerSiteId, string $commitSha): array;
+
     public function delete(string $providerSiteId): void;
 }

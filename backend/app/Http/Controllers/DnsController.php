@@ -18,6 +18,29 @@ class DnsController extends Controller
 {
     public function __construct(private DnsService $dns, private DnsPropagationService $propagation) {}
 
+    public function providers(Request $request): JsonResponse
+    {
+        $this->authorize('dns.read');
+
+        return response()->json(['data' => $this->dns->providers()]);
+    }
+
+    public function activeProvider(Request $request): JsonResponse
+    {
+        $this->authorize('dns.read');
+
+        return response()->json(['data' => $this->dns->activeProvider()]);
+    }
+
+    public function setProvider(Request $request): JsonResponse
+    {
+        $this->authorize('dns.manage');
+
+        $validated = $request->validate(['name' => ['required', 'string', 'max:32']]);
+
+        return response()->json(['data' => $this->dns->setProvider($validated['name'])]);
+    }
+
     public function index(Request $request, string $domain): JsonResponse
     {
         $this->authorize('dns.read');

@@ -33,6 +33,7 @@
   MFA enforcement policy, session management, SSL/certificate monitoring,
   backup status).
 - **Phase 8 — Cloud: IMPLEMENTED** (VPS via `ServerProviderInterface` — sandbox/Hetzner/DO/custom —, clés SSH + coffre, métriques SSE + historique, alertes de seuil, snapshots planifiés avec rétention, validation de tokens).
+- **Cross-cutting — Providers/Perks/Multi-tenant: IMPLEMENTED** (dynamic per-organization provider switching via `ResolvesTenantProvider` across storage/sites/cloud/domains/DNS/SSL, SSL issuance abstraction behind `SslProviderInterface` with sandbox + Cloudflare, plan-tier feature flags/perks enforced by `feature:` middleware + `useFeatures`, and atomic `OrganizationService` provisioning). See `docs/architecture-providers.md`.
 - **Phase 9 — Marketing & Commercial Website: PLANNED** (site public vitrine, pages services, tarifs, preuve sociale, SEO, analytics, CTA).
 - **Phase 10+ — Deploy, Mail, AI, Automate, Marketplace, Scale, Launch: PLANNED.**
 
@@ -173,6 +174,16 @@ stream, and a React UI (domains list + search/register + domain detail with
 DNS records/history/rollback/import/export). **Remaining:** DNSSEC, propagation
 monitoring, and a real registrar provider.
 
+**Cloudflare DNS provider (shipped):** `CloudflareDnsProvider` behind
+`DnsProviderInterface` (config `cloudflare.php`, `OMNEX_DNS_PROVIDER=cloudflare`
++ `CLOUDFLARE_API_TOKEN`). Real v4 API for zone create/delete (with account
+id), record CRUD with per-record CDN proxying (A/AAAA/CNAME) and MX priority,
+idempotent zone/record reuse, and DNSSEC enable/disable returning the DS
+record (key tag / algorithm / digest type / digest; also parses Cloudflare's
+space-separated `ds` string). Auth and API errors raise
+`DomainProviderException`; 14 Pest tests with fake HTTP. Surfaced on the
+Domains marketing page (EN/FR).
+
 ---
 
 ## Phase 4 — OMNEX Storage (Drive)
@@ -190,6 +201,18 @@ bar with used/limit), a **cumulative usage timeline** (`GET /storage/usage-histo
 — daily buckets over the last 30 days, newest last, from the version history)
 and a **files-by-type distribution donut** (image/media/text/document/archive/other
 by MIME category).
+
+**Delivered:** `StorageProviderInterface` with sandbox + **S3-compatible
+SigV4 engine** (`S3StorageProvider`, no SDK dependency) and an explicit
+**`R2StorageProvider`** (Cloudflare R2, subclass of the SigV4 engine:
+account-scoped endpoint auto-derived from `CLOUDFLARE_ACCOUNT_ID` —
+`https://{account}.r2.cloudflarestorage.com` — region `auto`, R2 API token
+credentials). Activated via `OMNEX_STORAGE_PROVIDER=s3|r2` +
+`OMNEX_STORAGE_S3_*` / `OMNEX_STORAGE_R2_*` env vars; sandbox stays the
+default. Same interface for MinIO / OVH Object Storage (just another
+endpoint+credentials). Unit tests cover R2 config detection, endpoint
+derivation, explicit-endpoint override and SigV4-signed URLs; the providers
+API lists sandbox / s3 / r2.
 
 **DoD:** swap between two storage providers without changing drive code;
 cross-tenant namespace tests green; versioning + trash restore tested.
@@ -213,7 +236,24 @@ with a deployment-status donut (healthy / failed / rolled back /
 provisioning), animated KPI chips, per-site **health bars** and a
 **deployment timeline** on the detail page (vertical colored timeline with a
 "Current" badge) plus a **deployments-by-status stacked bar** (live / failed /
-rolled back). **Remaining:** real hosting providers (Vercel, Netlify,
+rolled back). **Cloudflare Pages provider (shipped):** `CloudflareSiteProvider` behind
+`SiteProviderInterface` (config `cloudflare.php` → `sites`, `OMNEX_SITE_PROVIDER=cloudflare`
++ `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`). Real v4 API: Pages
+project creation (`POST .../pages/projects`, production branch from the Git
+branch), deploy via build trigger (`POST .../deployments`, deployment id as
+the revision since Pages exposes no git SHA), rollback via deployment retry
+(`POST .../deployments/{id}/retry`), project delete. **Preview:** every
+Pages deployment carries its own preview URL + aliases — `SiteProviderInterface::preview()`
+resolves them (`GET .../deployments/{id}`, fallback to the project subdomain),
+persisted as `site_deployments.preview_url` and surfaced as an "Open preview"
+action on each live deployment in the Sites cockpit (sandbox returns a
+deterministic `{sha}.{slug}.preview.omnex-sites.test` URL, custom proxies a
+`preview` command to the gateway). Deploy failures raise
+`SiteDeployFailedException` (automatic rollback path), other errors
+`SiteProviderException`; 11 Pest tests with fake HTTP. Surfaced on the Sites
+marketing page (EN/FR).
+
+**Remaining:** real hosting providers (Vercel, Netlify,
 Forge…), Git webhooks/auto-deploy, SSL/CDN/cache, backups.
 
 ---
@@ -346,8 +386,32 @@ per-locale JSON sections (`hero`, `offer`, `promo`, `comparison`, `features`,
 SEO meta, `hreflang` and `Product`/`BreadcrumbList` JSON-LD. Backed by a
 Laravel CMS (`landing_pages` table, public show gated to published, owner-only
 management API) and managed from the app at `/campaigns` (list, editor,
-publish/unpublish, delete). Remaining: blog/content hub, remarketing pixels +
-A/B testing harness.
+publish/unpublish, delete).
+
+**Blog / content hub (shipped):** typed bilingual content model
+(`blogPosts.ts` — shared metadata + full en/fr body, guides / news / case
+studies categories, tags, authors, ISO dates), a hub at `/blog` (category
+filter pills, featured post, post cards with date + reading time) and article
+pages at `/blog/{slug}` (intro, sections, lists, tags, related posts, CTA
+band). SEO: unique meta + canonical per post, `Article` + `BreadcrumbList`
+JSON-LD, `ItemList` on the hub, EN/FR hreflang, `estimateReadMinutes` (200
+wpm), timezone-safe `formatBlogDate`; `/blog` + post URLs added to
+`sitemap.xml`; nav + footer links with `marketing.nav.blog`. Six seed posts
+(bilingual, including a Serveurs du Peuple case study); 6 unit tests on data
+integrity (unique slugs, bilingual completeness, sorting, related posts).
+**A/B testing harness (shipped):** `lib/ab.ts` — experiment registry
+(`hero` message, `cta` label, `pricing` emphasis — weights 60/20/20 etc.,
+control-first), deterministic sticky bucketing per device (FNV-1a over the
+device id, persisted in localStorage), URL overrides (`?ab_hero=…`),
+`experiment_viewed` exposure events (once per assignment, with UTM
+attribution), conversion properties augmented with `ab_<experiment>` via
+`abProperties()`, and an operator panel (`?ab_debug=1`) that forces variants
+live — the page re-renders via the `omnex:ab` bus. Live on the homepage:
+hero title/subtitle variants, hero CTA label variants, and Free vs Pro pricing
+highlight experiment. 8 unit tests (sticky, deterministic, weights,
+overrides, exposure dedupe, conversion props).
+Remaining: remarketing pixels (P2), CMS-ification of posts to move content
+out of code when editorial volume grows.
 
 **Placement:** Phase 9 deliberately sits right after the core product is solid
 (Phase 8) and before the deep platform phases (Deploy, Mail, AI…), because the

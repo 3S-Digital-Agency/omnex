@@ -5,17 +5,17 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\ResolvesOrganizations;
 use App\Http\Resources\MembershipResource;
 use App\Http\Resources\OrganizationResource;
-use App\Models\Membership;
 use App\Models\Organization;
-use App\Models\Role;
 use App\Support\Audit\AuditLogger;
+use App\Support\Organizations\OrganizationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class OrganizationController extends Controller
 {
     use ResolvesOrganizations;
+
+    public function __construct(private OrganizationService $organizations) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -35,27 +35,7 @@ class OrganizationController extends Controller
             'name' => ['required', 'string', 'max:255'],
         ]);
 
-        $organization = DB::transaction(function () use ($request, $data) {
-            $organization = Organization::create([
-                'name' => $data['name'],
-                'plan_tier' => 'free',
-                'status' => 'active',
-            ]);
-
-            Membership::create([
-                'organization_id' => $organization->id,
-                'user_id' => $request->user()->id,
-                'role_id' => Role::where('key', 'owner')->firstOrFail()->id,
-                'status' => 'active',
-                'joined_at' => now(),
-            ]);
-
-            return $organization;
-        });
-
-        AuditLogger::record('organization.created', 'organization', $organization->id, null, [
-            'name' => $organization->name,
-        ]);
+        $organization = $this->organizations->create($request->user(), $data['name']);
 
         return response()->json(new OrganizationResource($organization), 201);
     }

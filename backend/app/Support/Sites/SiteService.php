@@ -6,6 +6,7 @@ use App\Contracts\SiteProviderInterface;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Support\Audit\AuditLogger;
+use App\Support\Providers\ResolvesTenantProvider;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -17,7 +18,19 @@ use Illuminate\Validation\ValidationException;
  */
 final class SiteService
 {
+    use ResolvesTenantProvider;
+
     public function __construct(private SiteProviderRegistry $providers) {}
+
+    protected function providerConfigKey(): string
+    {
+        return 'omnex.sites.provider';
+    }
+
+    protected function providerSettingsKey(): string
+    {
+        return 'site_provider';
+    }
 
     /**
      * @return array<int, array{name: string, label: string, configured: bool}>
@@ -29,7 +42,7 @@ final class SiteService
 
     private function provider(?string $name = null): SiteProviderInterface
     {
-        $provider = $this->providers->get($name ?? $this->providers->get()->name());
+        $provider = $this->providers->get($name ?? $this->activeProviderName());
 
         if (! $provider->isConfigured()) {
             throw new SiteProviderException("The [{$provider->label()}] sites provider is not configured.");
@@ -205,6 +218,28 @@ final class SiteService
         ]);
 
         return $target->fresh();
+    }
+
+    /**
+     * Resolve the provider preview URL for a deployment and persist it on the
+     * deployment record so the UI can show it without a second call.
+     *
+     * @return array{url: string, aliases: array<int, string>}
+     */
+    public function preview(Site $site, SiteDeployment $deployment): array
+    {
+        $this->provider($site->provider);
+
+        $result = $this->provider($site->provider)->preview(
+            $site->provider_site_id ?? '',
+            $deployment->commit_sha ?? $deployment->id,
+        );
+
+        if (($result['url'] ?? '') !== '') {
+            $deployment->update(['preview_url' => $result['url']]);
+        }
+
+        return $result;
     }
 
     public function delete(Site $site): void

@@ -11,6 +11,7 @@ use App\Models\ServerSnapshot;
 use App\Models\SshKey;
 use App\Support\Audit\AuditLogger;
 use App\Support\Notifications\NotificationService;
+use App\Support\Providers\ResolvesTenantProvider;
 use Closure;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
@@ -23,7 +24,19 @@ use Illuminate\Validation\ValidationException;
  */
 final class ServerService
 {
+    use ResolvesTenantProvider;
+
     public function __construct(private ServerProviderRegistry $providers) {}
+
+    protected function providerConfigKey(): string
+    {
+        return 'omnex.cloud.provider';
+    }
+
+    protected function providerSettingsKey(): string
+    {
+        return 'cloud_provider';
+    }
 
     /**
      * @return array<int, array{name: string, label: string, configured: bool}>
@@ -35,7 +48,7 @@ final class ServerService
 
     private function provider(?string $name = null): ServerProviderInterface
     {
-        $provider = $this->providers->get($name ?? $this->providers->get()->name());
+        $provider = $this->providers->get($name ?? $this->activeProviderName());
 
         if (! $provider->isConfigured()) {
             throw new ServerProviderException("The [{$provider->label()}] cloud provider is not configured.");

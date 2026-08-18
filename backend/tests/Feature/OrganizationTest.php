@@ -26,6 +26,25 @@ it('creates an organization and assigns the owner role', function () {
     expect($membership->role->key)->toBe('owner');
 });
 
+it('provisions a new organization with a fully configured environment', function () {
+    $user = User::factory()->create();
+    Sanctum::actingAs($user);
+
+    $response = $this->postJson('/api/v1/organizations', ['name' => 'Provisioned Inc']);
+
+    $response->assertStatus(201);
+
+    $organization = Organization::findOrFail($response->json('id'));
+
+    // Every provider brick is assigned (sandbox default) and perks start from
+    // plan-tier defaults with no overrides — the tenant is immediately usable.
+    expect($organization->settings)->toHaveKeys([
+        'storage_provider', 'site_provider', 'cloud_provider',
+        'domain_provider', 'dns_provider', 'ssl_provider', 'features',
+    ]);
+    expect($organization->settings['features'])->toBe([]);
+});
+
 it('lists only the organizations the user belongs to', function () {
     $userA = User::factory()->create();
     $userB = User::factory()->create();

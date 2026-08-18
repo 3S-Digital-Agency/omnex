@@ -19,6 +19,7 @@ class SiteDeployment extends Model
         'commit_sha',
         'status',
         'url',
+        'preview_url',
         'logs',
         'deployed_at',
     ];

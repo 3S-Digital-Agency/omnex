@@ -66,6 +66,16 @@ final class SandboxSiteProvider implements SiteProviderInterface
         return ['url' => 'https://'.Str::slug($providerSiteId).'.omnex-sites.test'];
     }
 
+    public function preview(string $providerSiteId, string $commitSha): array
+    {
+        $slug = Str::slug($providerSiteId);
+
+        return [
+            'url' => 'https://'.$commitSha.'.'.$slug.'.omnex-sites.test',
+            'aliases' => ['https://'.$slug.'.preview.omnex-sites.test'],
+        ];
+    }
+
     public function delete(string $providerSiteId): void
     {
         // Nothing to tear down in the in-memory sandbox.

@@ -27,6 +27,22 @@ class ServerController extends Controller
         return response()->json(['data' => $this->servers->providers()]);
     }
 
+    public function activeProvider(Request $request): JsonResponse
+    {
+        $this->authorize('cloud.read');
+
+        return response()->json(['data' => $this->servers->activeProvider()]);
+    }
+
+    public function setProvider(Request $request): JsonResponse
+    {
+        $this->authorize('cloud.manage');
+
+        $validated = $request->validate(['name' => ['required', 'string', 'max:32']]);
+
+        return response()->json(['data' => $this->servers->setProvider($validated['name'])]);
+    }
+
     /**
      * Live verification of every configured provider (or one named provider)
      * — read-only authenticated calls, nothing is provisioned or billed.

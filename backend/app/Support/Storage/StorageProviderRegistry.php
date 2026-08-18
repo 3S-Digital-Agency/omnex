@@ -3,6 +3,7 @@
 namespace App\Support\Storage;
 
 use App\Contracts\StorageProviderInterface;
+use App\Support\Storage\Providers\R2StorageProvider;
 use App\Support\Storage\Providers\S3StorageProvider;
 use App\Support\Storage\Providers\SandboxStorageProvider;
 use InvalidArgumentException;
@@ -16,6 +17,7 @@ final class StorageProviderRegistry
     {
         $this->register(new SandboxStorageProvider);
         $this->register(new S3StorageProvider);
+        $this->register(new R2StorageProvider);
     }
 
     public function register(StorageProviderInterface $provider): void

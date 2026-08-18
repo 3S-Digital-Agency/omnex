@@ -15,7 +15,7 @@ use Psr\Http\Message\ResponseInterface;
  * Objects are addressed path-style: {endpoint}/{bucket}/{key}, which every
  * S3-compatible backend supports.
  */
-final class S3StorageProvider implements StorageProviderInterface
+class S3StorageProvider implements StorageProviderInterface
 {
     private ?Client $client = null;
 
@@ -44,7 +44,7 @@ final class S3StorageProvider implements StorageProviderInterface
         ]);
 
         if ($response->getStatusCode() >= 300) {
-            throw new StorageProviderException("S3 PUT failed ({$response->getStatusCode()}).");
+            throw new StorageProviderException("{$this->displayName()} PUT failed ({$response->getStatusCode()}).");
         }
 
         return [
@@ -62,7 +62,7 @@ final class S3StorageProvider implements StorageProviderInterface
         }
 
         if ($response->getStatusCode() >= 300) {
-            throw new StorageProviderException("S3 GET failed ({$response->getStatusCode()}).");
+            throw new StorageProviderException("{$this->displayName()} GET failed ({$response->getStatusCode()}).");
         }
 
         return (string) $response->getBody();
@@ -73,7 +73,7 @@ final class S3StorageProvider implements StorageProviderInterface
         $response = $this->send('DELETE', $key);
 
         if ($response->getStatusCode() >= 300 && $response->getStatusCode() !== 404) {
-            throw new StorageProviderException("S3 DELETE failed ({$response->getStatusCode()}).");
+            throw new StorageProviderException("{$this->displayName()} DELETE failed ({$response->getStatusCode()}).");
         }
     }
 
@@ -97,9 +97,17 @@ final class S3StorageProvider implements StorageProviderInterface
     }
 
     /**
+     * Short name used in error messages, overridable by subclasses.
+     */
+    protected function displayName(): string
+    {
+        return 'S3';
+    }
+
+    /**
      * @return array{endpoint: string, region: string, bucket: string, key: string, secret: string}
      */
-    private function config(): array
+    protected function config(): array
     {
         return [
             'endpoint' => rtrim((string) config('omnex.storage.s3.endpoint'), '/'),
@@ -176,7 +184,7 @@ final class S3StorageProvider implements StorageProviderInterface
                 'body' => $options['body'] ?? null,
             ]);
         } catch (\Throwable $e) {
-            throw new StorageProviderException('S3 request failed: '.$e->getMessage(), 0, $e);
+            throw new StorageProviderException("{$this->displayName()} request failed: ".$e->getMessage(), 0, $e);
         }
     }
 

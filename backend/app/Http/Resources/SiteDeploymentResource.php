@@ -16,6 +16,7 @@ class SiteDeploymentResource extends JsonResource
             'commit_sha' => $this->commit_sha,
             'status' => $this->status,
             'url' => $this->url,
+            'preview_url' => $this->preview_url,
             'logs' => $this->logs,
             'deployed_at' => $this->deployed_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
