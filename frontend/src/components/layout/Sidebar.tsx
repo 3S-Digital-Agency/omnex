@@ -17,6 +17,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
 import { brand } from '../../lib/brand';
+import { useFeatures } from '../../lib/features';
 import { useI18n } from '../../lib/i18n';
 import { cn, initials } from '../../lib/utils';
 
@@ -24,6 +25,8 @@ interface NavItem {
   to: string;
   labelKey: string;
   icon: LucideIcon;
+  /** Feature-flag key gating this nav entry (omitted = always visible). */
+  feature?: string;
 }
 
 interface NavSection {
@@ -42,18 +45,18 @@ const sections: NavSection[] = [
   {
     labelKey: 'nav.services',
     items: [
-      { to: '/domains', labelKey: 'nav.domains', icon: Globe },
-      { to: '/sites', labelKey: 'nav.sites', icon: LayoutTemplate },
-      { to: '/cloud', labelKey: 'nav.cloud', icon: Server },
-      { to: '/storage', labelKey: 'nav.storage', icon: HardDrive },
-      { to: '/billing', labelKey: 'nav.billing', icon: CreditCard },
+      { to: '/domains', labelKey: 'nav.domains', icon: Globe, feature: 'domains' },
+      { to: '/sites', labelKey: 'nav.sites', icon: LayoutTemplate, feature: 'sites' },
+      { to: '/cloud', labelKey: 'nav.cloud', icon: Server, feature: 'cloud' },
+      { to: '/storage', labelKey: 'nav.storage', icon: HardDrive, feature: 'drive' },
+      { to: '/billing', labelKey: 'nav.billing', icon: CreditCard, feature: 'billing' },
       { to: '/campaigns', labelKey: 'nav.campaigns', icon: Megaphone },
     ],
   },
   {
     labelKey: 'nav.system',
     items: [
-      { to: '/security', labelKey: 'nav.security', icon: ShieldCheck },
+      { to: '/security', labelKey: 'nav.security', icon: ShieldCheck, feature: 'security' },
       { to: '/members', labelKey: 'nav.members', icon: Users },
       { to: '/audit', labelKey: 'nav.audit', icon: ScrollText },
       { to: '/settings', labelKey: 'nav.settings', icon: Settings },
@@ -64,6 +67,9 @@ const sections: NavSection[] = [
 export function Sidebar() {
   const { user } = useAuth();
   const { t } = useI18n();
+  const { enabled, isLoading } = useFeatures();
+
+  const visible = (item: NavItem): boolean => !item.feature || isLoading || enabled(item.feature);
 
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-edge bg-panel">
@@ -85,7 +91,7 @@ export function Sidebar() {
               {t(section.labelKey)}
             </div>
             <div className="space-y-0.5">
-              {section.items.map((item) => (
+              {section.items.filter(visible).map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}

@@ -4,6 +4,7 @@ import type { FormEvent } from 'react';
 import {
   ArrowLeft,
   ExternalLink,
+  Eye,
   GitBranch,
   LayoutTemplate,
   Plus,
@@ -371,6 +372,15 @@ function SiteDetail({
     onError: (err) => toast(errorMessage(err), 'error'),
   });
 
+  const preview = useMutation({
+    mutationFn: (deploymentId: string) => api.previewDeployment(site.id, deploymentId),
+    onSuccess: (preview) => {
+      window.open(preview.url, '_blank', 'noopener,noreferrer');
+      toast(t('toast.sites.previewOpened'));
+    },
+    onError: (err) => toast(errorMessage(err), 'error'),
+  });
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <header className="flex items-center justify-between">
@@ -477,6 +487,17 @@ function SiteDetail({
                           {deployment.url ? (
                             <Button size="sm" variant="ghost" title={t('sites.open')} onClick={() => window.open(deployment.url!, '_blank', 'noopener,noreferrer')}>
                               <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          ) : null}
+                          {deployment.status === 'live' ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              title={t('sites.preview')}
+                              loading={preview.isPending && preview.variables === deployment.id}
+                              onClick={() => preview.mutate(deployment.id)}
+                            >
+                              <Eye className="h-4 w-4" />
                             </Button>
                           ) : null}
                           {deployment.logs ? (

@@ -25,6 +25,8 @@ import { ModulePage } from './features/modules/ModulePage';
 import { MarketingLayout } from './features/marketing/MarketingLayout';
 import { MarketingHomePage } from './features/marketing/MarketingHomePage';
 import { MarketingServicePage } from './features/marketing/MarketingServicePage';
+import { BlogPage } from './features/marketing/BlogPage';
+import { BlogPostPage } from './features/marketing/BlogPostPage';
 import { ContactPage } from './features/marketing/ContactPage';
 import { LandingPageRoute } from './features/marketing/LandingPageRoute';
 import { LandingPagesPage } from './features/marketing/LandingPagesPage';
@@ -76,6 +78,22 @@ export function App() {
         element={
           <MarketingLayout>
             <MarketingServicePage />
+          </MarketingLayout>
+        }
+      />
+      <Route
+        path="/blog"
+        element={
+          <MarketingLayout>
+            <BlogPage />
+          </MarketingLayout>
+        }
+      />
+      <Route
+        path="/blog/:slug"
+        element={
+          <MarketingLayout>
+            <BlogPostPage />
           </MarketingLayout>
         }
       />

@@ -18,6 +18,7 @@ import type {
   CreditEntryDto,
   CreditSummaryDto,
   DnsHistoryDto,
+  FeatureFlagDto,
   DnsRecordDto,
   DnsRecordInput,
   DnssecStatus,
@@ -86,6 +87,7 @@ import type {
   SshKeyUpdateInput,
   SiteCreateInput,
   SiteDeploymentDto,
+  SitePreviewDto,
   SiteDto,
   SiteProviderDto,
   SiteUpdateInput,
@@ -607,6 +609,39 @@ export class HttpApiClient implements ApiClient {
     return res.data;
   }
 
+  async getStorageProvider(): Promise<StorageProviderDto> {
+    const res = await this.request<{ data: StorageProviderDto }>('/storage/provider');
+    return res.data;
+  }
+
+  async setStorageProvider(name: string): Promise<StorageProviderDto> {
+    const res = await this.request<{ data: StorageProviderDto }>('/storage/provider', {
+      method: 'PATCH',
+      body: { name },
+    });
+    return res.data;
+  }
+
+  async getFeatures(): Promise<FeatureFlagDto[]> {
+    const res = await this.request<{ data: FeatureFlagDto[] }>('/features');
+    return res.data;
+  }
+
+  async setFeatureOverride(flag: string, value: boolean | number): Promise<FeatureFlagDto> {
+    const res = await this.request<{ data: FeatureFlagDto }>(`/features/${flag}`, {
+      method: 'PATCH',
+      body: { value },
+    });
+    return res.data;
+  }
+
+  async resetFeatureOverride(flag: string): Promise<FeatureFlagDto> {
+    const res = await this.request<{ data: FeatureFlagDto }>(`/features/${flag}/override`, {
+      method: 'DELETE',
+    });
+    return res.data;
+  }
+
   listDrive(folderId?: string): Promise<DriveListing> {
     return this.request(folderId ? `/storage/folders/${folderId}` : '/storage');
   }
@@ -807,6 +842,10 @@ export class HttpApiClient implements ApiClient {
 
   rollbackSite(siteId: string, deploymentId: string): Promise<SiteDeploymentDto> {
     return this.request(`/sites/${siteId}/deployments/${deploymentId}/rollback`, { method: 'POST' });
+  }
+
+  previewDeployment(siteId: string, deploymentId: string): Promise<SitePreviewDto> {
+    return this.request(`/sites/${siteId}/deployments/${deploymentId}/preview`);
   }
 
   async listCloudProviders(): Promise<CloudProviderDto[]> {

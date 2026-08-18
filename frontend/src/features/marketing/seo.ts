@@ -145,3 +145,71 @@ export function breadcrumbJsonLd(serviceId: string, serviceName: string) {
     ],
   };
 }
+
+/** Blog index — ItemList with the newest posts for the hub page. */
+export function blogListJsonLd(posts: { slug: string; title: string; date: string }[]) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'OMNEX Blog',
+    numberOfItems: posts.length,
+    itemListElement: posts.map((post, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      url: `${BASE_URL}/blog/${post.slug}`,
+      name: post.title,
+    })),
+  };
+}
+
+/** Article — structured data for a blog post (rich results + knowledge graph). */
+export function articleJsonLd(opts: {
+  slug: string;
+  title: string;
+  description: string;
+  datePublished: string;
+  dateModified?: string;
+  authorName: string;
+  authorRole?: string;
+  tags: string[];
+  locale: string;
+}) {
+  const { slug, title, description, datePublished, dateModified, authorName, authorRole, tags, locale } = opts;
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: title,
+    description,
+    url: `${BASE_URL}/blog/${slug}`,
+    mainEntityOfPage: `${BASE_URL}/blog/${slug}`,
+    datePublished,
+    ...(dateModified ? { dateModified } : {}),
+    inLanguage: locale === 'fr' ? 'fr-CA' : 'en-US',
+    image: `${BASE_URL}/logo.png`,
+    keywords: tags.join(', '),
+    author: {
+      '@type': 'Person',
+      name: authorName,
+      ...(authorRole ? { jobTitle: authorRole } : {}),
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'OMNEX',
+      url: BASE_URL,
+      logo: { '@type': 'ImageObject', url: `${BASE_URL}/logo.png` },
+    },
+  };
+}
+
+/** BreadcrumbList for blog article pages. */
+export function blogBreadcrumbJsonLd(slug: string, title: string) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: BASE_URL },
+      { '@type': 'ListItem', position: 2, name: 'Blog', item: `${BASE_URL}/blog` },
+      { '@type': 'ListItem', position: 3, name: title, item: `${BASE_URL}/blog/${slug}` },
+    ],
+  };
+}

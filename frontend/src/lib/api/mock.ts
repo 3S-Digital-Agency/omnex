@@ -35,6 +35,7 @@ import type {
   DriveListing,
   DriveUsageHistoryDto,
   DriveVersionDto,
+  FeatureFlagDto,
   InvitationDto,
   BillingCostBreakdownDto,
   InvoiceDto,
@@ -83,6 +84,7 @@ import type {
   SshKeyUpdateInput,
   SiteCreateInput,
   SiteDeploymentDto,
+  SitePreviewDto,
   SiteDto,
   SiteProviderDto,
   SiteUpdateInput,
@@ -1055,6 +1057,7 @@ function billingPlanById(id: string): BillingPlanDto {
 const SITE_PROVIDERS: SiteProviderDto[] = [
   { name: 'sandbox', label: 'Sandbox', configured: true },
   { name: 'custom', label: 'Custom', configured: false },
+  { name: 'cloudflare', label: 'Cloudflare Pages', configured: false },
 ];
 
 const sites: SiteDto[] = [
@@ -1181,7 +1184,62 @@ const mockProviderTokens: Record<string, boolean> = {
   hetzner: false,
   digitalocean: false,
   custom: false,
+  cloudflare: false,
 };
+
+/** Active storage provider for the demo organization (mirrors the org settings). */
+let mockStorageProvider = 'sandbox';
+
+interface MockFeatureDef {
+  label: string;
+  type: 'boolean' | 'number';
+  default: boolean | number;
+  tiers: Record<string, boolean | number>;
+}
+
+// Mirrors config/omnex.php `features` (kept in sync by hand for the demo).
+const MOCK_FEATURES: Record<string, MockFeatureDef> = {
+  domains: { label: 'Domains & DNS', type: 'boolean', default: true, tiers: { free: true, starter: true, pro: true, business: true } },
+  dnssec: { label: 'DNSSEC', type: 'boolean', default: false, tiers: { free: false, starter: true, pro: true, business: true } },
+  ssl: { label: 'TLS certificates', type: 'boolean', default: false, tiers: { free: false, starter: true, pro: true, business: true } },
+  drive: { label: 'OMNEX Drive', type: 'boolean', default: true, tiers: { free: true, starter: true, pro: true, business: true } },
+  sites: { label: 'Sites', type: 'boolean', default: false, tiers: { free: false, starter: true, pro: true, business: true } },
+  cloud: { label: 'Cloud servers', type: 'boolean', default: false, tiers: { free: false, starter: false, pro: true, business: true } },
+  security: { label: 'Security Center', type: 'boolean', default: true, tiers: { free: true, starter: true, pro: true, business: true } },
+  billing: { label: 'Billing', type: 'boolean', default: true, tiers: { free: true, starter: true, pro: true, business: true } },
+  snapshots: { label: 'Server snapshots', type: 'boolean', default: false, tiers: { free: false, starter: false, pro: true, business: true } },
+  passkeys: { label: 'Passkeys / WebAuthn', type: 'boolean', default: true, tiers: { free: true, starter: true, pro: true, business: true } },
+  real_providers: { label: 'Live providers', type: 'boolean', default: false, tiers: { free: false, starter: false, pro: true, business: true } },
+  storage_quota_bytes: { label: 'Storage quota', type: 'number', default: 1073741824, tiers: { free: 1073741824, starter: 26843545600, pro: 268435456000, business: 0 } },
+  domain_limit: { label: 'Domain limit', type: 'number', default: 1, tiers: { free: 1, starter: 10, pro: 0, business: 0 } },
+  member_limit: { label: 'Member limit', type: 'number', default: 1, tiers: { free: 1, starter: 5, pro: 0, business: 0 } },
+  server_limit: { label: 'Server limit', type: 'number', default: 0, tiers: { free: 0, starter: 3, pro: 0, business: 0 } },
+  site_limit: { label: 'Site limit', type: 'number', default: 0, tiers: { free: 0, starter: 3, pro: 0, business: 0 } },
+};
+
+const mockFeatureOverrides: Record<string, boolean | number> = {};
+
+export function resetMockFeatureOverrides(): void {
+  for (const key of Object.keys(mockFeatureOverrides)) delete mockFeatureOverrides[key];
+}
+
+function mockFeatureFlags(tier: string): FeatureFlagDto[] {
+  return Object.entries(MOCK_FEATURES).map(([key, def]) => {
+    const overridden = Object.prototype.hasOwnProperty.call(mockFeatureOverrides, key);
+    const inTier = Object.prototype.hasOwnProperty.call(def.tiers, tier);
+    const raw = overridden ? mockFeatureOverrides[key] : inTier ? def.tiers[tier] : def.default;
+    const value = def.type === 'number' ? Number(raw) : Boolean(raw);
+
+    return {
+      key,
+      label: def.label,
+      type: def.type,
+      value,
+      enabled: Boolean(value),
+      source: overridden ? 'override' : inTier ? 'plan' : 'default',
+    };
+  });
+}
 
 export function setMockProviderConfigured(provider: string, configured: boolean): void {
   mockProviderTokens[provider] = configured;
@@ -2900,9 +2958,48 @@ export class MockApiClient implements ApiClient {
   async listStorageProviders(): Promise<StorageProviderDto[]> {
     requireUser();
     return Promise.resolve([
-      { name: 'sandbox', label: 'Sandbox', configured: true },
-      { name: 's3', label: 'S3', configured: false },
+      { name: 'sandbox', label: 'Sandbox', configured: true, active: mockStorageProvider === 'sandbox' },
+      { name: 's3', label: 'S3', configured: false, active: mockStorageProvider === 's3' },
+      { name: 'r2', label: 'Cloudflare R2', configured: mockProviderTokens.cloudflare, active: mockStorageProvider === 'r2' },
     ]);
+  }
+
+  async getStorageProvider(): Promise<StorageProviderDto> {
+    requireUser();
+    const providers = await this.listStorageProviders();
+    return Promise.resolve(providers.find((p) => p.name === mockStorageProvider) ?? providers[0]);
+  }
+
+  async setStorageProvider(name: string): Promise<StorageProviderDto> {
+    requireUser();
+    const providers = await this.listStorageProviders();
+    const provider = providers.find((p) => p.name === name);
+    if (!provider) throw new ApiError(422, 'Validation failed', undefined, { name: [`Unknown storage provider [${name}].`] });
+    mockStorageProvider = provider.name;
+    return Promise.resolve({ ...provider, active: true });
+  }
+
+  async getFeatures(): Promise<FeatureFlagDto[]> {
+    requireUser();
+    const tier = activeOrganization()?.plan_tier ?? 'free';
+    return Promise.resolve(mockFeatureFlags(tier));
+  }
+
+  async setFeatureOverride(flag: string, value: boolean | number): Promise<FeatureFlagDto> {
+    requireUser();
+    const def = MOCK_FEATURES[flag];
+    if (!def) throw new ApiError(422, 'Validation failed', undefined, { feature: [`Unknown feature flag [${flag}].`] });
+    mockFeatureOverrides[flag] = def.type === 'number' ? Number(value) : Boolean(value);
+    const tier = activeOrganization()?.plan_tier ?? 'free';
+    return Promise.resolve(mockFeatureFlags(tier).find((f) => f.key === flag)!);
+  }
+
+  async resetFeatureOverride(flag: string): Promise<FeatureFlagDto> {
+    requireUser();
+    if (!MOCK_FEATURES[flag]) throw new ApiError(422, 'Validation failed', undefined, { feature: [`Unknown feature flag [${flag}].`] });
+    delete mockFeatureOverrides[flag];
+    const tier = activeOrganization()?.plan_tier ?? 'free';
+    return Promise.resolve(mockFeatureFlags(tier).find((f) => f.key === flag)!);
   }
 
   async listDrive(folderId?: string): Promise<DriveListing> {
@@ -3231,6 +3328,8 @@ export class MockApiClient implements ApiClient {
 
     const provider = input.provider ?? 'sandbox';
     if (provider === 'custom') throw new ApiError(422, 'Validation failed', undefined, { provider: ['The Custom provider is not configured.'] });
+    if (provider === 'cloudflare' && !mockProviderTokens.cloudflare)
+      throw new ApiError(422, 'Validation failed', undefined, { provider: ['The Cloudflare Pages provider is not configured.'] });
 
     const site: SiteDto = {
       id: uid('site'),
@@ -3240,7 +3339,7 @@ export class MockApiClient implements ApiClient {
       git_branch: input.git_branch ?? 'main',
       provider,
       status: 'provisioning',
-      url: sandboxSiteUrl(input.name),
+      url: provider === 'cloudflare' ? `https://${input.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}.pages.dev` : sandboxSiteUrl(input.name),
       current_deployment_id: null,
       environment_variable_keys: Object.keys(input.environment_variables ?? {}),
       deployments_count: 0,
@@ -3294,16 +3393,20 @@ export class MockApiClient implements ApiClient {
     const number = siteDeploymentsOf(siteId).length + 1;
     const failed = site.git_branch === 'fail';
 
+    const liveUrl = site.provider === 'cloudflare' ? `https://${site.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}.pages.dev` : sandboxSiteUrl(site.name);
+
+    const sha = sandboxCommitSha(site.git_url, site.git_branch);
     const deployment: SiteDeploymentDto = {
       id: uid('site-dep'),
       site_id: siteId,
       number,
-      commit_sha: failed ? null : sandboxCommitSha(site.git_url, site.git_branch),
+      commit_sha: failed ? null : sha,
       status: failed ? 'failed' : 'live',
-      url: failed ? null : sandboxSiteUrl(site.name),
+      url: failed ? null : liveUrl,
+      preview_url: failed ? null : `https://${sha}.${site.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}.preview.omnex-sites.test`,
       logs: failed
         ? '[omnex-sites] ERROR: build script exited with code 1'
-        : `[omnex-sites] deploy succeeded @ ${sandboxCommitSha(site.git_url, site.git_branch)}`,
+        : `[omnex-sites] deploy succeeded @ ${sha}`,
       deployed_at: failed ? null : nowIso(),
       created_at: nowIso(),
       updated_at: nowIso(),
@@ -3312,7 +3415,7 @@ export class MockApiClient implements ApiClient {
 
     if (!failed) {
       site.status = 'ready';
-      site.url = sandboxSiteUrl(site.name);
+      site.url = liveUrl;
       site.current_deployment_id = deployment.id;
       pushNotification('deployment', 'success', 'Deployment completed', `${site.name} is live.`, '/sites');
       addActivityEvent({ type: 'deployment', severity: 'success', title: 'Deployment completed', description: `${site.name} is live`, actor: 'Demo Owner' });
@@ -3324,6 +3427,23 @@ export class MockApiClient implements ApiClient {
     site.updated_at = nowIso();
 
     return Promise.resolve({ ...deployment });
+  }
+
+  async previewDeployment(siteId: string, deploymentId: string): Promise<SitePreviewDto> {
+    requireUser();
+    const deployment = siteDeployments.find((d) => d.site_id === siteId && d.id === deploymentId);
+    if (!deployment) throw new ApiError(404, 'Not found', 'Deployment not found.');
+    if (deployment.status !== 'live') {
+      throw new ApiError(422, 'Validation failed', undefined, { deployment: ['Only a live deployment has a preview.'] });
+    }
+
+    const slug = (siteById(siteId).name ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const url = deployment.preview_url ?? `https://${deployment.commit_sha ?? deployment.id}.${slug}.preview.omnex-sites.test`;
+
+    return Promise.resolve({
+      url,
+      aliases: [`https://${slug}.preview.omnex-sites.test`],
+    });
   }
 
   async rollbackSite(siteId: string, deploymentId: string): Promise<SiteDeploymentDto> {

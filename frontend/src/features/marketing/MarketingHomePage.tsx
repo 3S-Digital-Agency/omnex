@@ -17,6 +17,7 @@ import { useI18n } from '../../lib/i18n';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { track } from '../../lib/analytics';
+import { abProperties, useExperiment } from '../../lib/ab';
 import { faqJsonLd, organizationJsonLd, useHreflang, useJsonLd, webSiteJsonLd } from './seo';
 import { useDocumentMeta } from './useDocumentMeta';
 
@@ -75,12 +76,20 @@ function PlanCell({ value, t }: { value: string; t: (key: string, params?: Recor
 export function MarketingHomePage() {
   const { locale, t } = useI18n();
 
+  // A/B experiments — sticky per device, override with ?ab_hero=… &ab_debug=1
+  const heroExp = useExperiment('hero');
+  const ctaExp = useExperiment('cta');
+  const pricingExp = useExperiment('pricing');
+
+  const heroTitleKey =
+    heroExp.variant === 'control' ? 'marketing.hero.title' : `ab.hero.${heroExp.variant}.title`;
+  const heroSubtitleKey =
+    heroExp.variant === 'control' ? 'marketing.hero.subtitle' : `ab.hero.${heroExp.variant}.subtitle`;
+  const heroCtaKey = ctaExp.variant === 'control' ? 'marketing.hero.cta' : `ab.cta.${ctaExp.variant}`;
+  const ab = abProperties();
+
   useHreflang('/', locale);
-  useDocumentMeta(
-    `OMNEX — ${t('marketing.hero.title')}`,
-    t('marketing.hero.subtitle'),
-    '/',
-  );
+  useDocumentMeta(`OMNEX — ${t(heroTitleKey)}`, t(heroSubtitleKey), '/');
   useJsonLd('organization', organizationJsonLd());
   useJsonLd('website', webSiteJsonLd());
   useJsonLd(
@@ -98,15 +107,15 @@ export function MarketingHomePage() {
             {t('marketing.badge')}
           </Badge>
           <h1 className="mx-auto max-w-4xl text-4xl font-bold tracking-tight text-white sm:text-6xl">
-            {t('marketing.hero.title')}
+            {t(heroTitleKey)}
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-zinc-400">
-            {t('marketing.hero.subtitle')}
+            {t(heroSubtitleKey)}
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link to="/login" onClick={() => track('cta_clicked', { cta: 'hero_start' })}>
+            <Link to="/login" onClick={() => track('cta_clicked', { cta: 'hero_start', ...ab })}>
               <Button size="lg" className="w-full sm:w-auto">
-                {t('marketing.hero.cta')}
+                {t(heroCtaKey)}
                 <ArrowRight className="h-5 w-5" />
               </Button>
             </Link>
@@ -244,7 +253,7 @@ export function MarketingHomePage() {
             features={[t('marketing.pricing.feature1')]}
             cta={t('marketing.pricing.cta', { name: t('marketing.pricing.free.name') })}
             to="/login"
-            highlighted={false}
+            highlighted={pricingExp.variant === 'free'}
           />
           <PricingCard
             name={t('marketing.pricing.pro.name')}
@@ -258,7 +267,7 @@ export function MarketingHomePage() {
             ]}
             cta={t('marketing.pricing.cta', { name: t('marketing.pricing.pro.name') })}
             to="/login"
-            highlighted
+            highlighted={pricingExp.variant !== 'free'}
           />
           <PricingCard
             name={t('marketing.pricing.business.name')}
@@ -373,7 +382,7 @@ export function MarketingHomePage() {
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-lg text-zinc-400">{t('marketing.ctaBand.subtitle')}</p>
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link to="/login" onClick={() => track('cta_clicked', { cta: 'final_trial' })}>
+            <Link to="/login" onClick={() => track('cta_clicked', { cta: 'final_trial', ...ab })}>
               <Button size="lg">
                 {t('marketing.cta.trial')}
                 <ArrowRight className="h-5 w-5" />

@@ -410,6 +410,18 @@ export interface StorageProviderDto {
   name: string;
   label: string;
   configured: boolean;
+  active?: boolean;
+}
+
+export type FeatureFlagSource = 'override' | 'plan' | 'default';
+
+export interface FeatureFlagDto {
+  key: string;
+  label: string;
+  type: 'boolean' | 'number';
+  value: boolean | number;
+  enabled: boolean;
+  source: FeatureFlagSource;
 }
 
 export interface DriveFolderDto {
@@ -510,10 +522,16 @@ export interface SiteDeploymentDto {
   commit_sha: string | null;
   status: string;
   url: string | null;
+  preview_url?: string | null;
   logs: string | null;
   deployed_at: string | null;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface SitePreviewDto {
+  url: string;
+  aliases: string[];
 }
 
 export interface SiteCreateInput {

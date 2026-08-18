@@ -15,6 +15,7 @@ import type {
   CreditEntryDto,
   CreditSummaryDto,
   DnsHistoryDto,
+  FeatureFlagDto,
   DnsRecordDto,
   DnsRecordInput,
   DnssecStatus,
@@ -78,6 +79,7 @@ import type {
   SshKeyUpdateInput,
   SiteCreateInput,
   SiteDeploymentDto,
+  SitePreviewDto,
   SiteDto,
   SiteProviderDto,
   SiteUpdateInput,
@@ -209,6 +211,12 @@ export interface ApiClient {
   checkDnsPropagation(domainId: string): Promise<PropagationStatusDto>;
 
   listStorageProviders(): Promise<StorageProviderDto[]>;
+  getStorageProvider(): Promise<StorageProviderDto>;
+  setStorageProvider(name: string): Promise<StorageProviderDto>;
+
+  getFeatures(): Promise<FeatureFlagDto[]>;
+  setFeatureOverride(flag: string, value: boolean | number): Promise<FeatureFlagDto>;
+  resetFeatureOverride(flag: string): Promise<FeatureFlagDto>;
   listDrive(folderId?: string): Promise<DriveListing>;
   getDriveUsageHistory(): Promise<DriveUsageHistoryDto>;
   listDriveTrash(): Promise<DriveFileDto[]>;
@@ -262,6 +270,7 @@ export interface ApiClient {
   getSiteDeployment(siteId: string, deploymentId: string): Promise<SiteDeploymentDto>;
   deploySite(siteId: string): Promise<SiteDeploymentDto>;
   rollbackSite(siteId: string, deploymentId: string): Promise<SiteDeploymentDto>;
+  previewDeployment(siteId: string, deploymentId: string): Promise<SitePreviewDto>;
 
   submitContactLead(input: ContactLeadInput): Promise<ContactLeadDto>;
 

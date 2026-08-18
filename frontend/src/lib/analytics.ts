@@ -22,6 +22,7 @@ export const ANALYTICS_EVENTS = {
   lead_submitted: 'lead_submitted',
   quote_requested: 'quote_requested',
   demo_requested: 'demo_requested',
+  experiment_viewed: 'experiment_viewed',
 } as const;
 
 export type AnalyticsEvent = (typeof ANALYTICS_EVENTS)[keyof typeof ANALYTICS_EVENTS];

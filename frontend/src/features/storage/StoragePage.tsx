@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { ArrowLeft, Download, FileText, Folder, FolderPlus, History, RotateCcw, Trash2, UploadCloud } from 'lucide-react';
+import { ArrowLeft, Check, Download, FileText, Folder, FolderPlus, History, Lock, RotateCcw, Trash2, UploadCloud } from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
 import { api } from '../../lib/api';
-import type { DriveFileDto } from '../../lib/api/types';
+import type { DriveFileDto, StorageProviderDto } from '../../lib/api/types';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader } from '../../components/ui/Card';
@@ -135,6 +135,8 @@ export function StoragePage() {
         isLoading={listing.isLoading || usageHistory.isLoading}
         t={t}
       />
+
+      <StorageProviderCard canManage={canManage} t={t} />
 
       <Card>
         <div className="flex items-center gap-2 border-b border-edge px-5 py-3">
@@ -283,6 +285,87 @@ export function StoragePage() {
         }}
       />
     </div>
+  );
+}
+
+/** Lets the user pick the active object-storage backend (sandbox / s3 / r2). */
+function StorageProviderCard({
+  canManage,
+  t,
+}: {
+  canManage: boolean;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { activeOrganization } = useAuth();
+
+  const providers = useQuery({
+    queryKey: ['drive', activeOrganization?.id, 'providers'],
+    queryFn: () => api.listStorageProviders(),
+    enabled: !!activeOrganization?.id,
+  });
+
+  const active = useQuery({
+    queryKey: ['drive', activeOrganization?.id, 'provider'],
+    queryFn: () => api.getStorageProvider(),
+    enabled: !!activeOrganization?.id,
+  });
+
+  const switchProvider = useMutation({
+    mutationFn: (name: string) => api.setStorageProvider(name),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['drive', activeOrganization?.id, 'provider'] });
+      void queryClient.invalidateQueries({ queryKey: ['drive', activeOrganization?.id, 'providers'] });
+      toast(t('storage.provider.switched'));
+    },
+    onError: (err) => toast(errorMessage(err), 'error'),
+  });
+
+  const activeName = active.data?.name ?? 'sandbox';
+
+  return (
+    <Card>
+      <CardHeader title={t('storage.provider.title')} description={t('storage.provider.description')} />
+      <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-3">
+        {(providers.data ?? []).map((provider: StorageProviderDto) => {
+          const isActive = provider.name === activeName;
+          const disabled = !provider.configured || switchProvider.isPending;
+          return (
+            <button
+              key={provider.name}
+              type="button"
+              disabled={disabled}
+              onClick={() => switchProvider.mutate(provider.name)}
+              className={cn(
+                'relative flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-colors',
+                isActive
+                  ? 'border-brand-600 bg-brand-900/20'
+                  : 'border-edge bg-raised hover:border-brand-700',
+                disabled && !isActive ? 'cursor-not-allowed opacity-60' : '',
+              )}
+              aria-pressed={isActive}
+            >
+              <div className="flex w-full items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-white">{provider.label}</p>
+                {isActive ? (
+                  <Badge tone="brand">
+                    <Check className="mr-1 h-3 w-3" /> {t('storage.provider.active')}
+                  </Badge>
+                ) : provider.configured ? (
+                  <Badge tone="neutral">{t('storage.provider.configured')}</Badge>
+                ) : (
+                  <Badge tone="neutral">
+                    <Lock className="mr-1 h-3 w-3" /> {t('storage.provider.notConfigured')}
+                  </Badge>
+                )}
+              </div>
+              <code className="text-xs text-zinc-500">{provider.name}</code>
+            </button>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
 

@@ -1,4 +1,4 @@
-import { ALERT_THRESHOLDS, MockApiClient } from '../mock';
+import { ALERT_THRESHOLDS, MockApiClient, resetMockFeatureOverrides } from '../mock';
 import type { ActivityItem, MfaPolicy, ServerMetricsDto } from '../types';
 
 describe('MockApiClient', () => {
@@ -458,9 +458,106 @@ describe('MockApiClient', () => {
     });
 
     const providers = await api.listSiteProviders();
-    expect(providers.map((p) => p.name)).toEqual(['sandbox', 'custom']);
+    expect(providers.map((p) => p.name)).toEqual(['sandbox', 'custom', 'cloudflare']);
     expect(providers.find((p) => p.name === 'sandbox')?.configured).toBe(true);
     expect(providers.find((p) => p.name === 'custom')?.configured).toBe(false);
+    expect(providers.find((p) => p.name === 'cloudflare')?.configured).toBe(false);
+  });
+
+  it('lists storage providers', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Storage Provider Tester',
+      email: 'storage-provider@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    const providers = await api.listStorageProviders();
+    expect(providers.map((p) => p.name)).toEqual(['sandbox', 's3', 'r2']);
+    expect(providers.find((p) => p.name === 'sandbox')?.configured).toBe(true);
+    expect(providers.find((p) => p.name === 's3')?.configured).toBe(false);
+    expect(providers.find((p) => p.name === 'r2')?.label).toBe('Cloudflare R2');
+    expect(providers.find((p) => p.name === 'r2')?.configured).toBe(false);
+  });
+
+  it('resolves a deployment preview url and aliases', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Preview Tester',
+      email: 'preview-tester@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    const site = await api.createSite({
+      name: 'Preview',
+      framework: 'static',
+      git_url: 'https://github.com/acme/preview.git',
+    });
+    const deployment = await api.deploySite(site.id);
+
+    expect(deployment.preview_url).toContain('.preview.omnex-sites.test');
+
+    const preview = await api.previewDeployment(site.id, deployment.id);
+    expect(preview.url).toBe(deployment.preview_url);
+    expect(preview.aliases).toContain('https://preview.preview.omnex-sites.test');
+
+    await api.deleteSite(site.id);
+  });
+
+  it('reports and switches the active storage provider', async () => {
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Storage Provider Tester 2',
+      email: 'storage-provider2@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    expect((await api.getStorageProvider()).name).toBe('sandbox');
+
+    const switched = await api.setStorageProvider('s3');
+    expect(switched.name).toBe('s3');
+    expect(switched.active).toBe(true);
+    expect((await api.getStorageProvider()).name).toBe('s3');
+
+    const providers = await api.listStorageProviders();
+    expect(providers.find((p) => p.name === 's3')?.active).toBe(true);
+    expect(providers.find((p) => p.name === 'sandbox')?.active).toBe(false);
+
+    await expect(api.setStorageProvider('nope')).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('resolves plan-tier feature flags and applies overrides', async () => {
+    resetMockFeatureOverrides();
+
+    const api = new MockApiClient();
+    await api.register({
+      name: 'Feature Tester',
+      email: 'feature-tester@example.com',
+      password: 'password123',
+      password_confirmation: 'password123',
+    });
+
+    // A freshly created org is on the free tier.
+    const flags = await api.getFeatures();
+    const flag = (key: string) => flags.find((f) => f.key === key);
+
+    expect(flag('domains')?.enabled).toBe(true);
+    expect(flag('cloud')?.enabled).toBe(false);
+    expect(flag('ssl')?.enabled).toBe(false);
+    expect(flag('domain_limit')?.value).toBe(1);
+
+    const overridden = await api.setFeatureOverride('ssl', true);
+    expect(overridden.enabled).toBe(true);
+    expect(overridden.source).toBe('override');
+
+    const reset = await api.resetFeatureOverride('ssl');
+    expect(reset.enabled).toBe(false);
+    expect(reset.source).toBe('plan');
+
+    await expect(api.setFeatureOverride('nope', true)).rejects.toMatchObject({ status: 422 });
   });
 
   it('creates, deploys, rolls back and deletes a site', async () => {

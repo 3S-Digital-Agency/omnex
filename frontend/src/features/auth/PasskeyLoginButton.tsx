@@ -165,7 +165,12 @@ export function PasskeyLoginButton({ compact = false }: { compact?: boolean }) {
       await signInWithPasskey(null);
       navigate('/', { replace: true });
     } catch (err) {
-      setError(errorMessage(err));
+      if (err instanceof DeviceVerificationRequired) {
+        setVerificationToken(err.verificationToken);
+        setError(null);
+      } else {
+        setError(errorMessage(err));
+      }
     } finally {
       setBusy(false);
     }
