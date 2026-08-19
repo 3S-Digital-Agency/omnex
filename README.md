@@ -25,10 +25,10 @@ API.
 | 4 | OMNEX Drive — storage abstraction (S3-compatible) | ✅ Delivered |
 | 5 | OMNEX Sites — Git deploys, rollback, encrypted env vars | ✅ Delivered |
 | 6 | Billing — plans, subscriptions, invoices, Stripe + sandbox | ✅ Delivered |
-| 7 | Security — findings engine, score, dismiss/reopen | ✅ Delivered |
+| 7 | Security — findings engine, MFA policy, sessions, SSL/vuln monitoring | ✅ Delivered |
 | 8 | OMNEX Cloud — VPS engine (sandbox · Hetzner · DigitalOcean · Custom) | ✅ Delivered |
-| 9 | Marketing & Commercial Website — site public vitrine, services, tarifs, SEO, analytics, CTA | 🔜 Planned |
-| 10+ | CI/CD, Mail, AI… | 🔜 Planned |
+| 9 | Marketing & Commercial Website — homepage, services, tarifs, SEO, contact/leads, analytics, blog, A/B | ✅ Delivered |
+| 10+ | Deploy, Mail, AI, Automate, Marketplace, Scale, Launch | 🔜 Planned |
 
 Phase 6 is delivered: `PaymentProviderInterface` with a deterministic **sandbox**
 and a **Stripe** adapter (hosted Checkout Sessions + HMAC-verified webhooks);
@@ -43,6 +43,14 @@ handling, audit + owner notifications, and the OMNEX Billing UI.
 - Accounts, organizations, invitations, roles/permissions (Owner / Admin /
   Developer / Viewer), org switching.
 - **MFA** — RFC 6238 TOTP implemented in-house + recovery codes.
+- **Passwordless & strong authentication** — full **WebAuthn / FIDO2**
+  (via `web-auth/webauthn-lib`): passkeys, YubiKey, Windows Hello, Touch ID /
+  Face ID, plus TOTP and recovery codes. Cryptographic verification is done
+  server-side (attestation at registration, signature + anti-replay at login).
+  **Cross-device login** (iPhone/Android): scan a QR code with the phone to
+  authenticate through its platform passkeys. **Unknown-device detection**: a
+  fresh device is flagged, the user is notified by e-mail and must pass a
+  verification step before it is trusted and listed under *My authenticators*.
 - **Social login (GAFAM + sovereign)** — Google, Microsoft (OpenID), Apple
   (JWT ES256), Facebook, Amazon, **GitHub** (OAuth2), **OpenAI** (OIDC) and
   **Serveurs du Peuple** (Nextcloud OAuth2), behind
@@ -81,10 +89,20 @@ handling, audit + owner notifications, and the OMNEX Billing UI.
   reversible rollback.
 - **DNSSEC** (enable/disable + DS records) and **per-nameserver propagation
   monitoring**, both behind provider abstractions.
+- **Cloudflare DNS** provider behind `DnsProviderInterface` (zone listing,
+  record CRUD, DNSSEC toggle) — activates once `CLOUDFLARE_API_TOKEN` is set.
+- **SSL engine** behind `SslProviderInterface` — issue / renew / revoke / status:
+  a deterministic **sandbox**, **Cloudflare Universal SSL** (real API) and
+  **Let's Encrypt** (RFC 8555 ACME client, zero-dependency, DNS-01 challenge
+  placed via the organization's active DNS provider). Certificates are
+  persisted (`ssl_certificates`, fullchain PEM) and issued automatically on
+  domain registration/transfer, renewed on renew. Selectable per organization
+  like every other provider.
 
 ### 💾 OMNEX Drive (Phase 4)
 - `StorageProviderInterface` with sandbox + S3-compatible providers
-  (AWS SigV4 over Guzzle — R2 / MinIO / OVH Object Storage).
+  (AWS SigV4 over Guzzle — **S3**, **Cloudflare R2**, MinIO / OVH Object
+  Storage), each explicit and selectable per organization.
 - Folders, files, versioning, trash/restore, per-organization quota,
   signed download/upload URLs, audit trail, RBAC (`storage.read` /
   `storage.manage`).
@@ -92,8 +110,9 @@ handling, audit + owner notifications, and the OMNEX Billing UI.
   abstraction and its own cloud UI.
 
 ### 🧱 OMNEX Sites (Phase 5)
-- `SiteProviderInterface` with **sandbox** (deterministic) + **Custom**
-  (HTTP/JSON hosting gateway) providers, selectable per request.
+- `SiteProviderInterface` with **sandbox** (deterministic), **Custom**
+  (HTTP/JSON hosting gateway) and **Cloudflare Pages** (deploy, preview
+  deployments, rollback via the real API) providers, selectable per request.
 - Provision sites from Git (static / Laravel / Next), deploy builds, list
   deployments and build logs, roll back to any previous live release.
 - **Failed deploy → automatic rollback** to the previous live deployment.
@@ -178,8 +197,33 @@ transmitted again** server-side. Keys show a **usage counter** ("used by N
 - Findings engine behind the live score: MFA, unverified email, single-member
   organization, expiring domains, DNSSEC off — each with severity, impact and
   remediation, dismissible/reopenable (`security.read` / `security.manage`).
+- **MFA policy** (enforce per role / optional-required toggle), **session
+  management** (list / revoke own + all sessions) and **SSL / vulnerability
+  monitoring** surfaced in the security cockpit.
 - Score recomputed on demand (`scan`); dashboard score and Security Center are
   both driven by the same API.
+
+### 🌍 Marketing & Commercial Website (Phase 9)
+- Public-facing site (`/`) separate from the authenticated app: **homepage**
+  (hero, value proposition, CTAs, social proof), **service pages** with
+  unique meta (domains, cloud, sites, storage, security, billing), **pricing
+  with plan comparison**, **contact form** with lead routing (rate-limited,
+  anti-spam, IP/UA recording), FAQ, footer.
+- **Technical SEO** — meta/OG tags, JSON-LD (Organization, FAQPage, Article),
+  sitemap, EN/FR **hreflang**, per-page meta hook, language selector in the
+  public header, browser-language detection.
+- **Blog / content hub** (bilingual posts + guides, Article JSON-LD),
+  **landing-page engine** (CMS-configured campaign pages: offer, promo,
+  comparison) and an **A/B testing harness** (hero/CTA/pricing variants with
+  conversion tracking).
+- **Analytics & consent** — pageview / CTA / conversion tracking with UTM
+  capture and a cookie-consent banner (opt-in/opt-out) driving `setConsent`.
+
+### ⚙️ Architecture: providers, features & provisioning
+
+See [`docs/architecture-providers.md`](docs/architecture-providers.md) for
+`ResolvesTenantProvider`, the SSL engine and the feature-flag system detailed
+above — with a worked multi-tenant provisioning use case.
 
 ---
 
@@ -262,11 +306,27 @@ code**. Swap a registrar, DNS or storage backend without touching module code:
 | Interface | Providers |
 |---|---|
 | `DomainProviderInterface` | sandbox · Namecheap · OVHcloud · Custom |
-| `DnsProviderInterface` | sandbox (real provider via the same port) |
+| `DnsProviderInterface` | sandbox · Cloudflare |
 | `StorageProviderInterface` | sandbox · S3-compatible (R2 / MinIO / OVH) |
-| `SocialAuthProviderInterface` | sandbox · Google · Microsoft · Apple · Facebook · Amazon · Serveurs du Peuple |
+| `SslProviderInterface` | sandbox · Cloudflare Universal SSL · Let's Encrypt (ACME) |
+| `SiteProviderInterface` | sandbox · Cloudflare Pages · Custom |
+| `SocialAuthProviderInterface` | sandbox · Google · Microsoft · Apple · Facebook · Amazon · GitHub · OpenAI · Serveurs du Peuple |
 | `DnsPropagationCheckerInterface` | sandbox (deterministic) |
 | `ServerProviderInterface` | sandbox · Hetzner · DigitalOcean · Custom |
+
+### Dynamic provider switching, feature flags & org provisioning
+
+- **Strategy/Factory everywhere** — every technical brick (storage, sites,
+  cloud, domains, DNS, SSL) resolves its active provider through a shared
+  `ResolvesTenantProvider` trait: per-organization override
+  (`organizations.settings.<service>_provider`) with environment fallback.
+  Providers are **data, not code** — swap one without touching module code.
+- **Feature flags / perks** (`config/omnex.features`, 16 typed flags) — resolved
+  as org override → plan tier → default; enforced server-side by a `feature:`
+  middleware (403) and surfaced in the UI (sidebar gating, `useFeatures()`).
+- **Real provisioning** — `OrganizationService::create()` configures a new
+  organization atomically: sandbox providers assigned + default perks per plan,
+  so a fresh tenant is immediately functional and isolated (`TenantScope`).
 
 ---
 
@@ -291,9 +351,11 @@ cross-tenant attack test checklist.
 | Layer | Status |
 |---|---|
 | Frontend typecheck (`pnpm typecheck`) | ✅ green |
-| Frontend tests (`pnpm test`) | ✅ 54/54 |
+| Frontend tests (`pnpm test`) | ✅ 95/95 |
 | Frontend build (`pnpm build`) | ✅ green |
-| Backend (`php artisan test`) | ✅ 273 passed + 1 skipped (1099 assertions) |
+| Backend (`php artisan test`) | ✅ 385 passed + 1 skipped (1543 assertions) |
+| CI (GitHub Actions — Pest + typecheck + vitest) | ✅ configured (`.github/workflows/ci.yml`) |
+| Dependabot (Composer + pnpm, grouped) | ✅ configured (`.github/dependabot.yml`) |
 
 The Laravel backend is validated against a local portable PHP + PostgreSQL
 setup (see `infra/dev-env.sh`); `php artisan test` runs the full Pest suite.
