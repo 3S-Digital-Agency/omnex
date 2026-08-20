@@ -1,0 +1,56 @@
+name: Deploy OMNEX Production
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: omnex-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy omnex.cloud
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.OMNEX_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.OMNEX_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/omnex-deploy
+          chmod 600 ~/.ssh/omnex-deploy
+
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Deploy to OVH
+        run: |
+          ssh \
+            -i ~/.ssh/omnex-deploy \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            deploy@${{ secrets.OMNEX_HOST }}
+
+      - name: Verify production
+        run: |
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --retry 5 \
+            --retry-delay 3 \
+            https://omnex.cloud/ \
+            >/dev/null
+
+          echo "OMNEX production healthy"
