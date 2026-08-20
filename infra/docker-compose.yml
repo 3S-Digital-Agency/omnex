@@ -2,12 +2,19 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: omnex-postgres
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+        compress: "true"
     environment:
       POSTGRES_DB: omnex
       POSTGRES_USER: omnex
       POSTGRES_PASSWORD: omnex
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - omnex_pg:/var/lib/postgresql/data
     healthcheck:
@@ -19,9 +26,16 @@ services:
   redis:
     image: redis:7-alpine
     container_name: omnex-redis
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+        compress: "true"
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - omnex_redis:/data
     healthcheck:

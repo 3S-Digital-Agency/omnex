@@ -14,7 +14,7 @@ import { errorMessage } from '../../lib/errors';
 import { useI18n } from '../../lib/i18n';
 
 export function OrganizationsPage() {
-  const { memberships, activeOrganization, switchOrganization, acceptInvitation, pendingInvitations, refresh } =
+  const { memberships, activeOrganization, switchOrganization, acceptInvitation, pendingInvitations } =
     useAuth();
   const { t } = useI18n();
   const { toast } = useToast();
@@ -25,10 +25,11 @@ export function OrganizationsPage() {
 
   const create = useMutation({
     mutationFn: () => api.createOrganization(name),
-    onSuccess: async () => {
+    onSuccess: async (organization) => {
       toast(t('toast.org.created'));
       setName('');
-      await refresh();
+
+      await switchOrganization(organization.id);
       await queryClient.invalidateQueries();
     },
     onError: (err) => setError(errorMessage(err)),

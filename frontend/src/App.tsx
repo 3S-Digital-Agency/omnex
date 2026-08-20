@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { useAuth } from './app/AuthProvider';
 import { AppShell } from './components/layout/AppShell';
@@ -33,11 +33,15 @@ import { LandingPagesPage } from './features/marketing/LandingPagesPage';
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { status, activeOrganization } = useAuth();
+  const location = useLocation();
 
   if (status === 'loading') return <FullPageLoader />;
   if (status === 'unauthenticated') return <Navigate to="/login" replace />;
   if (status === 'mfa') return <Navigate to="/mfa" replace />;
-  if (!activeOrganization) return <Navigate to="/organizations" replace />;
+
+  if (!activeOrganization && location.pathname !== '/organizations') {
+    return <Navigate to="/organizations" replace />;
+  }
 
   return <>{children}</>;
 }

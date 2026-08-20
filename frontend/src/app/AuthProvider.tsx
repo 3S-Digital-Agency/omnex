@@ -203,7 +203,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const switchOrganization = useCallback(
     async (orgId: string) => {
-      await api.switchOrganization(orgId);
+      const res = await api.switchOrganization(orgId);
+
+      session.setOrganizationId(res.active_organization.id);
+
       await refresh();
     },
     [refresh],
