@@ -21,7 +21,10 @@ final class SocialAuthRegistry
 
     public function __construct()
     {
-        $this->register(new SandboxSocialProvider);
+        if (config('socialauth.sandbox_enabled', false)) {
+            $this->register(new SandboxSocialProvider);
+        }
+
         $this->register(new GoogleSocialProvider);
         $this->register(new MicrosoftSocialProvider);
         $this->register(new AppleSocialProvider);

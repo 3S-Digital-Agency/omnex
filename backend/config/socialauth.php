@@ -16,6 +16,9 @@ return [
 
     'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
 
+    // Development/demo identity provider. Keep disabled in production.
+    'sandbox_enabled' => (bool) env('SOCIAL_SANDBOX_ENABLED', false),
+
     // How long a one-time completion code stays valid (seconds).
     'completion_ttl' => (int) env('SOCIAL_COMPLETION_TTL', 300),
 

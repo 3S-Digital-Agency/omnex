@@ -41,11 +41,7 @@ return [
     'webauthn' => [
         'rp_id' => env('OMNEX_WEBAUTHN_RP_ID'),
         'allowed_origins' => array_values(array_unique(array_filter([
-            env('FRONTEND_URL', 'http://localhost:5173'),
-            'http://localhost:5173',
-            'http://127.0.0.1:5173',
-            'http://localhost',
-            'http://127.0.0.1',
+            env('FRONTEND_URL'),
         ]))),
     ],
 
