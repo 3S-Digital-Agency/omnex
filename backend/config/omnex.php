@@ -4,6 +4,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Release version (surfaced by /api/v1/health and deploy artifacts)
+    |--------------------------------------------------------------------------
+    |
+    | Bumped by the deploy pipeline; read-only metadata for the health
+    | endpoint and monitoring.
+    |
+    */
+
+    'version' => env('OMNEX_VERSION', '0.1.0'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Tenant isolation (defense-in-depth)
     |--------------------------------------------------------------------------
     |

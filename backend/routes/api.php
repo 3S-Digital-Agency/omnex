@@ -9,6 +9,7 @@ use App\Http\Controllers\CrossDeviceController;
 use App\Http\Controllers\DnsController;
 use App\Http\Controllers\DomainController;
 use App\Http\Controllers\FeatureFlagController;
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\LandingPageController;
 use App\Http\Controllers\MemberController;
@@ -27,6 +28,9 @@ use App\Http\Controllers\StorageController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
+    // Public liveness/readiness — used by the deploy pipeline and monitoring.
+    Route::get('/health', HealthController::class);
+
     // Public auth
     Route::post('/auth/register', [AuthController::class, 'register']);
     Route::post('/auth/login', [AuthController::class, 'login']);

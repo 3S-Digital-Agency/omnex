@@ -90,9 +90,56 @@ jobs:
           cp .env.example .env
           php artisan key:generate --no-interaction --force
 
+      - name: Run migrations against PostgreSQL
+        working-directory: backend
+        run: php artisan migrate --force
+
       - name: Run Pest
         working-directory: backend
         run: php artisan test
+
+  security:
+    name: Security — dependency audits
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, curl, dom, fileinfo, openssl, pdo, pgsql, tokenizer, simplexml, ctype, intl, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Composer audit
+        working-directory: backend
+        run: composer audit --no-interaction
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: pnpm audit
+        working-directory: frontend
+        run: pnpm audit --prod
 
   frontend:
     name: Frontend — typecheck + vitest (Node 20 / pnpm 9)
@@ -125,3 +172,7 @@ jobs:
       - name: Run vitest
         working-directory: frontend
         run: pnpm test
+
+      - name: Production build
+        working-directory: frontend
+        run: pnpm build

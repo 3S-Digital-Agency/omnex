@@ -28,7 +28,8 @@ API.
 | 7 | Security — findings engine, MFA policy, sessions, SSL/vuln monitoring | ✅ Delivered |
 | 8 | OMNEX Cloud — VPS engine (sandbox · Hetzner · DigitalOcean · Custom) | ✅ Delivered |
 | 9 | Marketing & Commercial Website — homepage, services, tarifs, SEO, contact/leads, analytics, blog, A/B | ✅ Delivered |
-| 10+ | Deploy, Mail, AI, Automate, Marketplace, Scale, Launch | 🔜 Planned |
+| 10 | OMNEX Deploy — CI/CD pipeline (build → test → scan → staging → health → prod → rollback) | ✅ Delivered |
+| 11+ | Mail, AI, Automate, Marketplace, Scale, Launch | 🔜 Planned |
 
 Phase 6 is delivered: `PaymentProviderInterface` with a deterministic **sandbox**
 and a **Stripe** adapter (hosted Checkout Sessions + HMAC-verified webhooks);
@@ -219,6 +220,24 @@ transmitted again** server-side. Keys show a **usage counter** ("used by N
 - **Analytics & consent** — pageview / CTA / conversion tracking with UTM
   capture and a cookie-consent banner (opt-in/opt-out) driving `setConsent`.
 
+### 🚀 OMNEX Deploy (Phase 10)
+- **Public health endpoint** `GET /api/v1/health` — liveness/readiness
+  (service, version, environment, DB status; 503 `degraded` when the DB is
+  unreachable). No auth, no internals leaked — used by CI, staging/prod
+  checks and load balancers.
+- **CI hardened** (`.github/workflows/ci.yml`): DCO, Pest against PostgreSQL
+  16 (with real migrations), typecheck + vitest + **production build**, and a
+  dedicated **security job** (`composer audit` + `pnpm audit`).
+- **Production images** — `backend/Dockerfile` (PHP 8.3 FPM, optimized,
+  non-root) and `frontend/Dockerfile` (pnpm build → nginx SPA with history
+  fallback + caching).
+- **Deploy pipeline** (`.github/workflows/deploy.yml`): build & push images →
+  deploy **staging** → health check → promote **production** → health check →
+  **automatic rollback** to the previous release on any failure.
+- **Monitoring** (`.github/workflows/monitoring.yml`): probes production
+  every 15 min, opens an `incident` issue on failure and closes it on
+  recovery.
+
 ### ⚙️ Architecture: providers, features & provisioning
 
 See [`docs/architecture-providers.md`](docs/architecture-providers.md) for
@@ -354,7 +373,9 @@ cross-tenant attack test checklist.
 | Frontend tests (`pnpm test`) | ✅ 95/95 |
 | Frontend build (`pnpm build`) | ✅ green |
 | Backend (`php artisan test`) | ✅ 385 passed + 1 skipped (1543 assertions) |
-| CI (GitHub Actions — Pest + typecheck + vitest) | ✅ configured (`.github/workflows/ci.yml`) |
+| CI (GitHub Actions — Pest + typecheck + vitest + audits) | ✅ configured (`.github/workflows/ci.yml`) |
+| Deploy pipeline (staging → prod → rollback) | ✅ configured (`.github/workflows/deploy.yml`) |
+| Monitoring (health cron + incident issues) | ✅ configured (`.github/workflows/monitoring.yml`) |
 | Dependabot (Composer + pnpm, grouped) | ✅ configured (`.github/dependabot.yml`) |
 
 The Laravel backend is validated against a local portable PHP + PostgreSQL
