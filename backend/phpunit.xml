@@ -24,8 +24,10 @@
         <env name="DB_CONNECTION" value="pgsql"/>
         <env name="DB_DATABASE" value="omnex_test"/>
         <!-- Deterministic test environment: the sandbox OAuth provider must be
-             enabled, and FRONTEND_URL must match the origin used by the
-             WebAuthn test kit (http://localhost:5173) so attestations pass. -->
+             enabled, and FRONTEND_URL/APP_URL must match the origin and RP ID
+             used by the WebAuthn test kit (http://localhost:5173 / localhost)
+             so attestations pass regardless of the developer's .env. -->
+        <env name="APP_URL" value="http://localhost:8000"/>
         <env name="FRONTEND_URL" value="http://localhost:5173"/>
         <env name="SOCIAL_SANDBOX_ENABLED" value="true"/>
         <env name="MAIL_MAILER" value="array"/>
