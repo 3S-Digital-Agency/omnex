@@ -23,6 +23,11 @@
         <env name="CACHE_STORE" value="array"/>
         <env name="DB_CONNECTION" value="pgsql"/>
         <env name="DB_DATABASE" value="omnex_test"/>
+        <!-- Deterministic test environment: the sandbox OAuth provider must be
+             enabled, and FRONTEND_URL must match the origin used by the
+             WebAuthn test kit (http://localhost:5173) so attestations pass. -->
+        <env name="FRONTEND_URL" value="http://localhost:5173"/>
+        <env name="SOCIAL_SANDBOX_ENABLED" value="true"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
