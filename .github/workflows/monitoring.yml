@@ -1,77 +1,109 @@
 name: Monitoring — production health
 
-# Phase 10 monitoring: probes the production /api/v1/health endpoint every
-# 15 minutes. On repeated failure it opens an incident issue; on recovery it
-# closes it automatically. Requires the PRODUCTION_HEALTH_URL secret
-# (e.g. https://app.omnex.cloud/api/v1/health).
-
+# The production health endpoint is public and canonical. Keeping it in a
+# secret made monitoring silently depend on secret configuration and produced
+# opaque HTTP 000 incidents when the value was missing or invalid.
 on:
   schedule:
     - cron: '*/15 * * * *'
   workflow_dispatch:
 
 permissions:
+  contents: read
   issues: write
+
+concurrency:
+  group: omnex-production-monitoring
+  cancel-in-progress: true
 
 jobs:
   probe:
     name: Probe production health
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    timeout-minutes: 5
+    env:
+      HEALTH_URL: https://omnex.cloud/api/v1/health
 
-      - name: Probe endpoint
+    steps:
+      - name: Probe canonical endpoint
         id: probe
+        shell: bash
         run: |
-          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 \
-            "${{ secrets.PRODUCTION_HEALTH_URL }}" || true)
-          echo "code=$code" >> "$GITHUB_OUTPUT"
-          if [ "$code" = "200" ]; then
-            echo "✅ Production healthy"
+          set -uo pipefail
+
+          code="000"
+          curl_exit=0
+          attempts=0
+
+          while [ "$attempts" -lt 3 ]; do
+            attempts=$((attempts + 1))
+            curl_exit=0
+            code="$(
+              curl                 --silent                 --show-error                 --location                 --output /dev/null                 --write-out '%{http_code}'                 --connect-timeout 10                 --max-time 20                 --proto '=https'                 --tlsv1.2                 --header 'Accept: application/json'                 --user-agent 'OMNEX-GitHub-Monitor/1.0'                 "$HEALTH_URL"
+            )" || curl_exit=$?
+
+            code="${code:-000}"
+            if [ "$curl_exit" -eq 0 ] && [ "$code" = "200" ]; then
+              break
+            fi
+
+            if [ "$attempts" -lt 3 ]; then
+              sleep $((attempts * 3))
+            fi
+          done
+
+          {
+            echo "code=$code"
+            echo "curl_exit=$curl_exit"
+            echo "attempts=$attempts"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ "$curl_exit" -eq 0 ] && [ "$code" = "200" ]; then
+            echo "healthy=true" >> "$GITHUB_OUTPUT"
+            echo "Production healthy after $attempts attempt(s)"
           else
-            echo "::error::Production health probe failed with HTTP $code"
+            echo "healthy=false" >> "$GITHUB_OUTPUT"
+            echo "::error::Production health probe failed: HTTP $code, curl exit $curl_exit, attempts $attempts"
           fi
 
-      - name: Open incident issue on failure
-        if: steps.probe.outputs.code != '200'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const label = 'incident';
-            const title = `🚨 Incident — production health check failed (HTTP ${process.env.PROBE_CODE})`;
-            const body = `The production health probe returned HTTP ${process.env.PROBE_CODE} at ${new Date().toISOString()}.\n\nSee the [Deploy workflow](https://github.com/${context.repo.owner}/${context.repo.repo}/actions) for the latest deployment status.`;
-            try {
-              await github.rest.issues.createLabel({ ...context.repo, name: label, color: 'd73a4a' });
-            } catch {}
-            const open = await github.rest.issues.listForRepo({
-              ...context.repo, state: 'open', labels: [label],
-            });
-            if (open.data.length === 0) {
-              await github.rest.issues.create({
-                ...context.repo, title, body, labels: [label],
-              });
-              console.log('🚨 Incident issue opened');
-            } else {
-              console.log('⚠️ Incident already open — skipping duplicate');
-            }
+      - name: Open incident on failure
+        if: steps.probe.outputs.healthy != 'true'
+        shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           PROBE_CODE: ${{ steps.probe.outputs.code }}
+          CURL_EXIT: ${{ steps.probe.outputs.curl_exit }}
+          ATTEMPTS: ${{ steps.probe.outputs.attempts }}
+        run: |
+          set -euo pipefail
 
-      - name: Close incident on recovery
-        if: steps.probe.outputs.code == '200'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const label = 'incident';
-            const open = await github.rest.issues.listForRepo({
-              ...context.repo, state: 'open', labels: [label],
-            });
-            for (const issue of open.data) {
-              await github.rest.issues.update({
-                ...context.repo, issue_number: issue.number,
-                state: 'closed',
-                state_reason: 'completed',
-              });
-              console.log(`✅ Incident #${issue.number} closed — production is healthy`);
-            }
+          gh label create incident             --repo "$GITHUB_REPOSITORY"             --color d73a4a             --description "Production health incident"             --force
+
+          existing="$(
+            gh issue list               --repo "$GITHUB_REPOSITORY"               --state open               --label incident               --limit 1               --json number               --jq '.[0].number // empty'
+          )"
+
+          if [ -n "$existing" ]; then
+            echo "Incident #$existing already open; no duplicate created."
+            exit 0
+          fi
+
+          body="$(
+            printf '%s\n\n%s\n%s\n%s\n\n%s'               "The canonical production health endpoint failed at $(date -u +'%Y-%m-%dT%H:%M:%SZ')."               "- HTTP status: $PROBE_CODE"               "- curl exit: $CURL_EXIT"               "- attempts: $ATTEMPTS"               "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          )"
+
+          gh issue create             --repo "$GITHUB_REPOSITORY"             --title "🚨 Incident — production health check failed"             --body "$body"             --label incident
+
+      - name: Close incidents on recovery
+        if: steps.probe.outputs.healthy == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          gh issue list             --repo "$GITHUB_REPOSITORY"             --state open             --label incident             --limit 100             --json number             --jq '.[].number' |
+          while read -r issue_number; do
+            [ -n "$issue_number" ] || continue
+            gh issue close               "$issue_number"               --repo "$GITHUB_REPOSITORY"               --reason completed               --comment "Production health recovered in run $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID."
+          done
