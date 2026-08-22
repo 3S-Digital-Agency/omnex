@@ -1,0 +1,8 @@
+# ⚠️ TEMPLATE — NON AUTORITAIRE. Fichier réel : /etc/systemd/system/omnex-healthcheck.service.
+[Unit]
+Description=OMNEX health check
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/omnex-healthcheck
+# Sortie non nulle = dégradé. Relier le .timer au monitoring (docs/infrastructure-map.md §8).

@@ -3,6 +3,10 @@ services:
     image: postgres:16-alpine
     container_name: omnex-postgres
     restart: unless-stopped
+    # Limites de ressources — VPS partagé avec ACELIFE (FiveM est sensible au
+    # CPU). À ajuster selon l'usage réel (docs/infrastructure-map.md §12).
+    cpus: '2.0'
+    mem_limit: 2g
     logging:
       driver: "json-file"
       options:
@@ -27,6 +31,9 @@ services:
     image: redis:7-alpine
     container_name: omnex-redis
     restart: unless-stopped
+    # Cache/queue/session/streams : mono-thread, petit en mémoire.
+    cpus: '0.5'
+    mem_limit: 512m
     logging:
       driver: "json-file"
       options:

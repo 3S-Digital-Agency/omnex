@@ -1,0 +1,18 @@
+# ⚠️ TEMPLATE — NON AUTORITAIRE. État réel : `ufw status verbose` sur le VPS.
+# Reconstruit depuis docs/infrastructure-map.md §10.
+#
+#   incoming → deny, outgoing → allow
+#   Ports ouverts : 22 (SSH), 80/443 (HTTP/HTTPS), 30120 (FiveM, tcp+udp).
+#   PostgreSQL (5432) et Redis (6379) restent liés à 127.0.0.1 — jamais exposés.
+
+# (à appliquer, puis `ufw enable` une fois SSH/443 confirmés)
+ufw default deny incoming
+ufw default allow outgoing
+
+ufw allow 22/tcp          # SSH (Ed25519, PermitRootLogin no)
+ufw allow 80/tcp          # HTTP → redirige 443
+ufw allow 443/tcp         # HTTPS
+ufw allow 30120/tcp       # FiveM — ne jamais fermer
+ufw allow 30120/udp       # FiveM — ne jamais fermer
+
+# NE PAS ouvrir 5432/6379 : conteneurs en 127.0.0.1 uniquement.

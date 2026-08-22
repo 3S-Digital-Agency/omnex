@@ -1,0 +1,10 @@
+# ⚠️ TEMPLATE — NON AUTORITAIRE. Fichier réel : /etc/fail2ban/jail.local.
+# Reconstruit depuis docs/infrastructure-map.md §10.
+#
+#   jail sshd : maxretry 3, findtime 10m, bantime 1h.
+
+[sshd]
+enabled = true
+maxretry = 3
+findtime = 10m
+bantime = 1h

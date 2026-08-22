@@ -1,0 +1,11 @@
+# ⚠️ TEMPLATE — NON AUTORITAIRE. Fichier réel : /etc/systemd/system/omnex-scheduler.service.
+# Déclenché chaque minute par omnex-scheduler.timer.
+[Unit]
+Description=OMNEX Laravel scheduler (php artisan schedule:run)
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/omnex/backend
+ExecStart=/usr/bin/php artisan schedule:run

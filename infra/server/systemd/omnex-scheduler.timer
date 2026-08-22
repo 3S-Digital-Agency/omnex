@@ -1,0 +1,10 @@
+# ⚠️ TEMPLATE — NON AUTORITAIRE. Fichier réel : /etc/systemd/system/omnex-scheduler.timer.
+[Unit]
+Description=OMNEX Laravel scheduler — chaque minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

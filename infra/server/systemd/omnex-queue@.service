@@ -1,0 +1,20 @@
+# ⚠️ TEMPLATE — NON AUTORITAIRE. Fichier réel : /etc/systemd/system/omnex-queue@.service.
+# Instances : omnex-queue@1.service, omnex-queue@2.service (docs/infrastructure-map.md §5).
+[Unit]
+Description=OMNEX Laravel queue worker %i
+After=network.target docker.service
+
+[Service]
+Type=simple
+# www-data : le runtime n'utilise PAS le rôle owner (docs/rls-rollout.md).
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/omnex/backend
+Restart=always
+RestartSec=3
+# Réconcilier avec la machine (niveau de log, timeout, env).
+ExecStart=/usr/bin/php artisan queue:work --sleep=3 --tries=3 --max-time=3600
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

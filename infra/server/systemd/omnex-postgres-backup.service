@@ -1,0 +1,8 @@
+# ⚠️ TEMPLATE — NON AUTORITAIRE. Fichier réel : /etc/systemd/system/omnex-postgres-backup.service.
+[Unit]
+Description=OMNEX PostgreSQL backup
+
+[Service]
+Type=oneshot
+# Script root:root 700 (écrit dans /var/backups/omnex/postgres).
+ExecStart=/usr/local/sbin/omnex-postgres-backup

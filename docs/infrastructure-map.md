@@ -213,7 +213,8 @@ omnex-*      vs   acelife-*          (containers, volumes, services)
 - ⚠️ **Reste à faire côté serveur** : basculer `DB_USERNAME=omnex_app` dans le
   `.env` de prod et faire tourner les migrations du script `omnex-deploy` avec
   `--database=pgsql_migrate`. Tant que le runtime tourne en `omnex` (superuser),
-  RLS est contourné même avec FORCE.
+  RLS est contourné même avec FORCE. **Procédure complète (checklist + rollback) :
+  `docs/rls-rollout.md`.**
 - Tests : `tests/Unit/RlsMiddlewareTest.php`,
   `tests/Feature/RlsTenantIsolationTest.php` (isolation via rôle limité
   `SET LOCAL ROLE`), `tests/Feature/DatabaseRoleSeparationTest.php`
