@@ -18,14 +18,12 @@ afterEach(function () {
 });
 
 /**
- * Applies the RLS migration against the test schema. RefreshDatabase runs the
- * migrations with OMNEX_ENFORCE_RLS=false (so no policies are created), which
- * is exactly why we enable the flag and invoke the migration here: it lets us
- * prove the policies behave correctly before anyone flips the flag in prod.
+ * Idempotently re-applies the RLS migration so these tests stay explicit about
+ * what they exercise. 000046 is now unconditional, so RefreshDatabase already
+ * created the policies; re-running them is harmless.
  */
 function enableRls(): void
 {
-    config(['omnex.enforce_rls' => true]);
     $migration = require base_path('database/migrations/2024_01_01_000046_extend_tenant_row_level_security.php');
     $migration->up();
 }
@@ -88,6 +86,28 @@ it('scopes Drive, Sites, Billing and Cloud to the active tenant under RLS', func
         ->and(DB::table('sites')->count())->toBe(1)
         ->and(DB::table('servers')->count())->toBe(1)
         ->and(DB::table('subscriptions')->count())->toBe(1);
+});
+
+it('creates RLS policies unconditionally via the migration (no flag required)', function () {
+    // Regression for the chicken-and-egg: the migration used to early-return
+    // when OMNEX_ENFORCE_RLS was off, yet was recorded as run — so flipping
+    // the flag later never created the policies. RefreshDatabase runs the
+    // migrations with the flag off, so this proves they exist without any
+    // manual apply.
+    $policy = DB::table('pg_policies')
+        ->where('schemaname', 'public')
+        ->where('tablename', 'drive_files')
+        ->where('policyname', 'tenant_read')
+        ->exists();
+
+    $rls = DB::selectOne(
+        "SELECT relrowsecurity::text AS enabled, relforcerowsecurity::text AS forced "
+        ."FROM pg_class WHERE oid = 'drive_files'::regclass"
+    );
+
+    expect($policy)->toBeTrue()
+        ->and($rls->enabled)->toBe('true')
+        ->and($rls->forced)->toBe('true');
 });
 
 it('blocks writing another tenant\'s rows under RLS', function () {

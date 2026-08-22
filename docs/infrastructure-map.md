@@ -201,6 +201,11 @@ omnex-*      vs   acelife-*          (containers, volumes, services)
 - Migration `000046` : étend RLS aux 26 tables tenant-scoped (Drive, Sites,
   Billing, Cloud, Security, SSL, DNS) avec **échappement système**
   (`nexus_current_tenant() IS NULL`) + **`FORCE ROW LEVEL SECURITY`**.
+  Création **inconditionnelle** (corrigé le 21/08) : le gating sur
+  `OMNEX_ENFORCE_RLS` était un cercle vicieux — la migration est enregistrée
+  comme exécutée même en early-return, donc les policies n'étaient jamais créées.
+- Migration `000048` : pont pour les déploiements où `000046` a déjà tourné en
+  no-op ; rejoue les policies de `000046` de façon idempotente.
 - Séparation de rôles : migration `000047` provisionne `omnex_app` (LOGIN,
   `NOSUPERUSER`, `NOBYPASSRLS`) avec les grants DML + `ALTER DEFAULT
   PRIVILEGES` ; `config/database.php` ajoute la connexion `pgsql_migrate`

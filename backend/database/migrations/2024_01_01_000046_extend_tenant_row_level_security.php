@@ -65,10 +65,12 @@ return new class extends Migration
 
     public function up(): void
     {
-        if (! config('omnex.enforce_rls')) {
-            return;
-        }
-
+        // Unconditional: the policies carry a `nexus_current_tenant() IS NULL`
+        // escape hatch, so they are safe even while OMNEX_ENFORCE_RLS is off
+        // (no tenant GUC set => every row is visible; ResolveTenant only sets
+        // the GUC when the flag is on). Gating this on the flag was a
+        // chicken-and-egg: Laravel records the migration as run even when it
+        // early-returns, so flipping the flag later never created the policies.
         foreach (self::TENANT_TABLES as $table) {
             DB::statement("ALTER TABLE {$table} ENABLE ROW LEVEL SECURITY");
             DB::statement("ALTER TABLE {$table} FORCE ROW LEVEL SECURITY");
