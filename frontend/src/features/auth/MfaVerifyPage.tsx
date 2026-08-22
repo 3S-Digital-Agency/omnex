@@ -26,7 +26,7 @@ export function MfaVerifyPage() {
     setLoading(true);
     try {
       await verifyMfa(code, recoveryCode);
-      navigate('/');
+      navigate('/overview');
     } catch (err) {
       setError(errorMessage(err));
     } finally {

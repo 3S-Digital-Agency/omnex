@@ -41,7 +41,7 @@ export function CommandPalette() {
 
   const commands = useMemo<Command[]>(() => {
     const all: Command[] = [
-      { label: t('nav.goto', { name: t('nav.overview') }), icon: LayoutDashboard, action: () => navigate('/') },
+      { label: t('nav.goto', { name: t('nav.overview') }), icon: LayoutDashboard, action: () => navigate('/overview') },
       ...modules.map((module) => ({
         label: t('nav.goto', { name: moduleName(module.id) }),
         icon: module.icon,

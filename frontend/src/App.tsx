@@ -31,7 +31,7 @@ import { ContactPage } from './features/marketing/ContactPage';
 import { LandingPageRoute } from './features/marketing/LandingPageRoute';
 import { LandingPagesPage } from './features/marketing/LandingPagesPage';
 
-function RequireAuth({ children }: { children: ReactNode }) {
+export function RequireAuth({ children }: { children: ReactNode }) {
   const { status, activeOrganization } = useAuth();
   const location = useLocation();
 
@@ -60,10 +60,12 @@ function Home() {
   if (status === 'mfa') return <Navigate to="/mfa" replace />;
   if (!activeOrganization) return <Navigate to="/organizations" replace />;
 
+  // Authenticated members land on the vitrine here too; the Command Center
+  // overview lives at /overview.
   return (
-    <AppShell>
-      <DashboardPage />
-    </AppShell>
+    <MarketingLayout>
+      <MarketingHomePage />
+    </MarketingLayout>
   );
 }
 
@@ -74,7 +76,7 @@ export function App() {
 
   return (
     <Routes>
-      {/* Public marketing site — shown to visitors, the authenticated app takes over below. */}
+      {/* Marketing site (vitrine) at the root — shown to everyone; the authenticated Command Center lives under /overview and the /xxx routes below. */}
       <Route path="/" element={<Home />} />
       <Route path="/pricing" element={<Navigate to="/#pricing" replace />} />
       <Route
@@ -128,7 +130,7 @@ export function App() {
           </RequireAuth>
         }
       >
-        <Route path="/" element={<DashboardPage />} />
+        <Route path="/overview" element={<DashboardPage />} />
         <Route path="/activity" element={<ActivityPage />} />
         <Route path="/organizations" element={<OrganizationsPage />} />
         <Route path="/members" element={<MembersPage />} />

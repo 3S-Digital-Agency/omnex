@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, LayoutDashboard } from 'lucide-react';
+import { useAuth } from '../../app/AuthProvider';
 import { brand } from '../../lib/brand';
 import { setPublicLocale, useI18n } from '../../lib/i18n';
 import { Button } from '../../components/ui/Button';
@@ -11,6 +12,7 @@ import { AbDebugPanel } from './AbDebugPanel';
 
 export function MarketingLayout({ children }: { children: ReactNode }) {
   const { t } = useI18n();
+  const { status } = useAuth();
   usePageviewTracking();
 
   const navLinks = [
@@ -54,17 +56,28 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="flex items-center gap-3">
-            <Link to="/login">
-              <Button variant="ghost" size="sm">
-                {t('marketing.signIn')}
-              </Button>
-            </Link>
-            <Link to="/login">
-              <Button size="sm">
-                {t('marketing.getStarted')}
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
+            {status === 'authenticated' ? (
+              <Link to="/overview">
+                <Button size="sm">
+                  <LayoutDashboard className="h-4 w-4" />
+                  {t('marketing.console')}
+                </Button>
+              </Link>
+            ) : (
+              <>
+                <Link to="/login">
+                  <Button variant="ghost" size="sm">
+                    {t('marketing.signIn')}
+                  </Button>
+                </Link>
+                <Link to="/login">
+                  <Button size="sm">
+                    {t('marketing.getStarted')}
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -107,8 +120,12 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
             <FooterColumn
               title={t('marketing.footer.company')}
               links={[
-                { to: '/login', label: t('marketing.getStarted') },
-                { to: '/login', label: t('marketing.footer.signIn') },
+                status === 'authenticated'
+                  ? { to: '/overview', label: t('marketing.console') }
+                  : { to: '/login', label: t('marketing.getStarted') },
+                ...(status === 'authenticated'
+                  ? []
+                  : [{ to: '/login', label: t('marketing.footer.signIn') }]),
                 { to: '/contact', label: t('marketing.nav.contact') },
               ]}
             />

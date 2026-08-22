@@ -25,7 +25,7 @@ export function SocialCallbackPage() {
     }
 
     completeSocial(code)
-      .then(() => navigate('/', { replace: true }))
+      .then(() => navigate('/overview', { replace: true }))
       .catch(() => setError(true));
   }, [code, completeSocial, navigate]);
 

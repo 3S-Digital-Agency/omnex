@@ -59,7 +59,7 @@ export function PasskeyLoginButton({ compact = false }: { compact?: boolean }) {
           });
           if (assertion && assertion.type === 'public-key') {
             await signInWithPasskey(assertion as PublicKeyCredential);
-            navigate('/', { replace: true });
+            navigate('/overview', { replace: true });
             return;
           }
         } catch {
@@ -69,7 +69,7 @@ export function PasskeyLoginButton({ compact = false }: { compact?: boolean }) {
 
       // Sandbox fallback: complete the passkey sign-in against the mock.
       await signInWithPasskey(null);
-      navigate('/', { replace: true });
+      navigate('/overview', { replace: true });
     } catch (err) {
       if (err instanceof DeviceVerificationRequired) {
         setVerificationToken(err.verificationToken);
@@ -88,7 +88,7 @@ export function PasskeyLoginButton({ compact = false }: { compact?: boolean }) {
     setError(null);
     try {
       await verifyDevice(verificationToken, code.trim());
-      navigate('/', { replace: true });
+      navigate('/overview', { replace: true });
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -163,7 +163,7 @@ export function PasskeyLoginButton({ compact = false }: { compact?: boolean }) {
     setError(null);
     try {
       await signInWithPasskey(null);
-      navigate('/', { replace: true });
+      navigate('/overview', { replace: true });
     } catch (err) {
       if (err instanceof DeviceVerificationRequired) {
         setVerificationToken(err.verificationToken);

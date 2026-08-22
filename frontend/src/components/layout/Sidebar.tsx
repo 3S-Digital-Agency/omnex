@@ -1,8 +1,11 @@
+import { useRef, useState } from 'react';
+import type { TouchEvent } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import {
   Activity,
   Command,
   CreditCard,
+  ExternalLink,
   Globe,
   HardDrive,
   LayoutDashboard,
@@ -39,7 +42,7 @@ const sections: NavSection[] = [
   {
     labelKey: 'nav.platform',
     items: [
-      { to: '/', labelKey: 'nav.overview', icon: LayoutDashboard },
+      { to: '/overview', labelKey: 'nav.overview', icon: LayoutDashboard },
       { to: '/activity', labelKey: 'nav.activity', icon: Activity },
     ],
   },
@@ -65,26 +68,92 @@ const sections: NavSection[] = [
   },
 ];
 
+// Drawer width (w-60 = 15rem) and the leftward drag distance that dismisses
+// the drawer on release.
+const DRAWER_WIDTH = 240;
+const CLOSE_THRESHOLD = 80;
+
 export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: () => void }) {
   const { user } = useAuth();
   const { t } = useI18n();
   const { enabled, isLoading } = useFeatures();
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const dragging = useRef(false);
+  // Live horizontal drag offset in px (negative = pulled left); `null` means
+  // not dragging and the position follows the `open` prop.
+  const [dragX, setDragX] = useState<number | null>(null);
 
   const visible = (item: NavItem): boolean => !item.feature || isLoading || enabled(item.feature);
 
+  function onTouchStart(event: TouchEvent<HTMLElement>) {
+    // Only the mobile drawer (open) is draggable; the static desktop sidebar
+    // must never shift.
+    if (!open) return;
+    touchStart.current = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+    dragging.current = false;
+  }
+
+  function onTouchMove(event: TouchEvent<HTMLElement>) {
+    if (!touchStart.current || event.touches.length === 0) return;
+    const dx = event.touches[0].clientX - touchStart.current.x;
+    const dy = event.touches[0].clientY - touchStart.current.y;
+
+    // Begin the horizontal drag only once the gesture is clearly horizontal,
+    // so vertical scrolling of the nav is never hijacked.
+    if (!dragging.current) {
+      if (Math.abs(dx) > Math.abs(dy) && dx < -6) {
+        dragging.current = true;
+      } else {
+        return;
+      }
+    }
+
+    // Follow the finger, clamped between closed and open.
+    setDragX(Math.max(-DRAWER_WIDTH, Math.min(0, dx)));
+  }
+
+  function onTouchEnd(event: TouchEvent<HTMLElement>) {
+    const start = touchStart.current;
+    touchStart.current = null;
+    dragging.current = false;
+    setDragX(null);
+
+    if (!start) return;
+    const dx = event.changedTouches[0].clientX - start.x;
+    const dy = event.changedTouches[0].clientY - start.y;
+    // Close on a leftward, predominantly-horizontal swipe past the threshold;
+    // otherwise the drawer snaps back open.
+    if (dx < -CLOSE_THRESHOLD && Math.abs(dx) > Math.abs(dy)) {
+      onClose?.();
+    }
+  }
+
   return (
     <aside
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onTouchCancel={() => {
+        touchStart.current = null;
+        dragging.current = false;
+        setDragX(null);
+      }}
+      style={
+        dragX !== null
+          ? { transform: `translateX(${dragX}px)`, transition: 'none' }
+          : undefined
+      }
       className={cn(
-        'fixed inset-y-0 left-0 z-50 flex w-60 shrink-0 flex-col border-r border-edge bg-panel transition-transform duration-200 ease-in-out',
-        'md:static md:translate-x-0',
+        'fixed inset-y-0 left-0 z-50 flex w-60 shrink-0 flex-col border-r border-edge bg-panel transition-transform duration-200 ease-in-out touch-pan-y',
+        'md:static md:translate-x-0 md:touch-auto',
         open ? 'translate-x-0' : '-translate-x-full',
       )}
     >
       <div className="flex items-center justify-between border-b border-edge px-4 py-4">
         <Link
           to="/"
-          title={t('nav.overview')}
-          aria-label={t('nav.overview')}
+          title={t('nav.viewSite')}
+          aria-label={t('nav.viewSite')}
           className="transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded-lg"
         >
           <img src="/logo.png" alt={`${brand.name} logo`} className="h-auto w-40 rounded-lg" />
@@ -110,7 +179,7 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  end={item.to === '/'}
+                  end={item.to === '/overview'}
                   onClick={onClose}
                   className={({ isActive }) =>
                     cn(
@@ -131,6 +200,13 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
       </nav>
 
       <div className="border-t border-edge p-4">
+        <Link
+          to="/"
+          className="mb-3 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-zinc-400 transition-colors hover:bg-raised hover:text-white"
+        >
+          <ExternalLink className="h-4 w-4" />
+          {t('nav.viewSite')}
+        </Link>
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-700 text-xs font-bold text-zinc-950">
             {initials(user?.name ?? '')}

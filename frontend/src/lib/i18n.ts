@@ -55,6 +55,7 @@ const messages: Record<string, Record<string, string>> = {
     'nav.logout': 'Log out',
     'nav.openMenu': 'Open navigation',
     'nav.closeMenu': 'Close navigation',
+    'nav.viewSite': 'Public website',
 
     // Notifications
     'notifications.title': 'Notifications',
@@ -1039,6 +1040,7 @@ const messages: Record<string, Record<string, string>> = {
     'marketing.nav.contact': 'Contact',
     'marketing.signIn': 'Sign in',
     'marketing.getStarted': 'Get started',
+    'marketing.console': 'Dashboard',
     'marketing.cta.trial': 'Start free trial',
     'marketing.cta.sales': 'Talk to sales',
     'marketing.cta.quote': 'Request a quote',
@@ -1268,6 +1270,7 @@ const messages: Record<string, Record<string, string>> = {
     'nav.logout': 'Déconnexion',
     'nav.openMenu': 'Ouvrir la navigation',
     'nav.closeMenu': 'Fermer la navigation',
+    'nav.viewSite': 'Site vitrine',
 
     // Notifications
     'notifications.title': 'Notifications',
@@ -2253,6 +2256,7 @@ const messages: Record<string, Record<string, string>> = {
     'marketing.nav.contact': 'Contact',
     'marketing.signIn': 'Connexion',
     'marketing.getStarted': 'Commencer',
+    'marketing.console': 'Tableau de bord',
     'marketing.cta.trial': 'Essai gratuit',
     'marketing.cta.sales': 'Parler à un conseiller',
     'marketing.cta.quote': 'Demander une soumission',

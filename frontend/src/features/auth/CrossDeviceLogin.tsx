@@ -96,7 +96,7 @@ export function CrossDeviceLogin() {
       if (assertion && assertion.type === 'public-key') {
         await signInWithPasskey(assertion as PublicKeyCredential);
         setStep('done');
-        navigate('/', { replace: true });
+        navigate('/overview', { replace: true });
       }
     } catch {
       // Cancelled or unsupported — fall through to the sandbox pairing.
@@ -118,7 +118,7 @@ export function CrossDeviceLogin() {
         device_id: getDeviceId(),
       });
       setStep('done');
-      navigate('/', { replace: true });
+      navigate('/overview', { replace: true });
     } catch (err) {
       if (err instanceof DeviceVerificationRequired) {
         setVerificationToken(err.verificationToken);
@@ -139,7 +139,7 @@ export function CrossDeviceLogin() {
     try {
       await verifyDevice(verificationToken, code.trim());
       setStep('done');
-      navigate('/', { replace: true });
+      navigate('/overview', { replace: true });
     } catch (err) {
       setError(errorMessage(err));
     } finally {
