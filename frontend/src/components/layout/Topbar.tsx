@@ -1,11 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, ChevronsUpDown, LogOut, Plus, Search } from 'lucide-react';
+import { Check, ChevronsUpDown, LogOut, Menu, Plus, Search } from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
 import { useI18n } from '../../lib/i18n';
 import { NotificationBell } from './NotificationBell';
 
-export function Topbar() {
+export function Topbar({
+  sidebarOpen,
+  onToggleSidebar,
+}: {
+  sidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
+}) {
   const { activeOrganization, memberships, switchOrganization, logout } = useAuth();
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -29,7 +35,17 @@ export function Topbar() {
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-edge bg-surface px-6">
-      <div className="relative" ref={ref}>
+      <div className="flex min-w-0 items-center gap-2">
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-raised hover:text-white md:hidden"
+          aria-label={t('nav.openMenu')}
+          aria-expanded={sidebarOpen ?? false}
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <div className="relative" ref={ref}>
         <button
           onClick={() => setOpen((o) => !o)}
           className="flex items-center gap-2 rounded-md border border-edge bg-panel px-3 py-1.5 text-sm transition-colors hover:bg-raised"
@@ -71,6 +87,7 @@ export function Topbar() {
             </button>
           </div>
         ) : null}
+        </div>
       </div>
 
       <div className="flex items-center gap-2">

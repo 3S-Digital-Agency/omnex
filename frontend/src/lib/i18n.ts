@@ -53,6 +53,8 @@ const messages: Record<string, Record<string, string>> = {
     'nav.pressCtrlK': 'Press Ctrl K',
     'nav.search': 'Search',
     'nav.logout': 'Log out',
+    'nav.openMenu': 'Open navigation',
+    'nav.closeMenu': 'Close navigation',
 
     // Notifications
     'notifications.title': 'Notifications',
@@ -1264,6 +1266,8 @@ const messages: Record<string, Record<string, string>> = {
     'nav.pressCtrlK': 'Appuyez sur Ctrl K',
     'nav.search': 'Rechercher',
     'nav.logout': 'Déconnexion',
+    'nav.openMenu': 'Ouvrir la navigation',
+    'nav.closeMenu': 'Fermer la navigation',
 
     // Notifications
     'notifications.title': 'Notifications',

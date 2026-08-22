@@ -13,6 +13,7 @@ import {
   Settings,
   ShieldCheck,
   Users,
+  X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
@@ -64,7 +65,7 @@ const sections: NavSection[] = [
   },
 ];
 
-export function Sidebar() {
+export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: () => void }) {
   const { user } = useAuth();
   const { t } = useI18n();
   const { enabled, isLoading } = useFeatures();
@@ -72,8 +73,14 @@ export function Sidebar() {
   const visible = (item: NavItem): boolean => !item.feature || isLoading || enabled(item.feature);
 
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r border-edge bg-panel">
-      <div className="flex justify-center border-b border-edge px-4 py-4">
+    <aside
+      className={cn(
+        'fixed inset-y-0 left-0 z-50 flex w-60 shrink-0 flex-col border-r border-edge bg-panel transition-transform duration-200 ease-in-out',
+        'md:static md:translate-x-0',
+        open ? 'translate-x-0' : '-translate-x-full',
+      )}
+    >
+      <div className="flex items-center justify-between border-b border-edge px-4 py-4">
         <Link
           to="/"
           title={t('nav.overview')}
@@ -82,6 +89,14 @@ export function Sidebar() {
         >
           <img src="/logo.png" alt={`${brand.name} logo`} className="h-auto w-40 rounded-lg" />
         </Link>
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-raised hover:text-white md:hidden"
+          aria-label={t('nav.closeMenu')}
+        >
+          <X className="h-5 w-5" />
+        </button>
       </div>
 
       <nav className="flex-1 space-y-4 overflow-y-auto p-2">
@@ -96,6 +111,7 @@ export function Sidebar() {
                   key={item.to}
                   to={item.to}
                   end={item.to === '/'}
+                  onClick={onClose}
                   className={({ isActive }) =>
                     cn(
                       'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
