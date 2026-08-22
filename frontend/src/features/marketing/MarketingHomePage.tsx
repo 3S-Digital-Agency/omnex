@@ -16,6 +16,8 @@ import {
 import { useI18n } from '../../lib/i18n';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Reveal } from '../../components/Reveal';
+import { CountUp } from '../../components/CountUp';
 import { track } from '../../lib/analytics';
 import { abProperties, useExperiment } from '../../lib/ab';
 import { faqJsonLd, organizationJsonLd, useHreflang, useJsonLd, webSiteJsonLd } from './seo';
@@ -30,11 +32,18 @@ const services = [
   { id: 'billing', icon: CreditCard, path: '/marketing/billing' },
 ];
 
-const stats = [
-  { key: 'marketing.stat.servers', value: '10k+' },
-  { key: 'marketing.stat.domains', value: '25k+' },
-  { key: 'marketing.stat.deploys', value: '1M+' },
-  { key: 'marketing.stat.uptime', value: '99.9%' },
+interface Stat {
+  key: string;
+  end: number;
+  decimals?: number;
+  suffix?: string;
+}
+
+const stats: Stat[] = [
+  { key: 'marketing.stat.servers', end: 10, suffix: 'k+' },
+  { key: 'marketing.stat.domains', end: 25, suffix: 'k+' },
+  { key: 'marketing.stat.deploys', end: 1, suffix: 'M+' },
+  { key: 'marketing.stat.uptime', end: 99.9, decimals: 1, suffix: '%' },
 ];
 
 const features = [
@@ -102,62 +111,84 @@ export function MarketingHomePage() {
       {/* Hero */}
       <section className="relative overflow-hidden">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.06),transparent_60%)]" />
+        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+          <div className="omnex-anim-float-slow absolute -top-16 left-[10%] h-80 w-80 rounded-full bg-white/5 blur-3xl" />
+          <div className="omnex-anim-glow-pulse absolute top-10 right-[8%] h-64 w-64 rounded-full bg-white/5 blur-3xl" />
+        </div>
+        <div
+          className="omnex-anim-gradient pointer-events-none absolute inset-0 opacity-70"
+          aria-hidden="true"
+          style={{
+            backgroundImage:
+              'radial-gradient(45% 55% at 25% 20%, rgba(255,255,255,0.07), transparent 60%), radial-gradient(40% 50% at 75% 25%, rgba(255,255,255,0.05), transparent 60%)',
+          }}
+        />
         <div className="relative mx-auto max-w-7xl px-4 py-24 text-center sm:px-6 sm:py-32 lg:px-8">
-          <Badge tone="brand" className="mb-6">
-            {t('marketing.badge')}
-          </Badge>
-          <h1 className="mx-auto max-w-4xl text-4xl font-bold tracking-tight text-white sm:text-6xl">
-            {t(heroTitleKey)}
-          </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-zinc-400">
-            {t(heroSubtitleKey)}
-          </p>
-          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link to="/login" onClick={() => track('cta_clicked', { cta: 'hero_start', ...ab })}>
-              <Button size="lg" className="w-full sm:w-auto">
-                {t(heroCtaKey)}
-                <ArrowRight className="h-5 w-5" />
-              </Button>
-            </Link>
-            <a href="#services">
-              <Button variant="outline" size="lg" className="w-full sm:w-auto">
-                {t('marketing.hero.secondary')}
-              </Button>
-            </a>
-          </div>
+          <Reveal>
+            <Badge tone="brand" className="mb-6">
+              {t('marketing.badge')}
+            </Badge>
+          </Reveal>
+          <Reveal delay={80}>
+            <h1 className="mx-auto max-w-4xl text-4xl font-bold tracking-tight text-white sm:text-6xl">
+              {t(heroTitleKey)}
+            </h1>
+          </Reveal>
+          <Reveal delay={160}>
+            <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-zinc-400">
+              {t(heroSubtitleKey)}
+            </p>
+          </Reveal>
+          <Reveal delay={240}>
+            <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+              <Link to="/login" onClick={() => track('cta_clicked', { cta: 'hero_start', ...ab })}>
+                <Button size="lg" className="w-full sm:w-auto">
+                  {t(heroCtaKey)}
+                  <ArrowRight className="h-5 w-5" />
+                </Button>
+              </Link>
+              <a href="#services">
+                <Button variant="outline" size="lg" className="w-full sm:w-auto">
+                  {t('marketing.hero.secondary')}
+                </Button>
+              </a>
+            </div>
+          </Reveal>
 
           {/* Product preview card */}
-          <div className="mx-auto mt-16 max-w-4xl">
-            <div className="rounded-2xl border border-white/10 bg-[#121214] p-2 shadow-2xl">
-              <div className="flex items-center gap-1.5 border-b border-white/5 px-4 py-3">
-                <span className="h-3 w-3 rounded-full bg-red-500/70" />
-                <span className="h-3 w-3 rounded-full bg-amber-500/70" />
-                <span className="h-3 w-3 rounded-full bg-emerald-500/70" />
-                <span className="ml-3 text-xs text-zinc-500">console.omnex.cloud — Command Center</span>
-              </div>
-              <div className="grid grid-cols-3 gap-3 p-4 sm:grid-cols-6">
-                {services.map((service) => {
-                  const Icon = service.icon;
-                  return (
-                    <div
-                      key={service.id}
-                      className="flex flex-col items-center gap-2 rounded-lg border border-white/5 bg-[#16161a] p-4"
-                    >
-                      <Icon className="h-6 w-6 text-zinc-300" />
-                      <span className="text-xs text-zinc-400">{t(`module.${service.id}.name`)}</span>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="flex items-center justify-between border-t border-white/5 px-4 py-3">
-                <span className="flex items-center gap-2 text-xs text-emerald-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                  {t('common.live')}
-                </span>
-                <span className="text-xs text-zinc-500">{t('dashboard.liveActivity')}</span>
+          <Reveal delay={320} y={28}>
+            <div className="mx-auto mt-16 max-w-4xl">
+              <div className="rounded-2xl border border-white/10 bg-[#121214] p-2 shadow-2xl">
+                <div className="flex items-center gap-1.5 border-b border-white/5 px-4 py-3">
+                  <span className="h-3 w-3 rounded-full bg-red-500/70" />
+                  <span className="h-3 w-3 rounded-full bg-amber-500/70" />
+                  <span className="h-3 w-3 rounded-full bg-emerald-500/70" />
+                  <span className="ml-3 text-xs text-zinc-500">console.omnex.cloud — Command Center</span>
+                </div>
+                <div className="grid grid-cols-3 gap-3 p-4 sm:grid-cols-6">
+                  {services.map((service) => {
+                    const Icon = service.icon;
+                    return (
+                      <div
+                        key={service.id}
+                        className="flex flex-col items-center gap-2 rounded-lg border border-white/5 bg-[#16161a] p-4 transition-all duration-300 hover:-translate-y-1 hover:border-white/15 hover:bg-[#1a1a20]"
+                      >
+                        <Icon className="h-6 w-6 text-zinc-300" />
+                        <span className="text-xs text-zinc-400">{t(`module.${service.id}.name`)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center justify-between border-t border-white/5 px-4 py-3">
+                  <span className="flex items-center gap-2 text-xs text-emerald-400">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                    {t('common.live')}
+                  </span>
+                  <span className="text-xs text-zinc-500">{t('dashboard.liveActivity')}</span>
+                </div>
               </div>
             </div>
-          </div>
+          </Reveal>
         </div>
       </section>
 
@@ -167,123 +198,142 @@ export function MarketingHomePage() {
           <p className="text-center text-xs font-semibold uppercase tracking-widest text-zinc-500">
             {t('marketing.hero.trustedBy')}
           </p>
-          <dl className="mt-8 grid grid-cols-2 gap-8 sm:grid-cols-4">
-            {stats.map((stat) => (
-              <div key={stat.key} className="text-center">
-                <dt className="order-last mt-1 text-sm text-zinc-500">{t(stat.key)}</dt>
-                <dd className="text-3xl font-bold tracking-tight text-white">{stat.value}</dd>
-              </div>
-            ))}
-          </dl>
+          <Reveal delay={100}>
+            <dl className="mt-8 grid grid-cols-2 gap-8 sm:grid-cols-4">
+              {stats.map((stat) => (
+                <div key={stat.key} className="text-center">
+                  <dt className="order-last mt-1 text-sm text-zinc-500">{t(stat.key)}</dt>
+                  <dd className="text-3xl font-bold tracking-tight text-white">
+                    <CountUp end={stat.end} decimals={stat.decimals ?? 0} suffix={stat.suffix ?? ''} />
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </Reveal>
         </div>
       </section>
 
       {/* Services */}
       <section id="services" className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            {t('marketing.platform.title')}
-          </h2>
-          <p className="mt-4 text-lg text-zinc-400">{t('marketing.platform.subtitle')}</p>
-        </div>
-        <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {services.map((service) => {
-            const Icon = service.icon;
-            return (
-              <Link
-                key={service.id}
-                to={service.path}
-                className="group rounded-2xl border border-white/5 bg-[#121214] p-6 transition-colors hover:border-white/15 hover:bg-[#16161a]"
-              >
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-white/5">
-                  <Icon className="h-5 w-5 text-white" />
-                </div>
-                <h3 className="mt-4 text-lg font-semibold text-white">{t(`module.${service.id}.name`)}</h3>
-                <p className="mt-1 text-sm text-zinc-500">{t(`module.${service.id}.tagline`)}</p>
-                <p className="mt-3 text-sm leading-relaxed text-zinc-400">
-                  {t(`module.${service.id}.description`)}
-                </p>
-                <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-brand-200 opacity-0 transition-opacity group-hover:opacity-100">
-                  {t('marketing.cta.trial')}
-                  <ArrowRight className="h-4 w-4" />
-                </span>
-              </Link>
-            );
-          })}
-        </div>
+        <Reveal>
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              {t('marketing.platform.title')}
+            </h2>
+            <p className="mt-4 text-lg text-zinc-400">{t('marketing.platform.subtitle')}</p>
+          </div>
+        </Reveal>
+        <Reveal delay={100}>
+          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {services.map((service) => {
+              const Icon = service.icon;
+              return (
+                <Link
+                  key={service.id}
+                  to={service.path}
+                  className="group rounded-2xl border border-white/5 bg-[#121214] p-6 transition-all duration-300 hover:-translate-y-1 hover:border-white/15 hover:bg-[#16161a] hover:shadow-xl hover:shadow-black/40"
+                >
+                  <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-white/5 transition-colors duration-300 group-hover:bg-white/10">
+                    <Icon className="h-5 w-5 text-white transition-transform duration-300 group-hover:scale-110" />
+                  </div>
+                  <h3 className="mt-4 text-lg font-semibold text-white">{t(`module.${service.id}.name`)}</h3>
+                  <p className="mt-1 text-sm text-zinc-500">{t(`module.${service.id}.tagline`)}</p>
+                  <p className="mt-3 text-sm leading-relaxed text-zinc-400">
+                    {t(`module.${service.id}.description`)}
+                  </p>
+                  <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-brand-200 opacity-0 transition-opacity group-hover:opacity-100">
+                    {t('marketing.cta.trial')}
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </Reveal>
       </section>
 
       {/* Features */}
       <section className="border-y border-white/5 bg-[#0d0d10]">
         <div className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-              {t('marketing.features.title')}
-            </h2>
-            <p className="mt-4 text-lg text-zinc-400">{t('marketing.features.subtitle')}</p>
-          </div>
-          <div className="mt-14 grid gap-6 sm:grid-cols-2">
-            {features.map((feature) => {
-              const Icon = feature.icon;
-              return (
-                <div key={feature.titleKey} className="rounded-2xl border border-white/5 bg-[#121214] p-6">
-                  <Icon className="h-6 w-6 text-brand-200" />
-                  <h3 className="mt-4 text-lg font-semibold text-white">{t(feature.titleKey)}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-zinc-400">{t(feature.descKey)}</p>
-                </div>
-              );
-            })}
-          </div>
+          <Reveal>
+            <div className="mx-auto max-w-2xl text-center">
+              <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                {t('marketing.features.title')}
+              </h2>
+              <p className="mt-4 text-lg text-zinc-400">{t('marketing.features.subtitle')}</p>
+            </div>
+          </Reveal>
+          <Reveal delay={100}>
+            <div className="mt-14 grid gap-6 sm:grid-cols-2">
+              {features.map((feature) => {
+                const Icon = feature.icon;
+                return (
+                  <div
+                    key={feature.titleKey}
+                    className="group rounded-2xl border border-white/5 bg-[#121214] p-6 transition-all duration-300 hover:-translate-y-1 hover:border-white/15 hover:bg-[#16161a] hover:shadow-xl hover:shadow-black/40"
+                  >
+                    <Icon className="h-6 w-6 text-brand-200 transition-transform duration-300 group-hover:scale-110" />
+                    <h3 className="mt-4 text-lg font-semibold text-white">{t(feature.titleKey)}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-zinc-400">{t(feature.descKey)}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </Reveal>
         </div>
       </section>
 
       {/* Pricing teaser */}
       <section id="pricing" className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            {t('marketing.pricing.title')}
-          </h2>
-          <p className="mt-4 text-lg text-zinc-400">{t('marketing.pricing.subtitle')}</p>
-        </div>
-        <div className="mt-14 grid gap-6 lg:grid-cols-3">
-          <PricingCard
-            name={t('marketing.pricing.free.name')}
-            price={t('marketing.pricing.free.price')}
-            description={t('marketing.pricing.free.desc')}
-            features={[t('marketing.pricing.feature1')]}
-            cta={t('marketing.pricing.cta', { name: t('marketing.pricing.free.name') })}
-            to="/login"
-            highlighted={pricingExp.variant === 'free'}
-          />
-          <PricingCard
-            name={t('marketing.pricing.pro.name')}
-            price={t('marketing.pricing.pro.price')}
-            description={t('marketing.pricing.pro.desc')}
-            features={[
-              t('marketing.pricing.feature1'),
-              t('marketing.pricing.feature2'),
-              t('marketing.pricing.feature3'),
-              t('marketing.pricing.feature4'),
-            ]}
-            cta={t('marketing.pricing.cta', { name: t('marketing.pricing.pro.name') })}
-            to="/login"
-            highlighted={pricingExp.variant !== 'free'}
-          />
-          <PricingCard
-            name={t('marketing.pricing.business.name')}
-            price={t('marketing.pricing.business.price')}
-            description={t('marketing.pricing.business.desc')}
-            features={[
-              t('marketing.pricing.feature1'),
-              t('marketing.pricing.feature2'),
-              t('marketing.pricing.feature3'),
-              t('marketing.pricing.feature4'),
-            ]}
-            cta={t('marketing.pricing.contact')}
-            to="/contact"
-            highlighted={false}
-          />
-        </div>
+        <Reveal>
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              {t('marketing.pricing.title')}
+            </h2>
+            <p className="mt-4 text-lg text-zinc-400">{t('marketing.pricing.subtitle')}</p>
+          </div>
+        </Reveal>
+        <Reveal delay={100}>
+          <div className="mt-14 grid gap-6 lg:grid-cols-3">
+            <PricingCard
+              name={t('marketing.pricing.free.name')}
+              price={t('marketing.pricing.free.price')}
+              description={t('marketing.pricing.free.desc')}
+              features={[t('marketing.pricing.feature1')]}
+              cta={t('marketing.pricing.cta', { name: t('marketing.pricing.free.name') })}
+              to="/login"
+              highlighted={pricingExp.variant === 'free'}
+            />
+            <PricingCard
+              name={t('marketing.pricing.pro.name')}
+              price={t('marketing.pricing.pro.price')}
+              description={t('marketing.pricing.pro.desc')}
+              features={[
+                t('marketing.pricing.feature1'),
+                t('marketing.pricing.feature2'),
+                t('marketing.pricing.feature3'),
+                t('marketing.pricing.feature4'),
+              ]}
+              cta={t('marketing.pricing.cta', { name: t('marketing.pricing.pro.name') })}
+              to="/login"
+              highlighted={pricingExp.variant !== 'free'}
+            />
+            <PricingCard
+              name={t('marketing.pricing.business.name')}
+              price={t('marketing.pricing.business.price')}
+              description={t('marketing.pricing.business.desc')}
+              features={[
+                t('marketing.pricing.feature1'),
+                t('marketing.pricing.feature2'),
+                t('marketing.pricing.feature3'),
+                t('marketing.pricing.feature4'),
+              ]}
+              cta={t('marketing.pricing.contact')}
+              to="/contact"
+              highlighted={false}
+            />
+          </div>
+        </Reveal>
 
         {/* Comparison table */}
         <div className="mx-auto mt-16 max-w-5xl">
@@ -323,77 +373,88 @@ export function MarketingHomePage() {
       {/* Testimonials */}
       <section className="border-y border-white/5 bg-[#0d0d10]">
         <div className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-              {t('marketing.testimonials.title')}
-            </h2>
-          </div>
-          <div className="mt-14 grid gap-6 lg:grid-cols-3">
-            {testimonials.map((testimonial) => (
-              <figure key={testimonial.nameKey} className="rounded-2xl border border-white/5 bg-[#121214] p-6">
-                <div className="flex gap-1 text-amber-400" aria-label="5/5">
-                  {'★★★★★'}
-                </div>
-                <blockquote className="mt-4 text-sm leading-relaxed text-zinc-300">
-                  « {t(testimonial.quoteKey)} »
-                </blockquote>
-                <figcaption className="mt-5 flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-white">
-                    {t(testimonial.nameKey).charAt(0)}
-                  </span>
-                  <div>
-                    <div className="text-sm font-semibold text-white">{t(testimonial.nameKey)}</div>
-                    <div className="text-xs text-zinc-500">{t(testimonial.roleKey)}</div>
+          <Reveal>
+            <div className="mx-auto max-w-2xl text-center">
+              <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                {t('marketing.testimonials.title')}
+              </h2>
+            </div>
+          </Reveal>
+          <Reveal delay={100}>
+            <div className="mt-14 grid gap-6 lg:grid-cols-3">
+              {testimonials.map((testimonial) => (
+                <figure
+                  key={testimonial.nameKey}
+                  className="rounded-2xl border border-white/5 bg-[#121214] p-6 transition-all duration-300 hover:-translate-y-1 hover:border-white/15 hover:bg-[#16161a] hover:shadow-xl hover:shadow-black/40"
+                >
+                  <div className="flex gap-1 text-amber-400" aria-label="5/5">
+                    {'★★★★★'}
                   </div>
-                </figcaption>
-              </figure>
-            ))}
-          </div>
+                  <blockquote className="mt-4 text-sm leading-relaxed text-zinc-300">
+                    « {t(testimonial.quoteKey)} »
+                  </blockquote>
+                  <figcaption className="mt-5 flex items-center gap-3">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-white">
+                      {t(testimonial.nameKey).charAt(0)}
+                    </span>
+                    <div>
+                      <div className="text-sm font-semibold text-white">{t(testimonial.nameKey)}</div>
+                      <div className="text-xs text-zinc-500">{t(testimonial.roleKey)}</div>
+                    </div>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          </Reveal>
         </div>
       </section>
 
       {/* FAQ */}
       <section id="faq" className="mx-auto max-w-3xl px-4 py-24 sm:px-6 lg:px-8">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">{t('marketing.faq.title')}</h2>
-          <p className="mt-4 text-lg text-zinc-400">{t('marketing.faq.subtitle')}</p>
-        </div>
-        <div className="mt-12 space-y-4">
-          {faqs.map((faq) => (
-            <details
-              key={faq}
-              className="group rounded-xl border border-white/5 bg-[#121214] open:border-white/15"
-            >
-              <summary className="flex cursor-pointer items-center justify-between gap-4 px-5 py-4 text-sm font-medium text-white">
-                {t(`${faq}.q`)}
-                <span className="text-zinc-500 transition-transform group-open:rotate-45">+</span>
-              </summary>
-              <p className="px-5 pb-5 text-sm leading-relaxed text-zinc-400">{t(`${faq}.a`)}</p>
-            </details>
-          ))}
-        </div>
+        <Reveal>
+          <div className="text-center">
+            <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">{t('marketing.faq.title')}</h2>
+            <p className="mt-4 text-lg text-zinc-400">{t('marketing.faq.subtitle')}</p>
+          </div>
+          <div className="mt-12 space-y-4">
+            {faqs.map((faq) => (
+              <details
+                key={faq}
+                className="group rounded-xl border border-white/5 bg-[#121214] transition-colors duration-300 hover:border-white/15 open:border-white/15"
+              >
+                <summary className="flex cursor-pointer items-center justify-between gap-4 px-5 py-4 text-sm font-medium text-white">
+                  {t(`${faq}.q`)}
+                  <span className="text-zinc-500 transition-transform duration-300 group-open:rotate-45">+</span>
+                </summary>
+                <p className="px-5 pb-5 text-sm leading-relaxed text-zinc-400">{t(`${faq}.a`)}</p>
+              </details>
+            ))}
+          </div>
+        </Reveal>
       </section>
 
       {/* Final CTA */}
       <section className="border-t border-white/5 bg-gradient-to-b from-[#121214] to-[#0a0a0c]">
         <div className="mx-auto max-w-4xl px-4 py-24 text-center sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            {t('marketing.ctaBand.title')}
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl text-lg text-zinc-400">{t('marketing.ctaBand.subtitle')}</p>
-          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link to="/login" onClick={() => track('cta_clicked', { cta: 'final_trial', ...ab })}>
-              <Button size="lg">
-                {t('marketing.cta.trial')}
-                <ArrowRight className="h-5 w-5" />
-              </Button>
-            </Link>
-            <Link to="/contact">
-              <Button variant="outline" size="lg">
-                {t('marketing.cta.sales')}
-              </Button>
-            </Link>
-          </div>
+          <Reveal>
+            <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              {t('marketing.ctaBand.title')}
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-lg text-zinc-400">{t('marketing.ctaBand.subtitle')}</p>
+            <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+              <Link to="/login" onClick={() => track('cta_clicked', { cta: 'final_trial', ...ab })}>
+                <Button size="lg">
+                  {t('marketing.cta.trial')}
+                  <ArrowRight className="h-5 w-5" />
+                </Button>
+              </Link>
+              <Link to="/contact">
+                <Button variant="outline" size="lg">
+                  {t('marketing.cta.sales')}
+                </Button>
+              </Link>
+            </div>
+          </Reveal>
         </div>
       </section>
     </div>
@@ -448,8 +509,10 @@ function PricingCard({
   return to.startsWith('#') ? (
     <a
       href={to}
-      className={`rounded-2xl border p-6 transition-colors ${
-        highlighted ? 'border-brand-800 bg-[#16161a]' : 'border-white/5 bg-[#121214] hover:border-white/15'
+      className={`rounded-2xl border p-6 transition-all duration-300 hover:-translate-y-1 ${
+        highlighted
+          ? 'border-brand-800 bg-[#16161a] shadow-[0_0_40px_rgba(255,255,255,0.06)]'
+          : 'border-white/5 bg-[#121214] hover:border-white/15 hover:shadow-xl hover:shadow-black/40'
       }`}
     >
       {body}
@@ -457,8 +520,10 @@ function PricingCard({
   ) : (
     <Link
       to={to}
-      className={`rounded-2xl border p-6 transition-colors ${
-        highlighted ? 'border-brand-800 bg-[#16161a]' : 'border-white/5 bg-[#121214] hover:border-white/15'
+      className={`rounded-2xl border p-6 transition-all duration-300 hover:-translate-y-1 ${
+        highlighted
+          ? 'border-brand-800 bg-[#16161a] shadow-[0_0_40px_rgba(255,255,255,0.06)]'
+          : 'border-white/5 bg-[#121214] hover:border-white/15 hover:shadow-xl hover:shadow-black/40'
       }`}
     >
       {body}

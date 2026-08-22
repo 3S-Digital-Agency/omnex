@@ -5,6 +5,7 @@ import { api } from '../../lib/api';
 import { errorMessage } from '../../lib/errors';
 import { useI18n } from '../../lib/i18n';
 import { Button } from '../../components/ui/Button';
+import { Reveal } from '../../components/Reveal';
 import { Field } from '../../components/ui/Field';
 import { Input } from '../../components/ui/Input';
 import { Textarea } from '../../components/ui/Textarea';
@@ -104,13 +105,19 @@ export function ContactPage() {
       <section className="relative overflow-hidden">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.06),transparent_60%)]" />
         <div className="relative mx-auto max-w-7xl px-4 py-20 text-center sm:px-6 sm:py-24 lg:px-8">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5">
-            <Mail className="h-7 w-7 text-white" />
-          </div>
-          <h1 className="mx-auto mt-6 max-w-3xl text-4xl font-bold tracking-tight text-white sm:text-5xl">
-            {t('contact.title')}
-          </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-zinc-400">{t('contact.subtitle')}</p>
+          <Reveal>
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5">
+              <Mail className="h-7 w-7 text-white" />
+            </div>
+          </Reveal>
+          <Reveal delay={80}>
+            <h1 className="mx-auto mt-6 max-w-3xl text-4xl font-bold tracking-tight text-white sm:text-5xl">
+              {t('contact.title')}
+            </h1>
+          </Reveal>
+          <Reveal delay={160}>
+            <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-zinc-400">{t('contact.subtitle')}</p>
+          </Reveal>
         </div>
       </section>
 
@@ -196,7 +203,7 @@ export function ContactPage() {
           {/* Alternatives */}
           <aside className="lg:col-span-2">
             <div className="space-y-4">
-              <div className="rounded-2xl border border-white/5 bg-[#121214] p-6">
+              <div className="rounded-2xl border border-white/5 bg-[#121214] p-6 transition-all duration-300 hover:-translate-y-1 hover:border-white/15 hover:bg-[#16161a] hover:shadow-xl hover:shadow-black/40">
                 <h2 className="text-lg font-semibold text-white">{t('contact.direct')}</h2>
                 <p className="mt-2 text-sm text-zinc-400">
                   {t('contact.directHint')}{' '}
@@ -205,7 +212,7 @@ export function ContactPage() {
                   </a>
                 </p>
               </div>
-              <div className="rounded-2xl border border-white/5 bg-[#121214] p-6">
+              <div className="rounded-2xl border border-white/5 bg-[#121214] p-6 transition-all duration-300 hover:-translate-y-1 hover:border-white/15 hover:bg-[#16161a] hover:shadow-xl hover:shadow-black/40">
                 <h2 className="text-lg font-semibold text-white">{t('contact.alt.quote')}</h2>
                 <p className="mt-2 text-sm text-zinc-400">{t('marketing.pricing.business.desc')}</p>
                 <div className="mt-4">
@@ -214,7 +221,7 @@ export function ContactPage() {
                   </Button>
                 </div>
               </div>
-              <div className="rounded-2xl border border-white/5 bg-[#121214] p-6">
+              <div className="rounded-2xl border border-white/5 bg-[#121214] p-6 transition-all duration-300 hover:-translate-y-1 hover:border-white/15 hover:bg-[#16161a] hover:shadow-xl hover:shadow-black/40">
                 <h2 className="text-lg font-semibold text-white">{t('contact.alt.demo')}</h2>
                 <p className="mt-2 text-sm text-zinc-400">{t('marketing.hero.subtitle')}</p>
                 <div className="mt-4">

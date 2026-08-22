@@ -7,8 +7,9 @@ export function Spinner({ className }: { className?: string }) {
 
 export function FullPageLoader() {
   return (
-    <div className="flex h-full min-h-screen items-center justify-center">
-      <Spinner className="h-6 w-6" />
+    <div className="flex h-full min-h-screen flex-col items-center justify-center gap-5">
+      <img src="/logo.png" alt="OMNEX" className="h-12 w-auto animate-pulse" />
+      <Spinner className="h-5 w-5" />
     </div>
   );
 }

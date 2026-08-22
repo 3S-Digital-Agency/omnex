@@ -56,6 +56,8 @@ const messages: Record<string, Record<string, string>> = {
     'nav.openMenu': 'Open navigation',
     'nav.closeMenu': 'Close navigation',
     'nav.viewSite': 'Public website',
+    'app.pullRefresh': 'Pull to refresh',
+    'app.pullRefreshRelease': 'Release to refresh',
 
     // Notifications
     'notifications.title': 'Notifications',
@@ -1271,6 +1273,8 @@ const messages: Record<string, Record<string, string>> = {
     'nav.openMenu': 'Ouvrir la navigation',
     'nav.closeMenu': 'Fermer la navigation',
     'nav.viewSite': 'Site vitrine',
+    'app.pullRefresh': 'Tirez pour recharger',
+    'app.pullRefreshRelease': 'Relâchez pour recharger',
 
     // Notifications
     'notifications.title': 'Notifications',

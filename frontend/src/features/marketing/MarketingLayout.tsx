@@ -7,6 +7,7 @@ import { setPublicLocale, useI18n } from '../../lib/i18n';
 import { Button } from '../../components/ui/Button';
 import { cn } from '../../lib/utils';
 import { usePageviewTracking } from '../../lib/analytics';
+import { ScrollProgress } from '../../components/ScrollProgress';
 import { ConsentBanner } from './ConsentBanner';
 import { AbDebugPanel } from './AbDebugPanel';
 
@@ -25,6 +26,7 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-[#0a0a0c] text-zinc-100">
+      <ScrollProgress />
       {/* Header */}
       <header className="sticky top-0 z-40 border-b border-white/5 bg-[#0a0a0c]/80 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -33,7 +35,7 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
               src="/logo.png"
               alt={`${brand.name} logo`}
               title={t('marketing.footer.desc')}
-              className="h-11 w-auto cursor-help"
+              className="h-11 w-auto cursor-help transition-transform duration-300 hover:scale-[1.04]"
             />
             <span
               role="tooltip"
@@ -64,19 +66,12 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
                 </Button>
               </Link>
             ) : (
-              <>
-                <Link to="/login">
-                  <Button variant="ghost" size="sm">
-                    {t('marketing.signIn')}
-                  </Button>
-                </Link>
-                <Link to="/login">
-                  <Button size="sm">
-                    {t('marketing.getStarted')}
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </Link>
-              </>
+              <Link to="/login">
+                <Button size="sm">
+                  {t('marketing.getStarted')}
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
             )}
           </div>
         </div>

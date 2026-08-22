@@ -5,6 +5,7 @@ import type { LandingPageSection } from '../../lib/api/types';
 import { useI18n } from '../../lib/i18n';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Reveal } from '../../components/Reveal';
 import { track } from '../../lib/analytics';
 import { cn } from '../../lib/utils';
 
@@ -57,6 +58,7 @@ function HeroSection({
     <section className="relative overflow-hidden">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.07),transparent_60%)]" />
       <div className="relative mx-auto max-w-4xl px-4 py-20 text-center sm:px-6 sm:py-28 lg:px-8">
+        <Reveal>
         {section.badge ? (
           <Badge tone="brand" className="mb-6">
             {section.badge}
@@ -81,6 +83,7 @@ function HeroSection({
             </Link>
           ) : null}
         </div>
+        </Reveal>
       </div>
     </section>
   );
@@ -98,7 +101,7 @@ function OfferSection({
       <div className="mx-auto max-w-5xl px-4 py-20 sm:px-6 lg:px-8">
         <div
           className={cn(
-            'mx-auto max-w-xl rounded-3xl border p-8 sm:p-10',
+            'mx-auto max-w-xl rounded-3xl border p-8 sm:p-10 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/40',
             section.highlight
               ? 'border-white/15 bg-gradient-to-b from-[#161618] to-[#121214] shadow-[0_0_60px_rgba(255,255,255,0.05)]'
               : 'border-white/5 bg-[#121214]',
@@ -280,7 +283,10 @@ function FeaturesSection({
         <h2 className="text-center text-3xl font-bold tracking-tight text-white sm:text-4xl">{section.title}</h2>
         <div className="mt-12 grid gap-6 lg:grid-cols-3">
           {section.items.map((item, index) => (
-            <div key={item.title} className="rounded-2xl border border-white/5 bg-[#121214] p-6">
+            <div
+              key={item.title}
+              className="rounded-2xl border border-white/5 bg-[#121214] p-6 transition-all duration-300 hover:-translate-y-1 hover:border-white/15 hover:bg-[#16161a] hover:shadow-xl hover:shadow-black/40"
+            >
               <div className="flex items-center gap-2">
                 <BadgeCheck className="h-4 w-4 text-brand-200" />
                 <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">0{index + 1}</span>

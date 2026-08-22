@@ -68,16 +68,28 @@ const sections: NavSection[] = [
   },
 ];
 
-// Drawer width (w-60 = 15rem) and the leftward drag distance that dismisses
-// the drawer on release.
+// Drawer width (w-60 = 15rem), the leftward drag distance that dismisses the
+// drawer on release, and the minimum leftward fling velocity (px/ms) that
+// dismisses it regardless of distance.
 const DRAWER_WIDTH = 240;
 const CLOSE_THRESHOLD = 80;
+const FLING_VELOCITY = 0.5;
 
-export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: () => void }) {
+export function Sidebar({
+  open = false,
+  openDragX = null,
+  onClose,
+}: {
+  open?: boolean;
+  /** Rightward edge-drag offset while opening; null = not dragging. */
+  openDragX?: number | null;
+  onClose?: () => void;
+}) {
   const { user } = useAuth();
   const { t } = useI18n();
   const { enabled, isLoading } = useFeatures();
   const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const lastMove = useRef<{ x: number; t: number } | null>(null);
   const dragging = useRef(false);
   // Live horizontal drag offset in px (negative = pulled left); `null` means
   // not dragging and the position follows the `open` prop.
@@ -90,6 +102,7 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
     // must never shift.
     if (!open) return;
     touchStart.current = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+    lastMove.current = null;
     dragging.current = false;
   }
 
@@ -109,21 +122,32 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
     }
 
     // Follow the finger, clamped between closed and open.
+    lastMove.current = { x: event.touches[0].clientX, t: performance.now() };
     setDragX(Math.max(-DRAWER_WIDTH, Math.min(0, dx)));
   }
 
   function onTouchEnd(event: TouchEvent<HTMLElement>) {
     const start = touchStart.current;
+    const last = lastMove.current;
     touchStart.current = null;
+    lastMove.current = null;
     dragging.current = false;
     setDragX(null);
 
     if (!start) return;
-    const dx = event.changedTouches[0].clientX - start.x;
+    const endX = event.changedTouches[0].clientX;
+    const dx = endX - start.x;
     const dy = event.changedTouches[0].clientY - start.y;
-    // Close on a leftward, predominantly-horizontal swipe past the threshold;
-    // otherwise the drawer snaps back open.
-    if (dx < -CLOSE_THRESHOLD && Math.abs(dx) > Math.abs(dy)) {
+
+    // Predominantly-horizontal gestures only: a vertical scroll never closes.
+    if (Math.abs(dx) <= Math.abs(dy)) return;
+
+    // Leftward fling velocity (px/ms) from the last two move samples; a quick
+    // flick closes even if it travelled less than CLOSE_THRESHOLD.
+    const endT = performance.now();
+    const velocity = last && endT > last.t ? (endX - last.x) / (endT - last.t) : 0;
+
+    if (dx < -CLOSE_THRESHOLD || velocity < -FLING_VELOCITY) {
       onClose?.();
     }
   }
@@ -135,13 +159,16 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
       onTouchEnd={onTouchEnd}
       onTouchCancel={() => {
         touchStart.current = null;
+        lastMove.current = null;
         dragging.current = false;
         setDragX(null);
       }}
       style={
-        dragX !== null
-          ? { transform: `translateX(${dragX}px)`, transition: 'none' }
-          : undefined
+        openDragX !== null
+          ? { transform: `translateX(${openDragX}px)`, transition: 'none' }
+          : dragX !== null
+            ? { transform: `translateX(${dragX}px)`, transition: 'none' }
+            : undefined
       }
       className={cn(
         'fixed inset-y-0 left-0 z-50 flex w-60 shrink-0 flex-col border-r border-edge bg-panel transition-transform duration-200 ease-in-out touch-pan-y',

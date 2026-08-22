@@ -4,6 +4,7 @@ import { ArrowRight, CalendarDays, Clock } from 'lucide-react';
 import { useI18n, type TranslateFn } from '../../lib/i18n';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Reveal } from '../../components/Reveal';
 import { track } from '../../lib/analytics';
 import { cn } from '../../lib/utils';
 import {
@@ -45,17 +46,24 @@ export function BlogPage() {
       <section className="relative overflow-hidden border-b border-white/5">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.06),transparent_60%)]" />
         <div className="relative mx-auto max-w-7xl px-4 py-16 text-center sm:px-6 sm:py-20 lg:px-8">
-          <Badge tone="brand" className="mb-6">
-            OMNEX · {t('marketing.blog.badge')}
-          </Badge>
-          <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight text-white sm:text-5xl">
-            {t('marketing.blog.title')}
-          </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-zinc-400">
-            {t('marketing.blog.subtitle')}
-          </p>
+          <Reveal>
+            <Badge tone="brand" className="mb-6">
+              OMNEX · {t('marketing.blog.badge')}
+            </Badge>
+          </Reveal>
+          <Reveal delay={80}>
+            <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight text-white sm:text-5xl">
+              {t('marketing.blog.title')}
+            </h1>
+          </Reveal>
+          <Reveal delay={160}>
+            <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-zinc-400">
+              {t('marketing.blog.subtitle')}
+            </p>
+          </Reveal>
 
           {/* Category filter */}
+          <Reveal delay={240}>
           <div
             className="mt-9 inline-flex flex-wrap items-center justify-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1"
             role="group"
@@ -81,6 +89,7 @@ export function BlogPage() {
               );
             })}
           </div>
+          </Reveal>
         </div>
       </section>
 
@@ -95,7 +104,7 @@ export function BlogPage() {
         {posts.length > 0 && (
           <div className="space-y-8">
             {category === 'all' && (
-              <article className="group overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#16161a] to-[#101014]">
+              <article className="group overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#16161a] to-[#101014] transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:shadow-xl hover:shadow-black/40">
                 <Link to={`/blog/${posts[0].slug}`} className="grid md:grid-cols-2">
                   <div className="flex flex-col justify-center p-8 sm:p-10">
                     <PostMeta post={posts[0]} locale={locale} t={t} />
@@ -204,7 +213,7 @@ function PostCard({
   return (
     <Link
       to={`/blog/${post.slug}`}
-      className="group flex flex-col rounded-2xl border border-white/5 bg-[#121214] p-6 transition-colors hover:border-white/15 hover:bg-[#16161a]"
+      className="group flex flex-col rounded-2xl border border-white/5 bg-[#121214] p-6 transition-all duration-300 hover:-translate-y-1 hover:border-white/15 hover:bg-[#16161a] hover:shadow-xl hover:shadow-black/40"
     >
       <PostMeta post={post} locale={locale} t={t} />
       <h3 className="mt-3 text-lg font-semibold leading-snug text-white group-hover:text-brand-200">
