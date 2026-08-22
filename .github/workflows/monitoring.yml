@@ -89,7 +89,7 @@ jobs:
           fi
 
           body="$(
-            printf '%s\n\n%s\n%s\n%s\n\n%s'               "The canonical production health endpoint failed at $(date -u +'%Y-%m-%dT%H:%M:%SZ')."               "- HTTP status: `$PROBE_CODE`"               "- curl exit: `$CURL_EXIT`"               "- attempts: `$ATTEMPTS`"               "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            printf '%s\n\n%s\n%s\n%s\n\n%s'               "The canonical production health endpoint failed at $(date -u +'%Y-%m-%dT%H:%M:%SZ')."               "- HTTP status: $PROBE_CODE"               "- curl exit: $CURL_EXIT"               "- attempts: $ATTEMPTS"               "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           )"
 
           gh issue create             --repo "$GITHUB_REPOSITORY"             --title "🚨 Incident — production health check failed"             --body "$body"             --label incident
