@@ -35,7 +35,7 @@
 - **Phase 8 — Cloud: IMPLEMENTED** (VPS via `ServerProviderInterface` — sandbox/Hetzner/DO/custom —, clés SSH + coffre, métriques SSE + historique, alertes de seuil, snapshots planifiés avec rétention, validation de tokens).
 - **Cross-cutting — Providers/Perks/Multi-tenant: IMPLEMENTED** (dynamic per-organization provider switching via `ResolvesTenantProvider` across storage/sites/cloud/domains/DNS/SSL, SSL issuance abstraction behind `SslProviderInterface` with sandbox + Cloudflare, plan-tier feature flags/perks enforced by `feature:` middleware + `useFeatures`, and atomic `OrganizationService` provisioning). See `docs/architecture-providers.md`.
 - **Phase 9 — Marketing & Commercial Website: IMPLEMENTED** (homepage + pages services SEO avec meta uniques, tarifs + tableau comparatif, contact/leads anti-spam, SEO technique JSON-LD/hreflang/sitemap, blog/content hub, moteur de landing pages, harnais A/B, analytics + consentement cookies).
-- **Phase 10 — Deploy (CI/CD): IMPLEMENTED** (endpoint public `/api/v1/health`, CI étendu — Pest sur PostgreSQL, typecheck + vitest + build de prod, migrations, audits de sécurité `composer audit` + `pnpm audit` —, Dockerfiles backend/frontend, workflow `deploy.yml` build → staging → health check → prod avec **rollback automatique**, monitoring cron du health endpoint avec alertes issue).
+- **Phase 10 — Deploy (CI/CD): IMPLEMENTED** (endpoint public `/api/v1/health`, CI étendu — Pest sur PostgreSQL, typecheck + vitest + build de prod, migrations, audits de sécurité `composer audit` + `pnpm audit` —, déploiement bare-metal via `deploy-production.yml` (SSH → commande forcée `omnex-deploy` → vérification `https://omnex.cloud/`), monitoring cron du health endpoint avec alertes issue).
 - **Phase 11+ — Mail, AI, Automate, Marketplace, Scale, Launch: PLANNED.**
 
 ---
@@ -521,8 +521,12 @@ design system and brand.
 
 ## Phase 10 — OMNEX Deploy (CI/CD)
 
-GitHub first (then GitLab/Bitbucket): build → test → security scan → staging →
-health check → production → monitoring; automatic rollback on failure.
+GitHub Actions : build → test → security scan dans `ci.yml`, puis déploiement
+bare-metal vers la production via `deploy-production.yml` (SSH en tant que
+`deploy` → commande forcée `omnex-deploy` → vérification `https://omnex.cloud/`)
+et surveillance de la santé toutes les 15 minutes avec issues d'incident
+(`monitoring.yml`). L'automatisation staging → rollback reste un objectif pour
+lorsqu'une topologie conteneurisée ou multi-hôte sera réellement introduite.
 
 ---
 

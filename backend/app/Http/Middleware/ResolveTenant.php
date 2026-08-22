@@ -53,13 +53,17 @@ class ResolveTenant
             return;
         }
 
-        DB::statement('SELECT set_config(?, ?, true)', ['nexus.tenant_id', $organizationId]);
-        DB::statement('SELECT set_config(?, ?, true)', ['nexus.user_id', $userId]);
+        // Session-scoped (is_local=false): with autocommit (no ambient
+        // transaction) an is_local=true set_config is discarded as soon as the
+        // statement commits, so the tenant GUC would never reach the queries
+        // it is meant to filter. Cleared explicitly by clearRlsContext().
+        DB::statement('SELECT set_config(?, ?, false)', ['nexus.tenant_id', $organizationId]);
+        DB::statement('SELECT set_config(?, ?, false)', ['nexus.user_id', $userId]);
     }
 
     private function clearRlsContext(): void
     {
-        DB::statement("SELECT set_config('omnex.tenant_id', '', true)");
-        DB::statement("SELECT set_config('omnex.user_id', '', true)");
+        DB::statement("SELECT set_config('nexus.tenant_id', '', false)");
+        DB::statement("SELECT set_config('nexus.user_id', '', false)");
     }
 }

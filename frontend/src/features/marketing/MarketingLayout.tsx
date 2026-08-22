@@ -10,7 +10,7 @@ import { ConsentBanner } from './ConsentBanner';
 import { AbDebugPanel } from './AbDebugPanel';
 
 export function MarketingLayout({ children }: { children: ReactNode }) {
-  const { locale, t } = useI18n();
+  const { t } = useI18n();
   usePageviewTracking();
 
   const navLinks = [
@@ -54,26 +54,6 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="flex items-center gap-3">
-            <div
-              className="flex items-center overflow-hidden rounded-md border border-white/10 bg-white/5 text-xs font-medium"
-              role="group"
-              aria-label="Language"
-            >
-              {(['en', 'fr'] as const).map((code) => (
-                <button
-                  key={code}
-                  type="button"
-                  onClick={() => setPublicLocale(code)}
-                  aria-pressed={locale === code}
-                  className={cn(
-                    'h-7 px-2.5 uppercase transition-colors',
-                    locale === code ? 'bg-white text-black' : 'text-zinc-400 hover:text-white',
-                  )}
-                >
-                  {code}
-                </button>
-              ))}
-            </div>
             <Link to="/login">
               <Button variant="ghost" size="sm">
                 {t('marketing.signIn')}
@@ -147,7 +127,8 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
             <p>
               © {new Date().getFullYear()} {brand.name}. {t('marketing.footer.rights')}
             </p>
-            <div className="flex items-center gap-6">
+            <div className="flex flex-wrap items-center justify-center gap-6">
+              <LanguageToggle />
               <Link to="/login" className="transition-colors hover:text-white">
                 {t('marketing.footer.legal')}
               </Link>
@@ -176,6 +157,33 @@ function FooterColumn({ title, links }: { title: string; links: { to: string; la
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function LanguageToggle() {
+  const { locale } = useI18n();
+
+  return (
+    <div
+      className="flex items-center overflow-hidden rounded-md border border-white/10 bg-white/5 text-xs font-medium"
+      role="group"
+      aria-label="Language"
+    >
+      {(['en', 'fr'] as const).map((code) => (
+        <button
+          key={code}
+          type="button"
+          onClick={() => setPublicLocale(code)}
+          aria-pressed={locale === code}
+          className={cn(
+            'h-7 px-2.5 uppercase transition-colors',
+            locale === code ? 'bg-white text-black' : 'text-zinc-400 hover:text-white',
+          )}
+        >
+          {code}
+        </button>
+      ))}
     </div>
   );
 }

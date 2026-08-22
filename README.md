@@ -228,12 +228,11 @@ transmitted again** server-side. Keys show a **usage counter** ("used by N
 - **CI hardened** (`.github/workflows/ci.yml`): DCO, Pest against PostgreSQL
   16 (with real migrations), typecheck + vitest + **production build**, and a
   dedicated **security job** (`composer audit` + `pnpm audit`).
-- **Production images** — `backend/Dockerfile` (PHP 8.3 FPM, optimized,
-  non-root) and `frontend/Dockerfile` (pnpm build → nginx SPA with history
-  fallback + caching).
-- **Deploy pipeline** (`.github/workflows/deploy.yml`): build & push images →
-  deploy **staging** → health check → promote **production** → health check →
-  **automatic rollback** to the previous release on any failure.
+- **Deploy pipeline** (`.github/workflows/deploy-production.yml`): on merge to
+  `main`, connects over SSH as the `deploy` user — whose login is the
+  server-side `omnex-deploy` forced command (backup, pull, install, build,
+  migrate, cache, reload PHP-FPM, restart workers) — then verifies
+  `https://omnex.cloud/` responds.
 - **Monitoring** (`.github/workflows/monitoring.yml`): probes production
   every 15 min, opens an `incident` issue on failure and closes it on
   recovery.
@@ -374,7 +373,7 @@ cross-tenant attack test checklist.
 | Frontend build (`pnpm build`) | ✅ green |
 | Backend (`php artisan test`) | ✅ 385 passed + 1 skipped (1543 assertions) |
 | CI (GitHub Actions — Pest + typecheck + vitest + audits) | ✅ configured (`.github/workflows/ci.yml`) |
-| Deploy pipeline (staging → prod → rollback) | ✅ configured (`.github/workflows/deploy.yml`) |
+| Deploy pipeline (bare-metal → `omnex-deploy` → verify) | ✅ configured (`.github/workflows/deploy-production.yml`) |
 | Monitoring (health cron + incident issues) | ✅ configured (`.github/workflows/monitoring.yml`) |
 | Dependabot (Composer + pnpm, grouped) | ✅ configured (`.github/dependabot.yml`) |
 
