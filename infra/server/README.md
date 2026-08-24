@@ -20,9 +20,11 @@
 infra/server/
 ├── README.md               ← ce fichier
 ├── scripts/
-│   ├── omnex-deploy.sh           # déploiement bare-metal (push → omnex-deploy)
-│   ├── omnex-healthcheck.sh      # sondes de santé (5 min)
-│   └── omnex-postgres-backup.sh  # backup PG quotidien (03:30)
+│   ├── omnex-deploy.sh               # déploiement bare-metal (push → omnex-deploy)
+│   ├── omnex-fix-perms.sh            # correctif d'urgence permissions frontend/dist
+│   ├── omnex-create-admin-deploy.sh  # création compte SSH admin-deploy (CI fixes)
+│   ├── omnex-healthcheck.sh          # sondes de santé (5 min)
+│   └── omnex-postgres-backup.sh      # backup PG quotidien (03:30)
 ├── systemd/
 │   ├── omnex-queue@.service      # workers Laravel (@1, @2)
 │   ├── omnex-scheduler.service   # php artisan schedule:run
@@ -67,6 +69,37 @@ Pour chaque fichier ci-dessous, avant de le considérer « versionné » :
 omnex-*       vs   acelife-*          (containers, volumes, systemd)
 /var/log/{nginx,omnex,acelife}/…
 /var/backups/{omnex,acelife}/…
+```
+
+## Comptes SSH (accès CI depuis GitHub Actions)
+
+Deux comptes distincts :
+
+- **`deploy`** — forcé sur `/usr/local/sbin/omnex-deploy` (`command="sudo ..."`
+  dans `authorized_keys`). C'est le déclencheur normal du déploiement.
+  Aucune commande arbitraire n'est possible.
+- **`admin-deploy`** — créé par `scripts/omnex-create-admin-deploy.sh`, **sans
+  forced command**, mais avec un `sudoers` restreint (chown/chmod sur
+  `frontend/dist`, reload nginx/php-fpm, healthcheck). Utilisé pour les
+  correctifs post-déploiement (ex. permissions).
+
+### Mise en place d'`admin-deploy` (une seule fois)
+
+```bash
+# 1. Générer une paire de clés dédiée (sur ta machine)
+ssh-keygen -t ed25519 -f ~/.ssh/omnex-admin -N '' -C 'gh-actions-admin'
+
+# 2. Ajouter la clé PRIVÉE dans GitHub Secrets → OMNEX_ADMIN_KEY
+#    (cat ~/.ssh/omnex-admin)
+
+# 3. Sur le VPS, copier le script puis l'exécuter en injectant la clé publique
+cd /opt/omnex && git pull
+OMNEX_ADMIN_PUBKEY="$(cat ~/.ssh/omnex-admin.pub)" \
+  sudo bash infra/server/scripts/omnex-create-admin-deploy.sh
+
+# 4. Tester
+ssh -i ~/.ssh/omnex-admin admin-deploy@omnex.cloud \
+  'sudo systemctl reload nginx && echo OK'
 ```
 
 ## Références

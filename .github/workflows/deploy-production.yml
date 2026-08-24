@@ -27,12 +27,18 @@ jobs:
       - name: Configure SSH
         env:
           DEPLOY_KEY: ${{ secrets.OMNEX_DEPLOY_KEY }}
+          ADMIN_DEPLOY_KEY: ${{ secrets.OMNEX_ADMIN_KEY }}
           KNOWN_HOSTS: ${{ secrets.OMNEX_KNOWN_HOSTS }}
         run: |
           install -d -m 700 ~/.ssh
 
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/omnex-deploy
           chmod 600 ~/.ssh/omnex-deploy
+
+          if [[ -n "$ADMIN_DEPLOY_KEY" ]]; then
+            printf '%s\n' "$ADMIN_DEPLOY_KEY" > ~/.ssh/omnex-admin
+            chmod 600 ~/.ssh/omnex-admin
+          fi
 
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
@@ -48,14 +54,29 @@ jobs:
 
       - name: Fix frontend ownership + route cache
         if: always()
+        env:
+          ADMIN_DEPLOY_KEY: ${{ secrets.OMNEX_ADMIN_KEY }}
         run: |
-          ssh \
-            -i ~/.ssh/omnex-deploy \
-            -o BatchMode=yes \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            deploy@${{ secrets.OMNEX_HOST }} \
-            'sudo chown -R admin:www-data /opt/omnex/frontend/dist && sudo find /opt/omnex/frontend/dist -type d -exec chmod 755 {} \; && sudo find /opt/omnex/frontend/dist -type f -exec chmod 644 {} \; && cd /opt/omnex/backend && php artisan route:cache 2>/dev/null || true && sudo systemctl reload nginx php8.2-fpm && echo "Fix applied"'
+          # Compte admin-deploy (sans forced command) : permis pour chown/chmod
+          # sur frontend/dist + reload nginx/php-fpm. Sinon, le compte deploy
+          # (forced command) exécute le script omnex-fix-perms.sh embarqué.
+          if [[ -n "$ADMIN_DEPLOY_KEY" ]]; then
+            ssh \
+              -i ~/.ssh/omnex-admin \
+              -o BatchMode=yes \
+              -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=yes \
+              admin-deploy@${{ secrets.OMNEX_HOST }} \
+              'sudo chown -R admin:www-data /opt/omnex/frontend/dist && sudo find /opt/omnex/frontend/dist -type d -exec chmod 755 {} \; && sudo find /opt/omnex/frontend/dist -type f -exec chmod 644 {} \; && sudo systemctl reload nginx php8.2-fpm && echo "Fix applied (admin-deploy)"'
+          else
+            ssh \
+              -i ~/.ssh/omnex-deploy \
+              -o BatchMode=yes \
+              -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=yes \
+              deploy@${{ secrets.OMNEX_HOST }} \
+              'bash /opt/omnex/infra/server/scripts/omnex-fix-perms.sh && echo "Fix applied (deploy)"'
+          fi
 
       - name: Verify production
         run: |
