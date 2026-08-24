@@ -47,6 +47,7 @@ jobs:
             deploy@${{ secrets.OMNEX_HOST }}
 
       - name: Fix frontend ownership + route cache
+        if: always()
         run: |
           ssh \
             -i ~/.ssh/omnex-deploy \
