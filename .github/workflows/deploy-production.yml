@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - 'docs/**'
+      - 'infra/**'
+      - '*.md'
 
   workflow_dispatch:
 
@@ -41,6 +45,16 @@ jobs:
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             deploy@${{ secrets.OMNEX_HOST }}
+
+      - name: Fix frontend ownership + route cache
+        run: |
+          ssh \
+            -i ~/.ssh/omnex-deploy \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            admin@${{ secrets.OMNEX_HOST }} \
+            'sudo chown -R admin:www-data /opt/omnex/frontend/dist && sudo find /opt/omnex/frontend/dist -type d -exec chmod 755 {} \; && sudo find /opt/omnex/frontend/dist -type f -exec chmod 644 {} \; && cd /opt/omnex/backend && php artisan route:cache 2>/dev/null || true && sudo systemctl reload nginx php8.2-fpm && echo "Fix applied"'
 
       - name: Verify production
         run: |
