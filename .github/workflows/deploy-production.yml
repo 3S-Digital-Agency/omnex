@@ -54,7 +54,7 @@ jobs:
             -o BatchMode=yes \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
-            admin@${{ secrets.OMNEX_HOST }} \
+            deploy@${{ secrets.OMNEX_HOST }} \
             'sudo chown -R admin:www-data /opt/omnex/frontend/dist && sudo find /opt/omnex/frontend/dist -type d -exec chmod 755 {} \; && sudo find /opt/omnex/frontend/dist -type f -exec chmod 644 {} \; && cd /opt/omnex/backend && php artisan route:cache 2>/dev/null || true && sudo systemctl reload nginx php8.2-fpm && echo "Fix applied"'
 
       - name: Verify production
