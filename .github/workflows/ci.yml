@@ -22,7 +22,11 @@ jobs:
       - name: Check Signed-off-by on commits
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            COMMITS=$(git log --format='%H' origin/main..HEAD)
+            # Actions checks out a synthetic merge commit for pull requests.
+            # Validate only the real commits supplied by the contributor.
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+            COMMITS=$(git rev-list "$BASE_SHA..$HEAD_SHA")
           else
             COMMITS=$(git log --format='%H' -1)
           fi
