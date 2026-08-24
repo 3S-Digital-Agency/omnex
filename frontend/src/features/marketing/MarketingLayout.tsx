@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, LayoutDashboard } from 'lucide-react';
+import { ArrowRight, LayoutDashboard, Menu } from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
 import { brand } from '../../lib/brand';
 import { setPublicLocale, useI18n } from '../../lib/i18n';
@@ -14,7 +14,19 @@ import { AbDebugPanel } from './AbDebugPanel';
 export function MarketingLayout({ children }: { children: ReactNode }) {
   const { t } = useI18n();
   const { status } = useAuth();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   usePageviewTracking();
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const navLinks = [
     { to: '#services', label: t('marketing.nav.services') },
@@ -58,6 +70,16 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/5 text-zinc-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 md:hidden"
+              aria-label={t(isMobileMenuOpen ? 'nav.closeMenu' : 'nav.openMenu')}
+              aria-controls="mobile-marketing-navigation"
+              aria-expanded={isMobileMenuOpen}
+              onClick={() => setIsMobileMenuOpen((isOpen) => !isOpen)}
+            >
+              <Menu className="h-5 w-5" aria-hidden="true" />
+            </button>
             {status === 'authenticated' ? (
               <Link to="/overview">
                 <Button size="sm">
@@ -74,6 +96,34 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
               </Link>
             )}
           </div>
+        </div>
+
+        <div
+          className={cn(
+            'overflow-hidden border-t border-white/5 bg-[#0a0a0c]/95 opacity-0 backdrop-blur transition-[max-height,opacity,transform] duration-200 ease-out motion-reduce:transition-none md:hidden',
+            isMobileMenuOpen
+              ? 'max-h-96 translate-y-0 opacity-100'
+              : 'pointer-events-none max-h-0 -translate-y-2',
+          )}
+        >
+          <nav
+            id="mobile-marketing-navigation"
+            aria-label={brand.name}
+            aria-hidden={!isMobileMenuOpen}
+            className="mx-auto flex max-w-7xl flex-col px-4 py-3 sm:px-6"
+          >
+            {navLinks.map((link) => (
+              <a
+                key={link.to}
+                href={link.to}
+                tabIndex={isMobileMenuOpen ? 0 : -1}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="rounded-md px-3 py-2.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+              >
+                {link.label}
+              </a>
+            ))}
+          </nav>
         </div>
       </header>
 
