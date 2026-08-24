@@ -48,6 +48,11 @@ cd "$FRONTEND_DIR"
 pnpm install --frozen-lockfile
 pnpm build
 
+# 4b. Permissions frontend/dist — nginx (www-data) doit pouvoir lire
+chown -R admin:www-data "$FRONTEND_DIR/dist"
+find "$FRONTEND_DIR/dist" -type d -exec chmod 755 {} \;
+find "$FRONTEND_DIR/dist" -type f -exec chmod 644 {} \;
+
 # 5. Migrations — rôle OWNER uniquement (omnex_app n'a pas de droit DDL).
 #    DB_APP_PASSWORD est lu par env() dans la migration 000047 : l'exporter.
 cd "$BACKEND_DIR"
@@ -63,7 +68,7 @@ php artisan route:cache
 php artisan view:cache
 
 # 7. Reload / restart.
-sudo systemctl reload "$PHP_FPM_SERVICE"
+sudo systemctl reload "$PHP_FPM_SERVICE" nginx
 sudo systemctl restart 'omnex-queue@*.service'
 
 # 8. Vérification finale.
